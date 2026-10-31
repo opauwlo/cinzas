@@ -85,10 +85,10 @@ export function Hud() {
       <div className="toasts">{s.toasts.map(t => <div key={t.id} className="toast" style={{ color: t.cor }}>{t.texto}</div>)}</div>
       {s.acao && <div className="acao"><div className="r">{s.acao.rotulo}</div><div className="seg" style={{ ['--p' as string]: pct(s.acao.p * 100) }}><i /></div></div>}
       {s.dica && <div className="dica">{s.dica}</div>}
-      <div className="dir-bot">
+      <div className={`dir-bot ${s.cfg.canhoto ? 'esq' : ''}`}>
         <div className={`inter ${s.alvo ? 'on' : ''}`}><div className="rot vidro degrau">{s.alvo ?? ' '}</div><button className="btn aviso" aria-label="Interagir" {...press(() => ponte.cmd?.interagir())}><Ico src={icoAcao(s.alvo)} n={38} cor="#1c0e04" /></button></div>
       </div>
-      <div className={`hotbar vidro degrau ${hotRecente || slots.some(x => x.urg) ? '' : 'dim'}`}>{slots.map(sl => <button key={sl.k} className={`slot ${sl.n === 0 ? 'vazio' : ''} ${sl.on ? 'on' : ''} ${sl.urg ? 'urgente' : ''}`} aria-label={sl.k} {...press(sl.fn)}><Ico src={sl.ico} n={28} cor={sl.cor} />{sl.n >= 0 && <span className="q">{sl.n}</span>}<span className="k">{sl.t}</span></button>)}</div>
+      <div className={`hotbar vidro degrau ${s.cfg.canhoto ? 'canh' : ''} ${hotRecente || slots.some(x => x.urg) ? '' : 'dim'}`}>{slots.map(sl => <button key={sl.k} className={`slot ${sl.n === 0 ? 'vazio' : ''} ${sl.on ? 'on' : ''} ${sl.urg ? 'urgente' : ''}`} aria-label={sl.k} {...press(sl.fn)}><Ico src={sl.ico} n={28} cor={sl.cor} />{sl.n >= 0 && <span className="q">{sl.n}</span>}<span className="k">{sl.t}</span></button>)}</div>
       {s.cfg.fps && <div className="fpsc">{s.fps} fps</div>}
     </div>
   );

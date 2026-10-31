@@ -77,11 +77,29 @@ img { -webkit-user-drag: none; }
 .acao { position: absolute; left: 50%; bottom: calc(66px * var(--u) + var(--sb)); transform: translateX(-50%); width: min(60%, 260px); pointer-events: none !important; z-index: 6; }
 .acao .r { text-align: center; font: 700 calc(11px * var(--u)) var(--f-ui); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; text-shadow: 0 2px 0 #000; } .acao .seg { height: 11px; --c: var(--ambar); }
 .dica { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(120px * var(--u) + var(--sb)); max-width: 66vw; padding: 5px 10px 6px; font: calc(17px * var(--u)) var(--f-hud); line-height: 1.1; text-align: center; color: var(--osso); pointer-events: none !important; z-index: 6; box-shadow: inset 0 0 0 2px #050506, inset 0 0 0 4px var(--fosf); background: rgba(11,10,12,.9); animation: sobe .25s steps(3); }
-/* controles */
-.zona { position: absolute; top: 0; bottom: 0; z-index: 1; touch-action: none; } .zona.esq { left: 0; width: 50%; } .zona.dir { right: 0; width: 50%; }
-.joy { position: fixed; z-index: 4; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%; border: 3px solid rgba(207,199,174,.4); box-shadow: inset 0 0 0 3px rgba(5,5,6,.5), 0 0 0 2px rgba(5,5,6,.6); pointer-events: none; display: none; }
-.joy i { position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; background: rgba(207,199,174,.55); box-shadow: inset 0 0 0 3px rgba(5,5,6,.6); }
-.joy.dir { border-color: rgba(224,85,63,.5); } .joy.dir i { background: rgba(224,85,63,.6); }
+/* controles FIXOS: manche (polegar esquerdo) e ataque (polegar direito); os tamanhos encolhem em telas estreitas */
+.jogo { --base: min(calc(124px * var(--u)), 30vw); --atk: min(calc(96px * var(--u)), 24vw); --slot: min(calc(44px * var(--u)), 10.4vw); }
+.zona-mundo { position: absolute; inset: 0; z-index: 1; touch-action: none; }
+.stick, .atk { position: absolute; z-index: 6; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.stick { bottom: calc(10px + var(--sb)); width: calc(var(--base) + 26px); height: calc(var(--base) + 26px); display: grid; place-items: center; }
+.stick.esq { left: calc(4px + var(--sl)); } .stick.dir { right: calc(4px + var(--sr)); }
+.stick-base { position: relative; width: var(--base); height: var(--base); border-radius: 50%; background: rgba(8,8,10,.34); border: 3px solid rgba(207,199,174,.42); box-shadow: inset 0 0 0 3px rgba(5,5,6,.5), 0 0 0 2px rgba(5,5,6,.6); pointer-events: none; transition: background .12s, border-color .12s; }
+.stick-base::before { content: ''; position: absolute; inset: 37%; border-radius: 50%; border: 2px dashed rgba(143,227,106,.4); } /* dentro = furtivo */
+.stick-base::after { content: ''; position: absolute; inset: 10%; border-radius: 50%; border: 2px solid rgba(240,154,80,.34); } /* a partir daqui = correr */
+.stick-knob { position: absolute; left: 50%; top: 50%; width: calc(var(--base) * .42); height: calc(var(--base) * .42); margin: calc(var(--base) * -.21) 0 0 calc(var(--base) * -.21); border-radius: 50%; background: rgba(207,199,174,.6); box-shadow: inset 0 0 0 3px rgba(5,5,6,.6); }
+.stick[data-on='1'] .stick-base { background: rgba(8,8,10,.52); border-color: rgba(207,199,174,.78); }
+.stick[data-m='furtivo'] .stick-knob { background: rgba(143,227,106,.78); } .stick[data-m='correr'] .stick-knob { background: rgba(240,154,80,.92); box-shadow: inset 0 0 0 3px rgba(5,5,6,.6), 0 0 10px rgba(240,154,80,.6); }
+.atk { bottom: calc(22px + var(--sb)); width: var(--atk); height: var(--atk); border-radius: 50%; display: grid; place-items: center; background: rgba(122,30,20,.6); border: 3px solid rgba(224,85,63,.85); box-shadow: inset 0 0 0 3px rgba(5,5,6,.55), 0 0 0 2px rgba(5,5,6,.65); transition: transform .08s, background .12s; }
+.atk.dir { right: calc(14px + var(--sr)); } .atk.esq { left: calc(14px + var(--sl)); }
+.atk[data-on='1'] { transform: scale(.94); background: rgba(176,58,44,.86); }
+.atk .anel { position: absolute; left: -7px; top: -7px; width: calc(100% + 14px); height: calc(100% + 14px); transform: rotate(-90deg); pointer-events: none; }
+.atk .anel circle { fill: none; stroke: var(--aviso2); stroke-width: 5; stroke-dasharray: 289; stroke-dashoffset: 289; opacity: 0; }
+.atk[data-on='1'] .anel circle { opacity: 1; animation: anelcarga .26s linear forwards; } @keyframes anelcarga { to { stroke-dashoffset: 0; } }
+.atk .q { position: absolute; right: 6px; bottom: 4px; font: calc(20px * var(--u)) var(--f-hud); color: var(--osso); text-shadow: 1px 1px 0 #000; line-height: 1; }
+.atk .auto { position: absolute; left: 50%; top: -12px; transform: translateX(-50%); padding: 1px 6px 2px; font: 700 calc(11px * var(--u)) var(--f-ui); letter-spacing: .12em; color: #1c0e04; background: var(--aviso2); box-shadow: 0 0 0 2px #050506; opacity: 0; pointer-events: none; }
+.atk[data-auto='1'] { border-color: var(--aviso2); background: rgba(176,58,44,.92); box-shadow: inset 0 0 0 3px rgba(5,5,6,.55), 0 0 0 2px rgba(5,5,6,.65), 0 0 16px 3px rgba(240,154,80,.65); animation: pulso .55s ease-in-out infinite; }
+.atk[data-auto='1'] .auto { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .atk[data-auto='1'], .atk[data-on='1'] .anel circle { animation: none; } }
 
 /* ---------- painéis e telas ---------- */
 .ov { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: calc(10px + var(--st)) calc(10px + var(--sr)) calc(10px + var(--sb)) calc(10px + var(--sl)); background: rgba(6,6,8,.8); touch-action: pan-y; }
@@ -138,10 +156,6 @@ img { -webkit-user-drag: none; }
 .carga-d { max-width: min(86vw, 360px); margin: 6px auto 0; font: 17px/1.25 var(--f-hud); color: var(--osso2); }
 
 /* ---- controles dinâmicos e HUD que se acalma ---- */
-.joy.mover { width: 108px; height: 108px; margin: -54px 0 0 -54px; }
-.joy.mover::before { content: ''; position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; border: 2px dashed rgba(143,227,106,.4); } /* zona furtiva */
-.joy.mover::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; border: 2px solid rgba(240,154,80,.38); } /* acima desta borda = correr */
-.joy[data-m='furtivo'] i { background: rgba(143,227,106,.72); } .joy[data-m='correr'] i { background: rgba(240,154,80,.9); box-shadow: inset 0 0 0 3px rgba(5,5,6,.6), 0 0 10px rgba(240,154,80,.6); }
 .vrow { transition: opacity .5s; } .vrow.calma { opacity: .5; }
 .obj { pointer-events: auto !important; } .obj.min { opacity: .6; } .obj.min .seg, .obj.min b.ct { display: none; } .obj { transition: opacity .4s; }
 .inter { opacity: 0; transform: translateY(10px) scale(.88); pointer-events: none; transition: opacity .16s, transform .16s; } .inter.on { opacity: 1; transform: none; pointer-events: auto; }
@@ -221,3 +235,12 @@ body { font-family: var(--f-txt); font-size: 16px; line-height: 1.35; }
 
 /* ---- conversa com NPCs ---- */
 .fala p { margin: 0; font: 400 17px/1.45 var(--f-txt); color: var(--osso); } .fala .msg { margin-top: var(--sp3); padding-top: var(--sp2); border-top: 1px solid #0d0e10; font: 600 15px var(--f-txt); color: var(--ambar); }
+
+/* ---- layout final dos controles fixos: atalhos em grade 3x2 no centro, "agir" acima do ataque ---- */
+.hotbar { bottom: calc(14px + var(--sb)); display: grid; grid-template-columns: repeat(3, auto); gap: calc(5px * var(--u)); padding: 5px; left: calc((3px + var(--sl) - var(--sr) + var(--base) - var(--atk) + 100%) / 2); } /* centro do vão entre o manche (esq.) e o ataque (dir.) */
+.hotbar.canh { left: calc((-3px + var(--sl) - var(--sr) + var(--atk) - var(--base) + 100%) / 2); }
+.slot { width: var(--slot); height: var(--slot); } .slot .q { font-size: calc(18px * var(--u)); }
+@media (pointer: coarse) { .slot .k { display: none; } }
+.dir-bot { right: calc(14px + var(--sr)); bottom: calc(var(--atk) + 34px + var(--sb)); } .dir-bot.esq { right: auto; left: calc(14px + var(--sl)); justify-items: start; }
+.acao { bottom: calc(var(--base) + 40px + var(--sb)); } .dica { bottom: calc(var(--base) + 84px + var(--sb)); }
+.fpsc { right: auto; left: calc(8px + var(--sl)); bottom: calc(var(--base) + 50px + var(--sb)); }

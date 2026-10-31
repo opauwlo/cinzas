@@ -28,7 +28,7 @@ export default function Jogo() {
   };
   useEffect(() => {
     if (!jogando || !corrida || !mundoRef.current) return;
-    let game: Phaser.Game | null = null, vivo = true; const en = ponte.entrada; Object.assign(en, { mx: 0, my: 0, ax: 0, ay: 0, mira: false, atacar: false, correr: false, furtivo: false });
+    let game: Phaser.Game | null = null, vivo = true; const en = ponte.entrada; Object.assign(en, { mx: 0, my: 0, ax: 0, ay: 0, mira: false, atacar: false, auto: false, correr: false, furtivo: false });
     import('../game/cena').then(m => { if (!vivo || !mundoRef.current || !runRef.current) return; game = m.criarJogo(mundoRef.current, runRef.current, useJogo.getState().cfg.escala); window.__cinzas = { game, store: useJogo, ponte, cena: () => game!.scene.getScene('cena') }; });
     let wake: { release: () => Promise<void> } | null = null; try { void (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock?.request('screen').then(w => { wake = w; }).catch(() => undefined); } catch { /* sem wake lock */ }
     const vis = () => { if (document.hidden) { ponte.cmd?.salvar(); if (useJogo.getState().tela === 'jogo' && !useJogo.getState().painel) useJogo.setState({ painel: 'pausa' }); } };

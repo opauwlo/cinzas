@@ -61,20 +61,35 @@ try {
   const p1 = await cena(() => { const j = window.__cinzas.cena().jog; return [j.x, j.y]; });
   ok('o jogador anda', Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) > 0.5, `deslocou ${Math.hypot(p1[0] - p0[0], p1[1] - p0[1]).toFixed(2)} tiles`);
 
-  // 3b. stick dinâmico: a velocidade vem da força do toque (furtivo → andar → correr), sem botões
+  // 3b. manche FIXO: a velocidade vem da força do toque (furtivo → andar → correr), sem botões, e ele não sai do lugar
   const stick = await ev(() => {
-    const z = document.querySelector('.zona.esq'), en = window.__cinzas.ponte.entrada, out = {}; const ptr = (t, x, y) => z.dispatchEvent(new PointerEvent(t, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true }));
-    ptr('pointerdown', 120, 600); ptr('pointermove', 132, 600); out.suave = { f: en.furtivo, c: en.correr };            // 12 px: empurrão leve
-    ptr('pointermove', 160, 600); out.medio = { f: en.furtivo, c: en.correr };                                          // 40 px: andar
-    ptr('pointermove', 175, 600); out.forte = { f: en.furtivo, c: en.correr };                                          // 55 px: borda = correr
-    const j = document.querySelector('.joy.mover'); ptr('pointermove', 260, 600); out.seguiu = parseFloat(j.style.left) > 125;       // o stick acompanha o dedo
-    ptr('pointerup', 260, 600); out.solto = { f: en.furtivo, c: en.correr, mx: en.mx }; return out;
+    const el = document.querySelector('.stick'), base = el.querySelector('.stick-base'), en = window.__cinzas.ponte.entrada, out = {}, r0 = base.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+    const ptr = (t, x, y) => el.dispatchEvent(new PointerEvent(t, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true }));
+    ptr('pointerdown', cx, cy); ptr('pointermove', cx + 12, cy); out.suave = { f: en.furtivo, c: en.correr };            // 12 px: empurrão leve
+    ptr('pointermove', cx + 40, cy); out.medio = { f: en.furtivo, c: en.correr };                                       // 40 px: andar
+    ptr('pointermove', cx + 56, cy); out.forte = { f: en.furtivo, c: en.correr, d: el.dataset.m };                       // borda = correr
+    const r1 = base.getBoundingClientRect(); out.fixo = Math.abs(r1.left - r0.left) < 0.5 && Math.abs(r1.top - r0.top) < 0.5; // o manche não acompanha o dedo
+    ptr('pointermove', cx + 300, cy - 200); out.longe = Math.hypot(en.mx, en.my) <= 1.001;                                   // longe do manche: o vetor continua limitado
+    ptr('pointerup', cx + 300, cy - 200); out.solto = { f: en.furtivo, c: en.correr, mx: en.mx, m: el.dataset.m };
+    out.canto = r0.left < innerWidth / 2 && r0.top > innerHeight / 2; return out;
   });
-  ok('stick: empurrão leve = furtivo', stick.suave.f === true && stick.suave.c === false, JSON.stringify(stick.suave));
-  ok('stick: empurrão médio = andar', stick.medio.f === false && stick.medio.c === false, JSON.stringify(stick.medio));
-  ok('stick: até a borda = correr', stick.forte.c === true, JSON.stringify(stick.forte));
-  ok('stick: o círculo acompanha o dedo e soltar zera tudo', stick.seguiu === true && stick.solto.c === false && stick.solto.f === false && stick.solto.mx === 0, JSON.stringify(stick.solto));
+  ok('manche: empurrão leve = furtivo', stick.suave.f === true && stick.suave.c === false, JSON.stringify(stick.suave));
+  ok('manche: empurrão médio = andar', stick.medio.f === false && stick.medio.c === false, JSON.stringify(stick.medio));
+  ok('manche: até a borda = correr', stick.forte.c === true && stick.forte.d === 'correr', JSON.stringify(stick.forte));
+  ok('manche: fica fixo embaixo, à esquerda, e soltar zera tudo', stick.fixo === true && stick.canto === true && stick.longe === true && stick.solto.c === false && stick.solto.f === false && stick.solto.mx === 0 && stick.solto.m === 'parado', JSON.stringify(stick));
   ok('não existem botões de correr/furtivo na tela', await ev(() => !document.querySelector('[aria-label="Correr"], [aria-label="Furtivo"]')));
+  // 3c. botão de ataque fixo, atalhos e botão de agir sem sobreposição; modo canhoto espelha os lados
+  const lay = await ev(() => {
+    const R = s => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+    const cruza = (a, b) => !!a && !!b && a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1, st = R('.stick-base'), at = R('.atk'), ho = R('.hotbar');
+    const esq = { st, at, ho }, antes = window.__cinzas.store.getState().cfg;
+    window.__cinzas.store.setState({ cfg: { ...antes, canhoto: true } });
+    return new Promise(res => setTimeout(() => { const st2 = R('.stick-base'), at2 = R('.atk'); window.__cinzas.store.setState({ cfg: antes }); res({ atkDir: !!at && at.l > innerWidth / 2 && at.t > innerHeight / 2, semCruzar: !cruza(st, at) && !cruza(st, ho) && !cruza(at, ho), canhoto: !!st2 && !!at2 && st2.l > innerWidth / 2 && at2.l < innerWidth / 2, tam: at ? Math.round(at.r - at.l) : 0, esq }); }, 250));
+  });
+  ok('o botão de ataque é fixo, embaixo à direita, grande o bastante para o polegar', lay.atkDir === true && lay.tam >= 80, JSON.stringify({ atkDir: lay.atkDir, tam: lay.tam }));
+  ok('manche, ataque e atalhos não se sobrepõem', lay.semCruzar === true, JSON.stringify(lay.esq));
+  ok('modo canhoto espelha: manche à direita e ataque à esquerda', lay.canhoto === true);
+  await espera(300);
 
   // 4. estações da base abrem seus painéis
   for (const [rx, painel] of [['bancada', 'craft'], ['baú do abrigo', 'bau'], ['jipe', 'mapa'], ['^dormir', 'dormir'], ['fogão', 'cozinha']]) {
@@ -218,6 +233,21 @@ try {
   const contou = await ate(a0 => window.__cinzas.store.getState().abates > a0, 8000, abates0); // o HUD espelha a cena a cada 0,1 s de jogo; em máquina lenta isso passa de 700 ms
   ok('o abate é contado', contou, JSON.stringify({ antes: abates0, depois: (await estado()).abates }));
   await foto('3-combate');
+  // 5b. ataque automático (botão segurado): olha em volta (360°), só bate com alvo ao alcance e nunca fere NPC
+  const auto1 = await ev(() => { const k = window.__cinzas.cena(), J = k.jog; return { vazio: k.mirarAuto(J.ang, true) === null }; });
+  const auto2 = await ev(() => { const k = window.__cinzas.cena(), J = k.jog, e = k.dev('irradiado', -Math.cos(J.ang) * 1.3, -Math.sin(J.ang) * 1.3); e.hp = e.maxHp = 24; return { id: e.id, frente: k.mirarAuto(J.ang) !== null, volta: k.mirarAuto(J.ang, true) !== null }; });
+  ok('ataque automático: sem inimigo por perto não há alvo', auto1.vazio === true);
+  ok('ataque automático olha em volta (360°); a mira comum só olha à frente', auto2.frente === false && auto2.volta === true, JSON.stringify(auto2));
+  await ev(() => { const a = document.querySelector('.atk'), r = a.getBoundingClientRect(); a.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, pointerType: 'touch', isPrimary: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true })); });
+  const ligou = await ate(() => window.__cinzas.ponte.entrada.auto === true && document.querySelector('.atk').dataset.auto === '1', 3000);
+  const morreuAuto = await ate(id => { const k = window.__cinzas.cena(), e = k.ents.find(x => x.id === id); return !e || !e.vivo; }, 30000, auto2.id); /* em máquina lenta o jogo roda em câmera lenta (dt limitado): espera folgada */
+  const diagAuto = await ev(id => { const k = window.__cinzas.cena(), J = k.jog, e = k.ents.find(x => x.id === id), en = window.__cinzas.ponte.entrada; return { vivo: !!e?.vivo, hpE: e && Math.round(e.hp), d: e && +Math.hypot(e.x - J.x, e.y - J.y).toFixed(2), cd: +k.cdAtaque.toFixed(2), st: Math.round(k.s.stamina), acao: !!k.acao, painel: window.__cinzas.store.getState().painel, auto: en.auto, mira: en.mira, pausada: k.scene.isPaused() }; }, auto2.id);
+  await ev(() => { document.querySelector('.atk').dispatchEvent(new PointerEvent('pointerup', { pointerId: 9, pointerType: 'touch', isPrimary: true, bubbles: true })); });
+  ok('segurar o botão de ataque liga o modo automático', ligou);
+  ok('o ataque automático derruba o inimigo que está atrás, sem mais toques', morreuAuto, JSON.stringify(diagAuto));
+  ok('soltar o botão desliga o automático', await ev(() => window.__cinzas.ponte.entrada.auto === false && document.querySelector('.atk').dataset.auto === '0'));
+  const npcSeg = await ev(async () => { const k = window.__cinzas.cena(), en = window.__cinzas.ponte.entrada, J = k.jog, e = k.devNpc('acampado'); e.x = J.x + Math.cos(J.ang) * 1.2; e.y = J.y + Math.sin(J.ang) * 1.2; e.npc.ferido = false; const antes = e.hp; en.auto = true; en.tap++; await new Promise(r => setTimeout(r, 1300)); en.auto = false; return { ferido: e.npc.ferido, hp: e.hp, antes, alvoNpc: k.mirarAuto(J.ang, true) }; });
+  ok('o ataque automático nunca mira nem fere NPCs', npcSeg.ferido === false && npcSeg.hp === npcSeg.antes && npcSeg.alvoNpc === null, JSON.stringify(npcSeg));
 
   // 6. clima (todos os estados, sem exceção)
   for (const t of ['chuva', 'tempestade', 'neblina', 'poeira', 'acida', 'vento', 'limpo']) { await ev(t => window.__cinzas.cena().clima.definir(t, true), t); await espera(450); }

@@ -1,5 +1,6 @@
 // Ponte entre a UI React e a cena Phaser (um singleton simples).
-export type Entrada = { mx: number; my: number; ax: number; ay: number; mira: boolean; atacar: boolean; correr: boolean; furtivo: boolean; tap: number };
+/** `auto` = ataque automático (botão de ataque segurado): a cena escolhe o alvo e só bate quando há inimigo ao alcance */
+export type Entrada = { mx: number; my: number; ax: number; ay: number; mira: boolean; atacar: boolean; auto: boolean; correr: boolean; furtivo: boolean; tap: number };
 export type Rapido = 'agua' | 'comida' | 'curar' | 'antirrad';
 export type Cmd = {
   interagir(): void; usarRapido(k: Rapido): void; usarItem(id: string): void; largar(id: string, n?: number): void;
@@ -12,6 +13,6 @@ export type Cmd = {
   eventoEscolher(i: number): void; eventoFim(): void; escolherPerk(id: string): void; receberContrato(id: number): void; melhorar(id: string): void;
 };
 export const ponte: { entrada: Entrada; cmd: Cmd | null; ref: unknown } = {
-  entrada: { mx: 0, my: 0, ax: 0, ay: 0, mira: false, atacar: false, correr: false, furtivo: false, tap: 0 },
+  entrada: { mx: 0, my: 0, ax: 0, ay: 0, mira: false, atacar: false, auto: false, correr: false, furtivo: false, tap: 0 },
   cmd: null, ref: null,
 };

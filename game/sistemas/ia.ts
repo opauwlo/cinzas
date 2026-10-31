@@ -71,13 +71,13 @@ export function iniciarMorte(c: Cena) { c.jog.morrendo = 0.9; }
 
 // ---------------------------------------------------------------- ataque do jogador
 export function atacarJogador(c: Cena) {
-  if (c.cdAtaque > 0 || c.morto || c.acao) return; const J = c.jog, arma = armaDe(c.s.arma);
+  if (c.cdAtaque > 0 || c.morto || c.acao) return; const J = c.jog, arma = armaDe(c.s.arma), auto = c.atqAuto; /* o ataque automático nunca fere NPCs */
   if (arma.alvo === 'tiro') {
     const mun = arma.municao!; if ((c.s.balas[mun] ?? 0) <= 0) { if (performance.now() - (J as unknown as { av?: number }).av! > 900 || (J as unknown as { av?: number }).av === undefined) { (J as unknown as { av?: number }).av = performance.now(); sfx.seco(); useJogo.getState().toast('Sem munição', '#d9a02b'); } c.cdAtaque = 0.3; return; }
     c.s.balas[mun]--; c.cdAtaque = arma.cd; J.atk = J.atkDur = 0.2; const n = arma.pelotas ?? 1;
     for (let p = 0; p < n; p++) {
       const a = J.ang + (Math.random() - 0.5) * (n > 1 ? 0.3 : 0.07) * (pk(c.s, 'mira') ? 0.6 : 1), lim = c.obstaculoAte(J.x, J.y, a, arma.alcance); let alvo: Ent | null = null, melhor = lim;
-      for (const e of c.ents) { if (!e.vivo) continue; const dx = e.x - J.x, dy = e.y - J.y, pr = dx * Math.cos(a) + dy * Math.sin(a); if (pr < 0 || pr > melhor) continue; const pe = Math.abs(-Math.sin(a) * dx + Math.cos(a) * dy); if (pe < e.arq.raio + 0.14) { alvo = e; melhor = pr; } }
+      for (const e of c.ents) { if (!e.vivo || (auto && e.npc)) continue; const dx = e.x - J.x, dy = e.y - J.y, pr = dx * Math.cos(a) + dy * Math.sin(a); if (pr < 0 || pr > melhor) continue; const pe = Math.abs(-Math.sin(a) * dx + Math.cos(a) * dy); if (pe < e.arq.raio + 0.14) { alvo = e; melhor = pr; } }
       const fim = alvo ? melhor : lim, [x0, y0] = proj(J.x + Math.cos(a) * 0.8, J.y + Math.sin(a) * 0.8, 18), [x1, y1] = proj(J.x + Math.cos(a) * fim, J.y + Math.sin(a) * fim, 18); c.tracers.push({ x0, y0, x1, y1, t: 0, cor: 0xffe0a0 });
       if (alvo) { ferir(c, alvo, arma.dano * (pk(c.s, 'mira') ? 1.25 : 1), a); sfx.acerto(); c.hitstop = 0.04; }
     }
@@ -86,7 +86,7 @@ export function atacarJogador(c: Cena) {
   } else {
     if (c.s.stamina < arma.custo + 1) { c.cdAtaque = 0.6; return; } c.s.stamina -= arma.custo; c.cdAtaque = arma.cd; J.atk = J.atkDur = Math.min(0.34, arma.cd * 0.85); sfx.swing(); c.ruido(J.x, J.y, arma.ruido);
     const a0 = J.ang; c.time.delayedCall(J.atkDur * 0.45 * 1000, () => {
-      let bateu = false; for (const e of c.ents) { if (!e.vivo || e.arq.ia === 'voo') continue; const dx = e.x - J.x, dy = e.y - J.y, d = Math.hypot(dx, dy); if (d < arma.alcance + e.arq.raio && Math.abs(ang(Math.atan2(dy, dx) - a0)) < 1.0 && c.temLOS(J.x, J.y, e.x, e.y)) { ferir(c, e, arma.dano * (0.85 + Math.random() * 0.3) * (pk(c.s, 'forte') ? 1.25 : 1), a0, !!arma.corta); bateu = true; } }
+      let bateu = false; for (const e of c.ents) { if (!e.vivo || e.arq.ia === 'voo' || (auto && e.npc)) continue; const dx = e.x - J.x, dy = e.y - J.y, d = Math.hypot(dx, dy); if (d < arma.alcance + e.arq.raio && Math.abs(ang(Math.atan2(dy, dx) - a0)) < 1.0 && c.temLOS(J.x, J.y, e.x, e.y)) { ferir(c, e, arma.dano * (0.85 + Math.random() * 0.3) * (pk(c.s, 'forte') ? 1.25 : 1), a0, !!arma.corta); bateu = true; } }
       if (bateu) { sfx.acerto(); c.hitstop = 0.055; c.cameras.main.shake(100, 0.005); }
     });
   }

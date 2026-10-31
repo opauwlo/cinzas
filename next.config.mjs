@@ -1,4 +1,4 @@
-// Exportação estática. Em hospedagem com subcaminho (GitHub Pages: /cinzas) defina NEXT_PUBLIC_BASE_PATH=/cinzas na build.
+// Exportação estática. Na Vercel (raiz do domínio) não precisa de nada; em hospedagem com subcaminho (ex.: /cinzas) defina NEXT_PUBLIC_BASE_PATH=/cinzas na build.
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
 /** @type {import('next').NextConfig} */

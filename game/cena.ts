@@ -352,10 +352,12 @@ export class Cena extends Phaser.Scene {
     } else s.stamina = Math.min(100, s.stamina + 16 * dt);
     this.tRuido += dt; if (this.tRuido > 0.45) { this.tRuido = 0; const r = (!J.andando ? 0 : corre ? 9 : furtivo ? 1.5 : 4) * (pk(s, 'leve') ? 0.6 : 1); if (r > 1.2) this.ruido(J.x, J.y, r); }
     let alvoAng = J.ang, atacando = e.atacar; const novoTap = e.tap !== this.tapVisto; this.tapVisto = e.tap; if (novoTap) atacando = true;
-    if (e.mira && Math.hypot(e.ax, e.ay) > 0.2) { alvoAng = Math.atan2((e.ay - e.ax) * R2, (e.ax + e.ay) * R2); atacando = true; }
+    const manual = e.mira && Math.hypot(e.ax, e.ay) > 0.2; this.atqAuto = false;
+    if (manual) { alvoAng = Math.atan2((e.ay - e.ax) * R2, (e.ax + e.ay) * R2); atacando = true; }
     else if (this.desktop && this.mouse.ativo) { alvoAng = Math.atan2(this.mouse.y - J.y, this.mouse.x - J.x); atacando = this.mouse.baixo || k.SPACE.isDown || atacando; }
     else if (J.andando && !atacando) alvoAng = Math.atan2(my, mx);
-    if (atacando && !(e.mira && Math.hypot(e.ax, e.ay) > 0.2) && (st.cfg.autoMira || this.desktop === false)) { const a = this.mirarAuto(alvoAng); if (a !== null) alvoAng = a; }
+    if (e.auto && !manual) { /* ataque automático (botão segurado): olha para o inimigo mais próximo em volta e só bate com alvo ao alcance */ const a = this.mirarAuto(alvoAng, true); this.atqAuto = true; if (a !== null) { alvoAng = a; atacando = true; } else atacando = novoTap; }
+    else if (atacando && !manual && (st.cfg.autoMira || this.desktop === false)) { const a = this.mirarAuto(alvoAng); if (a !== null) alvoAng = a; }
     J.ang += ang(alvoAng - J.ang) * Math.min(1, dt * 16);
     this.cdAtaque -= dt; if (atacando) atacarJogador(this);
     if (this.flash > 0) { this.flash -= dt; if (this.flash <= 0) this.clarao.setVisible(false); } this.flashRaio = Math.max(0, this.flashRaio - dt * 2);
@@ -363,12 +365,14 @@ export class Cena extends Phaser.Scene {
     if (this.acao) { this.acao.t += dt; ticarAcao(this, dt); if (this.acao.ruido && Math.random() < dt * 0.8) this.ruido(J.x, J.y, this.acao.ruido); if (this.acao.t >= this.acao.dur) { const f = this.acao.fim; this.acao = null; f(); } }
     useJogo.setState(q => (q.acao?.p === (this.acao ? this.acao.t / this.acao.dur : undefined) ? q : { acao: this.acao ? { rotulo: this.acao.rotulo, p: this.acao.t / this.acao.dur } : null }));
   }
-  /** direção para o inimigo mais próximo (visível) na frente do jogador; null se não há */
-  mirarAuto(base: number): number | null {
-    const J = this.jog, arma = armaDe(this.s.arma), alc = arma.alvo === 'tiro' ? arma.alcance : arma.alcance + 1.5; let melhor: Ent | null = null, md = 1e9;
-    for (const e of this.ents) { if (!e.vivo || !e.arq.hostil) continue; const d = Math.hypot(e.x - J.x, e.y - J.y); if (d > alc || this.luzFrame[idx(Math.min(W - 1, Math.max(0, Math.floor(e.x))), Math.min(H - 1, Math.max(0, Math.floor(e.y))))] < 0.4) continue; const da = Math.abs(ang(Math.atan2(e.y - J.y, e.x - J.x) - base)); const sc = d + da * 3; if (da < 1.9 && sc < md && this.temLOS(J.x, J.y, e.x, e.y)) { md = sc; melhor = e; } }
+  /** direção para o inimigo mais próximo (visível) na frente do jogador; null se não há. `amplo` (ataque automático) olha em volta (360°) e só conta o que está ao alcance do golpe. */
+  mirarAuto(base: number, amplo = false): number | null {
+    const J = this.jog, arma = armaDe(this.s.arma), alc = arma.alvo === 'tiro' ? arma.alcance : arma.alcance + (amplo ? 0.5 : 1.5); let melhor: Ent | null = null, md = 1e9;
+    for (const e of this.ents) { if (!e.vivo || !e.arq.hostil || e.npc) continue; const d = Math.hypot(e.x - J.x, e.y - J.y); if (d > alc || this.luzFrame[idx(Math.min(W - 1, Math.max(0, Math.floor(e.x))), Math.min(H - 1, Math.max(0, Math.floor(e.y))))] < 0.4) continue; const da = Math.abs(ang(Math.atan2(e.y - J.y, e.x - J.x) - base)); const sc = d + (amplo ? da * 0.4 : da * 3); if ((amplo || da < 1.9) && sc < md && this.temLOS(J.x, J.y, e.x, e.y)) { md = sc; melhor = e; } }
     return melhor ? Math.atan2(melhor.y - J.y, melhor.x - J.x) : null;
   }
+  /** verdadeiro enquanto o ataque automático está ligado: nunca fere NPCs (ver atacarJogador) */
+  atqAuto = false;
   alvoProx(): Interativo | null {
     const J = this.jog; let melhor: Interativo | null = null, md = 1e9;
     for (const it of this.interativos) { if (!it.ok()) continue; const d = Math.hypot(it.x - J.x, it.y - J.y); if (d <= it.r && d < md && this.alcancavel(it)) { md = d; melhor = it; } }
@@ -401,10 +405,10 @@ export class Cena extends Phaser.Scene {
   dicas() {
     const st = useJogo.getState(), s = this.s, J = this.jog, d = s.dicas, mostrar = (id: string, t: string) => { if (d.includes(id) || st.dica) return false; d.push(id); st.set({ dica: t }); setTimeout(() => useJogo.setState({ dica: null }), 6500); return true; };
     if (this.tempo < 3) return;
-    if (!J.andando && this.tempo < 25 && mostrar('mover', 'Arraste o dedo no lado ESQUERDO da tela para andar.')) return;
+    if (!J.andando && this.tempo < 25 && mostrar('mover', 'Use o MANCHE, embaixo à esquerda, para andar. Empurre de leve para ir furtivo, até a borda para correr.')) return;
     if (this.alvoInter && mostrar('interagir', 'Toque no botão laranja (ou no objeto) para interagir.')) return;
     if (this.zona.id === 'base' && mostrar('jipe', 'Use o JIPE no portão para viajar. Cada viagem gasta combustível.')) return;
-    if (this.ents.some(e => e.vivo && e.arq.hostil && Math.hypot(e.x - J.x, e.y - J.y) < 12) && mostrar('atacar', 'Toque no lado DIREITO para atacar. Arraste para mirar.')) return;
+    if (this.ents.some(e => e.vivo && e.arq.hostil && Math.hypot(e.x - J.x, e.y - J.y) < 12) && mostrar('atacar', 'Toque no botão vermelho para atacar. SEGURE para atacar sozinho; arraste a partir dele para mirar.')) return;
     if (s.hp < 40 && mostrar('curar', 'Vida baixa! Use bandagem ou kit nos atalhos de baixo.')) return;
     if (this.ambient < 0.4 && mostrar('noite', 'Escureceu. Acenda a lanterna e evite barulho.')) return;
     if (this.clima.tipo === 'acida' && mostrar('acida', 'Chuva ácida sobe a radiação. Procure abrigo coberto.')) return;

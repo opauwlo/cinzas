@@ -111,9 +111,10 @@ export function EventoPainel() {
 // ---------------------------------------------------------------- como jogar
 export function Ajuda() {
   const itens: [string, string][] = [
-    ['Mover e atacar', 'Arraste o dedo no lado esquerdo para andar. No lado direito, toque para atacar (mira sozinha) ou arraste para mirar.'],
-    ['Interagir', 'Chegue perto de um objeto e toque nele ou no botão laranja. Dá para vasculhar, abrir o baú, fabricar, cozinhar e dormir.'],
-    ['Furtivo e correr', 'Furtivo (pé) faz menos barulho. Correr gasta fôlego e chama a atenção de tudo por perto.'],
+    ['Mover', 'O manche fica fixo embaixo, de um lado. Empurre de leve para ir furtivo, até o meio para andar e até a borda para correr.'],
+    ['Atacar', 'O botão vermelho fica no outro lado. Toque para um golpe (mira sozinho no inimigo mais próximo). SEGURE para atacar sozinho: o personagem vira para o inimigo mais perto e bate no ritmo da arma, sem gastar tiro nem fôlego se não houver alvo. Arraste a partir do botão para mirar à mão.'],
+    ['Interagir', 'Chegue perto de um objeto e toque nele ou no botão laranja. Dá para vasculhar, colher, garimpar, ler bilhetes, abrir o baú, fabricar, cozinhar e dormir.'],
+    ['Furtivo e correr', 'Furtivo (pé) faz menos barulho. Correr gasta fôlego e chama a atenção de tudo por perto. O modo canhoto, em Config., troca os lados.'],
     ['Sobreviver', 'Fome, sede e radiação cobram caro. Beba água limpa, cozinhe carne e use máscara em áreas radioativas.'],
     ['Abrigo e jipe', 'Do abrigo você viaja de jipe (gasta combustível e horas). Volte para guardar, fabricar, dormir e melhorar a base.'],
     ['Subir de nível', 'Abater, vasculhar e explorar dão XP. A cada nível, escolha 1 entre 3 habilidades.'],

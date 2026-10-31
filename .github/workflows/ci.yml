@@ -1,0 +1,35 @@
+# Integração contínua do CINZAS: testes de lógica e balanço (Node), checagem de tipos, build estático e smoke test em Chrome headless.
+# O site é publicado na Vercel (https://cinzas-green.vercel.app), que reconstrói sozinha a cada push na main.
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Testes de lógica e balanço (Node)
+        run: npm run teste
+      - name: Checagem de tipos
+        run: npx tsc --noEmit
+      - name: Build estático
+        run: npm run build
+      # O smoke usa Chrome com GL por software, que em runner lento pode estourar tempo: não trava o resto enquanto é endurecido.
+      - name: Smoke test (Chrome headless)
+        run: node tools/smoke.mjs
+        continue-on-error: true
+        env:
+          CHROME: /usr/bin/google-chrome
