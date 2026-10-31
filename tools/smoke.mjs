@@ -1,106 +1,143 @@
-// Smoke tests: serve out/ e abre no Chrome do sistema (puppeteer-core). Rode `npm run build` antes.
+// Smoke test do CINZAS em Chrome headless (GL por software). Requer `npm run build` antes (lê a pasta out/).
+// Uso: node tools/smoke.mjs [pasta-de-capturas]   — sai com código 0 se tudo passou, 1 se algo falhou, 3 se o teste quebrou.
 import http from 'node:http';
 import { readFile, stat, mkdir } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import puppeteer from 'puppeteer-core';
 
-const raiz = process.env.RAIZ ?? new URL('../out/', import.meta.url).pathname;
-const shots = process.env.SHOT_DIR; if (shots) await mkdir(shots, { recursive: true });
-const tipos = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ttf': 'font/ttf', '.woff2': 'font/woff2', '.json': 'application/json', '.txt': 'text/plain' };
+const raiz = new URL('../out/', import.meta.url).pathname, capturas = process.argv[2] ?? null;
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ttf': 'font/ttf', '.woff2': 'font/woff2', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const srv = http.createServer(async (req, res) => {
   let p = join(raiz, decodeURIComponent(req.url.split('?')[0]));
-  try { if ((await stat(p)).isDirectory()) p = join(p, 'index.html'); res.writeHead(200, { 'content-type': tipos[extname(p)] ?? 'application/octet-stream' }); res.end(await readFile(p)); }
-  catch { res.writeHead(404); res.end(); }
+  try { if ((await stat(p)).isDirectory()) p = join(p, 'index.html'); res.writeHead(200, { 'content-type': MIME[extname(p)] ?? 'application/octet-stream' }); res.end(await readFile(p)); } catch { res.writeHead(404); res.end(); }
 }).listen(0);
-const porta = srv.address().port;
-const falhas = []; const erros = [];
-const ok = (c, m) => { console.log((c ? 'OK    ' : 'FALHA ') + m); if (!c) falhas.push(m); };
-const esp = ms => new Promise(r => setTimeout(r, ms));
-const foto = async (pg, n) => { if (shots) await pg.screenshot({ path: `${shots}/${n}.png` }); };
+const url = `http://localhost:${srv.address().port}/`;
+const nav = await puppeteer.launch({ executablePath: process.env.CHROME ?? '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
+const pg = await nav.newPage();
+await pg.setViewport({ width: 412, height: 915, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+const erros = [];
+pg.on('pageerror', e => erros.push('PAGEERR ' + String(e.stack ?? e).slice(0, 400)));
+pg.on('console', m => { if (m.type() === 'error') erros.push('CONERR ' + m.text().slice(0, 300)); });
 
-const nav = await puppeteer.launch({ executablePath: process.env.CHROME ?? '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-async function abrir(query = '') {
-  const pg = await nav.newPage();
-  await pg.setViewport({ width: 412, height: 915, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
-  pg.on('pageerror', e => erros.push(String(e.stack ?? e).split('\n').slice(0, 6).join(' / ')));
-  pg.on('console', m => { if (m.type() === 'error') erros.push(m.text()); });
-  await pg.goto(`http://localhost:${porta}/${query}`, { waitUntil: 'networkidle0', timeout: 30000 });
-  return pg;
-}
-const clicar = (pg, texto) => pg.evaluate(t => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.includes(t)); if (!b) return false; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.click(); return true; }, texto);
-const estado = pg => pg.evaluate(() => { const s = window.__cinzas.store.getState(); return { hp: s.hp, tela: s.tela, inv: s.inv, vasc: s.vasculhados, abates: s.abates, minutos: s.minutos }; });
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const resultados = [];
+const ok = (nome, cond, detalhe = '') => { resultados.push({ nome, ok: !!cond }); console.log(`${cond ? 'OK  ' : 'FALHA'}  ${nome}${detalhe ? '  — ' + detalhe : ''}`); };
+const foto = async nome => { if (capturas) { await mkdir(capturas, { recursive: true }); await pg.screenshot({ path: join(capturas, nome + '.png') }); } };
+const ev = (fn, ...a) => pg.evaluate(fn, ...a);
+const ate = async (fn, ms = 20000, ...a) => { try { await pg.waitForFunction(fn, { timeout: ms, polling: 150 }, ...a); return true; } catch { return false; } };
+const toque = rx => ev(s => { const b = [...document.querySelectorAll('button')].find(x => new RegExp(s, 'i').test(x.textContent)); if (!b) return false; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.click(); return true; }, rx);
+const jogoPronto = (ms = 90000) => ate(() => window.__cinzas && window.__cinzas.store.getState().carga >= 1, ms);
+const cena = fn => ev(fn);
+const estado = () => ev(() => { const s = window.__cinzas.store.getState(); return { zonaId: s.zonaId, tela: s.tela, painel: s.painel, hp: s.hp, abates: s.abates, combustivel: s.combustivel, carga: s.carga, minutos: s.minutos }; });
 
+let codigo = 0;
 try {
-  // ---- modo normal
-  let pg = await abrir();
-  await foto(pg, '1-menu');
-  ok(await pg.$eval('h1', e => e.textContent) === 'CINZAS', 'menu mostra CINZAS');
-  ok(await pg.evaluate(() => document.fonts.check('700 20px Silkscreen') && document.fonts.check('20px VT323')), 'fontes pixel carregadas');
-  ok(!(await pg.evaluate(() => document.body.innerText.includes('PERDIDO'))), 'menu normal sem manipulação');
-  await clicar(pg, 'Sobreviver');
-  await pg.waitForSelector('canvas', { timeout: 20000 });
-  await pg.waitForFunction(() => window.__cinzas && window.__cinzas.store.getState().carga >= 1, { timeout: 60000 });
-  await esp(2500); await foto(pg, '2-jogo');
-  const px = await pg.evaluate(() => new Promise(res => window.__cinzas.game.renderer.snapshot(img => { const t = document.createElement('canvas'); t.width = img.width; t.height = img.height; const x = t.getContext('2d'); x.drawImage(img, 0, 0); const d = x.getImageData(0, 0, t.width, t.height).data; let n = 0; for (let i = 0; i < d.length; i += 4 * 97) if (d[i] + d[i + 1] + d[i + 2] > 30) n++; res(n); })));
-  ok(px > 200, `canvas com pixels (${px})`);
-  ok(await pg.evaluate(() => { const m = document.querySelector('.mundo').getBoundingClientRect(), p = document.querySelector('.painel').getBoundingClientRect(), t = document.querySelector('.topo').getBoundingClientRect(); return m.bottom <= p.top + 1 && m.top >= t.bottom - 1; }), 'topo, mundo e painel não se sobrepõem');
-  let s = await estado(pg); ok(s.tela === 'jogo' && s.hp > 95, 'run começou com vida cheia');
+  // 1. menu
+  await pg.goto(url, { waitUntil: 'networkidle0' });
+  const texto = await ev(() => document.body.innerText);
+  ok('menu mostra o título CINZAS', /cinzas/i.test(texto));
+  ok('menu tem o botão de começar', await ev(() => [...document.querySelectorAll('button')].some(b => /sobreviver|nova run/i.test(b.textContent))));
+  const pwa = await pg.evaluate(async u => { const r = await fetch(u + 'manifest.webmanifest').catch(() => null); return r && r.ok ? (await r.json()).name : null; }, url);
+  ok('manifesto PWA publicado', !!pwa, String(pwa));
+  await foto('1-menu');
 
-  // movimento pelo joystick virtual (via entrada)
-  console.log('      fps', await pg.evaluate(() => Math.round(window.__cinzas.game.loop.actualFps)));
-  const x0 = await pg.evaluate(() => window.__cinzas.cena().jog.x);
-  await pg.evaluate(() => { window.__cinzas.ponte.entrada.mx = 1; }); await esp(1500); await pg.evaluate(() => { window.__cinzas.ponte.entrada.mx = 0; });
-  const x1 = await pg.evaluate(() => window.__cinzas.cena().jog.x); ok(x1 > x0 + 1, `joystick move o jogador (${x0.toFixed(1)} -> ${x1.toFixed(1)})`);
+  // 2. nova run
+  ok('toque em "Sobreviver"', await toque('Sobreviver|Nova run'));
+  const t0 = Date.now(); ok('mundo da base carregou', await jogoPronto(), `${Date.now() - t0} ms`);
+  let s = await estado(); ok('começa na base', s.zonaId === 'base', JSON.stringify(s));
+  await espera(1500); await foto('2-base');
 
-  // vasculhar: vai até o contêiner mais próximo, executa a ação com tempo e confere item
-  await pg.evaluate(() => { const c = window.__cinzas.cena(); const a = c.props.filter(o => o.p.loot && o.p.tipo !== 'carro' && o.p.tipo !== 'carro_v').sort((u, v) => Math.hypot(u.p.x - c.jog.x, u.p.y - c.jog.y) - Math.hypot(v.p.x - c.jog.x, v.p.y - c.jog.y))[0].p; c.jog.x = a.x + 0.5; c.jog.y = a.y + 1.6; c.mundo.solido[Math.floor(c.jog.y) * 96 + Math.floor(c.jog.x)] = 0; });
-  await pg.waitForFunction(() => !!window.__cinzas.store.getState().alvo, { timeout: 8000 }).catch(() => {});
-  const alvo = await pg.evaluate(() => window.__cinzas.store.getState().alvo); ok(!!alvo, `botão de interagir mostra alvo (“${alvo}”)`);
-  const antes = Object.values((await estado(pg)).inv).reduce((a, b) => a + b, 0);
-  await pg.evaluate(() => window.__cinzas.ponte.cmd.interagir()); await esp(600); await foto(pg, '3-saque');
-  ok(await pg.evaluate(() => !!window.__cinzas.store.getState().acao), 'barra de progresso da ação aparece');
-  await pg.waitForFunction(() => window.__cinzas.store.getState().vasculhados >= 1, { timeout: 20000 }).catch(() => {}); s = await estado(pg);
-  ok(s.vasc === 1, 'vasculhar concluiu e contou'); ok(Object.values(s.inv).reduce((a, b) => a + b, 0) > antes, 'vasculhar deu item');
+  // 3. movimento (joystick virtual)
+  const p0 = await cena(() => { const j = window.__cinzas.cena().jog; return [j.x, j.y]; });
+  await ev(() => { window.__cinzas.ponte.entrada.mx = 0.7; window.__cinzas.ponte.entrada.my = 0.7; }); await espera(1600); await ev(() => { window.__cinzas.ponte.entrada.mx = 0; window.__cinzas.ponte.entrada.my = 0; });
+  const p1 = await cena(() => { const j = window.__cinzas.cena().jog; return [j.x, j.y]; });
+  ok('o jogador anda', Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) > 0.5, `deslocou ${Math.hypot(p1[0] - p0[0], p1[1] - p0[1]).toFixed(2)} tiles`);
 
-  // combate: inimigo ao lado, ataque corpo a corpo
-  await pg.evaluate(() => { const c = window.__cinzas.cena(); c.jog.ang = 0; c.inim.length = 0; window.__e = c.criarInimigo('irr', c.jog.x + 1.3, c.jog.y); window.__e.estado = 'ocioso'; window.__cinzas.ponte.entrada.atacar = true; });
-  await esp(500); await foto(pg, '4-combate'); await pg.waitForFunction(() => window.__cinzas.store.getState().abates >= 1, { timeout: 15000 }).catch(() => {});
-  await pg.evaluate(() => { window.__cinzas.ponte.entrada.atacar = false; });
-  s = await estado(pg); ok(s.abates >= 1, 'inimigo aparece e morre (corpo a corpo)');
+  // 4. estações da base abrem seus painéis
+  for (const [rx, painel] of [['bancada', 'craft'], ['baú do abrigo', 'bau'], ['jipe', 'mapa'], ['^dormir', 'dormir'], ['fogão', 'cozinha']]) {
+    const achou = await ev(rx => {
+      const k = window.__cinzas.cena(), it = k.interativos.find(i => new RegExp(rx, 'i').test(i.rot)); if (!it) return false;
+      k.jog.x = it.x; k.jog.y = it.y + 0.6; k.alvoInter = it; window.__cinzas.store.setState({ painel: null }); window.__cinzas.ponte.cmd.interagir(); return true;
+    }, rx);
+    const abriu = achou && await ate(p => window.__cinzas.store.getState().painel === p, 4000, painel);
+    ok(`estação "${painel}" abre o painel`, abriu, achou ? '' : 'interativo não encontrado');
+    await ev(() => window.__cinzas.store.setState({ painel: null }));
+  }
 
-  // tiro com pistola
-  await pg.evaluate(() => { const c = window.__cinzas.cena(); c.s.arma = 'pistola'; c.s.municao = 5; c.inim.length = 0; window.__e2 = c.criarInimigo('cao', c.jog.x + 4, c.jog.y); window.__e2.estado = 'ocioso'; c.jog.ang = 0; window.__cinzas.ponte.entrada.atacar = true; });
-  await pg.waitForFunction(() => !window.__e2.vivo, { timeout: 15000 }).catch(() => {}); await pg.evaluate(() => { window.__cinzas.ponte.entrada.atacar = false; });
-  ok(await pg.evaluate(() => !window.__e2.vivo), 'pistola mata cão a distância');
+  // 4b. economia da base: fabricar, cozinhar, baú, uso rápido e sono
+  const inv = () => ev(() => ({ ...window.__cinzas.store.getState().inv }));
+  const bau = () => ev(() => ({ ...window.__cinzas.store.getState().bau }));
+  await ev(() => { const st = window.__cinzas.store, i = st.getState().inv; st.setState({ inv: { ...i, tecido: 4, carne_crua: 2, agua: 1 } }); });
+  let a = await inv(); await ev(() => window.__cinzas.ponte.cmd.craft('r_bandagem')); let d = await inv();
+  ok('fabricar: bandagem gasta tecido e cria o item', (d.bandagem ?? 0) === (a.bandagem ?? 0) + 1 && d.tecido === a.tecido - 2, `tecido ${a.tecido}→${d.tecido}, bandagem ${a.bandagem ?? 0}→${d.bandagem}`);
+  a = d; await ev(() => window.__cinzas.ponte.cmd.cozinhar('c_carne')); d = await inv();
+  ok('cozinhar: carne crua vira carne cozida', (d.carne_cozida ?? 0) === (a.carne_cozida ?? 0) + 1 && d.carne_crua === a.carne_crua - 1);
+  await ev(() => window.__cinzas.ponte.cmd.bauMover('bandagem', 1, true)); const b1 = await bau(), i1 = await inv();
+  ok('baú guarda item da mochila', (b1.bandagem ?? 0) >= 1 && (i1.bandagem ?? 0) === (d.bandagem ?? 0) - 1);
+  await ev(() => window.__cinzas.ponte.cmd.bauMover('bandagem', 1, false)); const i2 = await inv();
+  ok('baú devolve o item', (i2.bandagem ?? 0) === (d.bandagem ?? 0));
+  await ev(() => { window.__cinzas.cena().s.sede = 30; window.__cinzas.store.setState({ sede: 30 }); }); await ev(() => window.__cinzas.ponte.cmd.usarRapido('agua')); await espera(1800); // usar item leva 1 s de ação
+  ok('beber água repõe a sede', (await ev(() => window.__cinzas.cena().s.sede)) > 30);
+  const m0 = (await estado()).minutos; await ev(() => window.__cinzas.ponte.cmd.dormir(1)); await espera(1500);
+  ok('dormir faz o tempo passar', (await estado()).minutos >= m0 + 50, `${Math.round(m0)} → ${Math.round((await estado()).minutos)} min`);
+  await ev(() => window.__cinzas.store.setState({ painel: null }));
 
-  // inventário abre e pausa
-  await pg.evaluate(() => window.__cinzas.store.setState({ invAberto: true })); await esp(400); await foto(pg, '5-inv');
-  ok(await pg.evaluate(() => document.body.innerText.includes('Mochila')), 'inventário abre');
-  await pg.evaluate(() => window.__cinzas.store.setState({ invAberto: false }));
+  // 5. combate corpo a corpo
+  await ev(() => { const k = window.__cinzas.cena(); k.jog.x = 40; k.jog.y = 40; });
+  await espera(600);
+  const abates0 = (await estado()).abates;
+  const idZ = await ev(() => { const k = window.__cinzas.cena(), e = k.dev('irradiado', 1.1, 0.2); e.hp = e.maxHp = 24; return e.id; });
+  await ev(() => { window.__cinzas.ponte.entrada.atacar = true; });
+  const morreu = await ate(id => { const k = window.__cinzas.cena(); const e = k.ents.find(x => x.id === id); return !e || !e.vivo; }, 14000, idZ);
+  await ev(() => { window.__cinzas.ponte.entrada.atacar = false; });
+  ok('o jogador mata um irradiado com a arma branca', morreu);
+  await espera(700); ok('o abate é contado', (await estado()).abates > abates0);
+  await foto('3-combate');
 
-  // noite + lanterna: confere cone
-  await pg.evaluate(() => { const c = window.__cinzas.cena(); c.s.minutos = 22 * 60; c.s.lanterna = { tem: true, ligada: true, bat: 100 }; window.__cinzas.store.setState({ inv: { ...window.__cinzas.store.getState().inv, lanterna: 1 } }); });
-  await esp(1500); await foto(pg, '6-noite');
+  // 6. clima (todos os estados, sem exceção)
+  for (const t of ['chuva', 'tempestade', 'neblina', 'poeira', 'acida', 'vento', 'limpo']) { await ev(t => window.__cinzas.cena().clima.definir(t, true), t); await espera(450); }
+  ok('todos os climas renderizam', erros.length === 0, erros[0] ?? '');
 
-  // morte permanente
-  await pg.evaluate(() => { window.__cinzas.cena().machucar(500, 0); }); await pg.waitForFunction(() => window.__cinzas.store.getState().tela === 'morte', { timeout: 15000 }).catch(() => {}); await esp(300); await foto(pg, '7-morte');
-  s = await estado(pg); ok(s.tela === 'morte', 'morte leva à tela de morte');
-  ok(!(await pg.evaluate(() => /faltaram/i.test(document.body.innerText))), 'tela de morte normal é honesta (sem quase-vitória)');
-  await pg.close();
+  // 7. viagem de ida e volta (gasta combustível e troca de zona)
+  const comb0 = (await estado()).combustivel;
+  await ev(() => window.__cinzas.ponte.cmd.viajar('ermo'));
+  ok('viaja para o Ermo', await ate(() => { const s = window.__cinzas.store.getState(); return s.zonaId === 'ermo' && s.carga >= 1; }, 60000), JSON.stringify(await estado()));
+  s = await estado(); ok('a viagem gastou combustível', s.combustivel < comb0, `${comb0} → ${s.combustivel}`);
+  await espera(2500); await foto('4-ermo');
+  const z = await ev(() => { const k = window.__cinzas.cena(); return { ents: k.ents.length, flora: k.floras.length, props: k.props.length }; });
+  ok('o Ermo tem criaturas, flora e objetos', z.ents > 0 && z.flora > 20 && z.props > 5, JSON.stringify(z));
 
-  // ---- modo estudo
-  pg = await abrir('?estudo=1');
-  ok(await pg.evaluate(() => document.body.innerText.includes('PERDIDO')), 'estudo: menu mostra aversão à perda');
-  await clicar(pg, 'Sobreviver'); await pg.waitForSelector('canvas'); await pg.waitForFunction(() => window.__cinzas && window.__cinzas.store.getState().carga >= 1, { timeout: 60000 }); await esp(1500);
-  await pg.evaluate(() => { window.__cinzas.cena().machucar(500, 0); }); await pg.waitForFunction(() => window.__cinzas.store.getState().tela === 'morte', { timeout: 15000 }).catch(() => {}); await pg.waitForFunction(() => /faltaram/i.test(document.body.innerText), { timeout: 10000 }).catch(() => {});
-  ok(await pg.evaluate(() => /faltaram só/i.test(document.body.innerText)), 'estudo: quase-vitória fabricada aparece'); await foto(pg, '8-estudo-morte');
-  await clicar(pg, 'Reviver'); await esp(300); await foto(pg, '9-loja');
-  ok(await pg.evaluate(() => document.body.innerText.includes('MAIS POPULAR')), 'estudo: loja com ancoragem');
-  await clicar(pg, 'Comprar'); await esp(300); await foto(pg, '10-revelacao');
-  const n = await pg.evaluate(() => document.querySelectorAll('.manip').length); ok(n >= 6, `revelação lista as técnicas (${n})`);
-  ok(await pg.evaluate(() => document.body.innerText.includes('Nada foi cobrado')), 'revelação avisa que nada foi cobrado');
-  await pg.close();
-  ok(erros.length === 0, 'sem erros no console' + (erros.length ? ': ' + [...new Set(erros)].slice(0, 5).join(' | ') : ''));
-} finally { await nav.close(); srv.close(); }
-if (falhas.length) { console.log(`\n${falhas.length} falha(s)`); process.exit(1); }
-console.log('\nsmoke OK');
+  // 7b. saque de um contêiner no Ermo
+  const vas0 = await ev(() => window.__cinzas.store.getState().vasculhados);
+  const alvoSaque = await ev(() => {
+    const k = window.__cinzas.cena(), it = k.interativos.filter(i => /vasculhar/i.test(i.rot) && i.ok()).sort((x, y) => Math.hypot(x.x - k.jog.x, x.y - k.jog.y) - Math.hypot(y.x - k.jog.x, y.y - k.jog.y))[0]; if (!it) return null;
+    k.s.hp = 100; k.jog.x = it.x; k.jog.y = it.y + 0.8; k.alvoInter = it; window.__cinzas.ponte.cmd.interagir(); return it.rot;
+  });
+  ok('há contêiner para vasculhar no Ermo', !!alvoSaque, String(alvoSaque));
+  ok('vasculhar conclui e conta o saque', alvoSaque && await ate(v => window.__cinzas.store.getState().vasculhados > v, 12000, vas0));
+
+  // 8. salvar, recarregar a página e continuar
+  await ev(() => window.__cinzas.ponte.cmd.salvar()); await espera(300);
+  await pg.goto(url, { waitUntil: 'networkidle0' });
+  ok('menu oferece "Continuar" após recarregar', await ev(() => [...document.querySelectorAll('button')].some(b => /^continuar/i.test(b.textContent.trim()))));
+  await toque('^continuar'); ok('continua o jogo salvo', await jogoPronto());
+  s = await estado(); ok('retoma na zona salva', s.zonaId === 'ermo', JSON.stringify(s));
+
+  // 9. morte e tela final
+  await ev(() => { const k = window.__cinzas.cena(); k.s.hp = 1; k.dev('corredor', 0.7, 0.1); k.dev('corredor', -0.7, 0.1); });
+  ok('a morte leva à tela final', await ate(() => window.__cinzas.store.getState().tela === 'morte', 25000));
+  await espera(800); await foto('5-morte');
+  ok('a tela final mostra o resumo da run', /sobreviveu|resumo|dia|abates/i.test(await ev(() => document.body.innerText)));
+
+  // 10. Modo Estudo (reportagem) abre sem quebrar
+  await pg.goto(url + '?estudo=1', { waitUntil: 'networkidle0' }); await espera(600);
+  ok('Modo Estudo carrega', /estudo|b[oô]nus|sequ[eê]ncia/i.test(await ev(() => document.body.innerText)));
+  await ev(() => localStorage.removeItem('cinzas.estudo'));
+
+  ok('nenhum erro de console/exceção em todo o teste', erros.length === 0, erros.slice(0, 3).join(' | '));
+} catch (e) { console.log('O TESTE QUEBROU:', String(e.stack ?? e).slice(0, 700)); codigo = 3; }
+
+await nav.close(); srv.close();
+const falhas = resultados.filter(r => !r.ok);
+console.log(`\n${resultados.length - falhas.length}/${resultados.length} verificações passaram.`);
+process.exit(codigo || (falhas.length ? 1 : 0));

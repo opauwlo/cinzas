@@ -3,6 +3,8 @@
 Passagem de bastão da sessão de chat (31/out/2026) para a sessão de Code.
 Leia inteiro antes de começar. Nome **CINZAS** é provisório.
 
+> **Atualização (31/out/2026):** o estado ATUAL do projeto está na **seção 15**. As seções 11–14 descrevem a versão anterior (`game/voxel.ts`, `game/mapa.ts`, `game/modelos.ts`… foram substituídos pela biblioteca em `game/lib/`, zonas em `game/zona.ts` etc.).
+
 ## 1. O que o Uwlo pediu
 
 - **Gênero:** survival **pós-apocalíptico nuclear** (fim do mundo por bomba atômica). **Não é zumbi.**
@@ -287,3 +289,32 @@ Pedido do Uwlo: pixel art grande em tamanho normal, visão isométrica como Proj
 - `npm run empacotar` gera `dist-artifact/` (ignorado pelo git): `artifact.html` (fragmento para o Artifact) e `index.html` (documento completo, para testar com `RAIZ=dist-artifact/ node tools/smoke.mjs`). JS, CSS, fontes e ícones vão num arquivo só.
 - GitHub Pages não foi usado: exige mesclar na `main` e ativar Pages nas configurações. Para publicar lá, é preciso `basePath` e prefixo nos caminhos `/icons/...`.
 - O link do artifact não aceita `?estudo=1`: toque 7 vezes no título CINZAS para ligar/desligar o Modo Estudo. O compartilhamento nativo é recusado no artifact; o card abre numa tela para segurar e salvar.
+
+## 15. Reescrita "produto" (sessão de Code, 31/out/2026) — ESTADO ATUAL
+
+**Pedido do Uwlo:** parar de empacotar artifact; HUD refatorado e mais espaço pro jogo; animação; diversidade de plantas e bichos; vento, ciclo dia/noite, clima (chuva, tempestade…); gangues, mutantes gigantes, membros faltando; **biblioteca de componentes raiz** para montar qualquer coisa de forma procedural; cara de produto; melhor jogabilidade/botões/som/exploração; vibe *The Last Day on Earth*, Android, viagens.
+
+### Mapa do código
+- `game/lib/` — **biblioteca raiz procedural**. `vox.ts` (grade voxel, `carimbar` 3D com matrizes, `renderVox` = ray-cast ortográfico 30° com faixas de luz e contorno), `rig.ts` (articulação), `humano.ts`/`fauna.ts`/`flora.ts`/`props.ts` (receitas `Rec*` + geradores `gerar*` + clipes de animação), `fabrica.ts` (fábrica preguiçosa com orçamento de ms e poda), `paletas.ts`, `cor.ts`, `rng.ts`. **Criar bicho/planta/prop novo = uma entrada de dados**, sem desenhar sprite.
+- `game/dados/` — `itens.ts` (itens, armas, receitas, cozinha, loot), `criaturas.ts` (arquétipos: zumbis, gangues, fauna, colosso), `biomas.ts`, `locais.ts` (mapa-múndi e custo de viagem).
+- `game/zona.ts` — gerador único de zonas (base, ermo, cidade, floresta, industrial, pântano) com props interativos, flora, spawns, acampamentos de gangue, POIs, luzes. `game/chao.ts` — chão isométrico contínuo.
+- `game/sistemas/` — `clima.ts` (chuva/tempestade/neblina/poeira/ácida, raios, vento, grade de cor por hora), `particulas.ts`, `ia.ts` (famílias de IA), `acoes.ts` (interações, fabricar, cozinhar, dormir, viajar, morte/vitória), `salvar.ts` (`localStorage cinzas.save.v2`).
+- `game/cena.ts` — cena Phaser (luz/visão, camadas, vento, loop). `game/audio.ts` — barramentos + ambiente em camadas + música de drone.
+- UI: `components/Hud.tsx` (HUD em tela cheia, área segura), `Controles.tsx` (joysticks próprios), `Paineis.tsx`, `Telas.tsx`. `app/arte/` — catálogo visual da biblioteca (`/arte/?g=humanos|animais|clipes|colosso|flora|props`).
+
+### Jogo
+Base (abrigo com cama, baú, bancada, fogão, horta, tanque de chuva) → jipe → mapa → viagem (gasta combustível e horas) → saque/combate/gangues/colosso → volta. Salva sozinho (continuar no menu). Vitória: rádio de campanha → Abrigo 7.
+
+### Testes e ferramentas
+- `npm run build` e depois `npm run smoke`: 33 verificações em Chrome headless (menu, manifesto PWA, base, movimento, estações, fabricar, cozinhar, baú, sono, combate, climas, viagem, saque, salvar/continuar, morte, Modo Estudo). ~3 min em GL por software. Capturas: `node tools/smoke.mjs <pasta>`.
+- Para depurar no console: `window.__cinzas` (`cena()`, `store`, `ponte`) e `cena().dev('lobo', 3, 0)` cria criatura perto do jogador.
+- `tools/icones.mjs` gera `public/pwa/*`. `tools/empacotar.mjs`/`entrada.tsx` (artifact em arquivo único) são **legado: não usar mais**.
+
+### Publicação (Android/PWA)
+`app/manifest.ts`, `public/sw.js` (offline), `components/RegistrarSW.tsx`, ícones em `public/pwa/`. Para hospedar em subcaminho defina `NEXT_PUBLIC_BASE_PATH=/cinzas` na build. `.github/workflows/pages.yml` publica no **GitHub Pages** a cada push na `main` — o Uwlo precisa ligar uma vez: *Settings → Pages → Source: GitHub Actions*. No Android: abrir o link no Chrome → menu → **Instalar app**.
+
+### Pendências / ideias
+- Testar em celular de verdade (desempenho, toque, áudio) e ajustar `cfg.escala`/qualidade.
+- Habilidades/XP, coquetel molotov, evento de lançamento de suprimentos, mais eventos de viagem, mais biomas, multiplayer P2P (§8).
+- Modo Estudo: `executarMorte` usa uma distância placeholder (143) para a "quase-vitória" — trocar por distância real ao Abrigo 7.
+

@@ -19,8 +19,8 @@
 
 ## Código (npm, em uso)
 
-Next.js, React, Phaser 4.2.1, nipplejs, simplex-noise, alea, zustand, ZzFX (MIT); rot-js (BSD-3-Clause, FOV e A*). Fontes via @fontsource: Silkscreen, VT323 (OFL). Ícones convertidos em pixel art em tempo de execução (`components/Ico.tsx`). Personagens, props e paredes são renderizados de modelos voxel próprios (`game/voxel.ts`). `app/icon.svg` é o ícone radioactive (Lorc, CC BY 3.0).
+Next.js, React, Phaser 4.2.1, simplex-noise, alea, zustand, ZzFX (MIT; usamos o `buildSamples` com barramentos de áudio próprios); rot-js (BSD-3-Clause, FOV e A*). Fontes via @fontsource: Silkscreen, VT323 (OFL). Ícones convertidos em pixel art em tempo de execução (`components/Ico.tsx`). Todo o resto da arte (personagens, criaturas, flora, props, paredes) é gerado por código próprio: a biblioteca procedural em `game/lib/` (voxel → sprite isométrico em 8 direções). `app/icon.svg` é o ícone radioactive (Lorc, CC BY 3.0); os ícones do PWA em `public/pwa/` são gerados dele por `tools/icones.mjs`.
 
 ## Código (a ser incluído — ver HANDOFF.md §5)
 
-Phaser (MIT), Box2D v3 (MIT), walloc (MIT), Trystero (MIT), @noble/secp256k1 (MIT), nipplejs (MIT), ZzFX (MIT), simplex-noise (MIT), alea (MIT), PathFinding.js e heap.js (MIT). Ao vendorizar qualquer um, copiar o arquivo de licença junto.
+Phaser (MIT), Box2D v3 (MIT), walloc (MIT), Trystero (MIT), @noble/secp256k1 (MIT), ZzFX (MIT), simplex-noise (MIT), alea (MIT), PathFinding.js e heap.js (MIT). Ao vendorizar qualquer um, copiar o arquivo de licença junto.
