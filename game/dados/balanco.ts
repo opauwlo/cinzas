@@ -6,10 +6,13 @@ import { ARMAS } from './itens';
 // ---------------------------------------------------------------- tempo e necessidades
 export const DIA_REAL_MIN = 14;                              // 1 dia de jogo = 14 min reais
 export const MIN_POR_SEG = 1440 / (DIA_REAL_MIN * 60);       // minutos de jogo por segundo real
-export const FOME_POR_MIN = 0.044;                           // pontos por minuto de jogo: 100 → 0 em ~22 min reais (Normal)
-export const SEDE_POR_MIN = 0.07;                            // 100 → 0 em ~14 min reais (Normal)
+export const FOME_POR_MIN = 0.036;                           // pontos por minuto de jogo: 100 → 0 em ~34 min reais (Normal)
+export const SEDE_POR_MIN = 0.055;                           // 100 → 0 em ~22 min reais (Normal)
+export const REGEN_VIDA = 0.35;                              // vida por segundo quando está alimentado e hidratado (cura sozinho em poucos minutos)
+export const RAID_DIA_MIN = 3;                               // a primeira invasão ao abrigo só chega a partir deste dia
+export const VIDA_POR_NIVEL = 4;                            // cada nível sobe a vida máxima (progressão que se sente)
 /** multiplicadores por dificuldade (0 Calmo · 1 Normal · 2 Brutal) */
-export const DIF = { dano: [0.75, 1, 1.3], fome: [0.8, 1, 1.2], xp: [0.9, 1, 1.25], spawn: [0.7, 1, 1.4], raid: [0.8, 1, 1.35], chanceRaid: [0.35, 0.5, 0.7] } as const;
+export const DIF = { dano: [0.5, 0.75, 1.1], fome: [0.6, 0.8, 1.1], xp: [1.2, 1, 1.2], spawn: [0.45, 0.7, 1.2], raid: [0.5, 0.8, 1.3], chanceRaid: [0.15, 0.35, 0.65] } as const;
 export const segundosAteZerar = (taxaPorMin: number, dif = 1, mult = 1) => 100 / (taxaPorMin * DIF.fome[dif] * mult) / MIN_POR_SEG;
 
 // ---------------------------------------------------------------- progressão
@@ -29,7 +32,7 @@ export function perdaEmLuta(armaId: string, arqId: string, n: number, dif = 1, v
 }
 
 // ---------------------------------------------------------------- invasões ao abrigo
-export function tamanhoRaid(dia: number, muro: number, dif = 1) { return Math.max(2, Math.min(10, Math.round((1.5 + dia * 0.8) * (1 - 0.2 * muro) * DIF.raid[dif]))); }
+export function tamanhoRaid(dia: number, muro: number, dif = 1) { return Math.max(1, Math.min(10, Math.round((1 + dia * 0.6) * (1 - 0.2 * muro) * DIF.raid[dif]))); }
 
 // ---------------------------------------------------------------- economia de troca (NPCs): valor em fichas
 export const VALOR: Record<string, number> = {

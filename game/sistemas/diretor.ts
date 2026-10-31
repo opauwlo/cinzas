@@ -12,7 +12,7 @@ import { ITENS } from '../dados/itens';
 import { criarEnt } from './ia';
 import { montarInterativos } from './acoes';
 import { DIF, dif, melNivel, ganharXp, registrar } from './progresso';
-import { tamanhoRaid } from '../dados/balanco';
+import { tamanhoRaid, RAID_DIA_MIN } from '../dados/balanco';
 export { airdropColetado } from './progresso';
 
 const ID_AIRDROP = 910000;
@@ -98,7 +98,7 @@ export function atualizarDiretor(c: Cena, _dt: number) {
     return;
   }
   const forcar = c.devForcar === 'raid';
-  if (c.raid || (!forcar && (d < 2 || s.raidDia === d || h < 21.5 || h >= 23.5))) return;
+  if (c.raid || (!forcar && (d < RAID_DIA_MIN || s.raidDia === d || h < 21.5 || h >= 23.5))) return;
   s.raidDia = d; const rng = new Rng(`${s.seed}|raid|${d}`); if (!forcar && !rng.chance(DIF.chanceRaid[dif(s)])) return; c.devForcar = null;
   toast('Rádio: movimento suspeito ao norte do abrigo. Prepare-se!', '#e0b83a'); sfx.sinal();
   c.time.delayedCall(forcar ? 1200 : 9000, () => {

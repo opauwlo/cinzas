@@ -4,10 +4,11 @@ import assert from 'node:assert/strict';
 import { ARQS } from '../../game/dados/criaturas';
 import { ARMAS, ITENS } from '../../game/dados/itens';
 import { BIOMAS } from '../../game/dados/biomas';
-import { LOCAIS } from '../../game/dados/locais';
+import { LOCAIS, custoViagem } from '../../game/dados/locais';
+import { estadoInicial } from '../../game/store';
 import { Rng } from '../../game/lib/rng';
 import { gerarZona } from '../../game/zona';
-import { DIF, FOME_POR_MIN, SEDE_POR_MIN, danoPorAcao, acoesParaMatar, dpsInimigo, perdaEmLuta, segundosAteZerar, tamanhoRaid, xpNivel, xpAcumulado, nivelPorXp } from '../../game/dados/balanco';
+import { DIF, FOME_POR_MIN, SEDE_POR_MIN, REGEN_VIDA, RAID_DIA_MIN, VIDA_POR_NIVEL, danoPorAcao, acoesParaMatar, dpsInimigo, perdaEmLuta, segundosAteZerar, tamanhoRaid, xpNivel, xpAcumulado, nivelPorXp } from '../../game/dados/balanco';
 import { planejarNpcs, falaDe, estoqueMascate, vendavel, TIPOS_NPC, type CtxFala } from '../../game/dados/npcs';
 import { OBJETIVOS } from '../../game/dados/objetivos';
 import { VALOR, precoCompra, precoVenda } from '../../game/dados/balanco';
@@ -20,14 +21,14 @@ const ctx = (o: Partial<CtxSpawn> = {}): CtxSpawn => ({ hora: 12, nivel: 1, dia:
 const HOSTIS_BASICOS = ['irradiado', 'corredor', 'rastejador', 'cao', 'lobo', 'javali', 'rato', 'barata', 'escorpiao', 'aranha'];
 
 // ================================================================ combate
-teste('um irradiado sozinho custa 8–30% da vida com o pé de cabra', () => entre(perdaEmLuta('pe_de_cabra', 'irradiado', 1), 0.08, 0.3, 'perda 1 irradiado'));
-teste('3 irradiados ao mesmo tempo são perigosos mas sobrevivíveis (45–90%)', () => entre(perdaEmLuta('pe_de_cabra', 'irradiado', 3), 0.45, 0.9, 'perda 3 irradiados'));
+teste('um irradiado sozinho custa 4–15% da vida com o pé de cabra (Normal)', () => entre(perdaEmLuta('pe_de_cabra', 'irradiado', 1), 0.04, 0.15, 'perda 1 irradiado'));
+teste('3 irradiados ao mesmo tempo são perigosos mas sobrevivíveis (25–60%) e no Calmo quase não matam (≤ 40%)', () => { entre(perdaEmLuta('pe_de_cabra', 'irradiado', 3), 0.25, 0.6, 'perda 3 irradiados'); assert.ok(perdaEmLuta('pe_de_cabra', 'irradiado', 3, 0) <= 0.4, 'Calmo deveria ser bem leve'); });
 teste('matilhas e javalis do começo não matam no corpo a corpo', () => {
-  entre(perdaEmLuta('pe_de_cabra', 'corredor', 2), 0.2, 0.5, 'corredor x2'); entre(perdaEmLuta('pe_de_cabra', 'cao', 3), 0.3, 0.6, 'cão x3');
-  entre(perdaEmLuta('pe_de_cabra', 'lobo', 3), 0.3, 0.65, 'lobo x3'); entre(perdaEmLuta('pe_de_cabra', 'javali', 2), 0.4, 0.85, 'javali x2');
+  entre(perdaEmLuta('pe_de_cabra', 'corredor', 2), 0.1, 0.4, 'corredor x2'); entre(perdaEmLuta('pe_de_cabra', 'cao', 3), 0.15, 0.45, 'cão x3');
+  entre(perdaEmLuta('pe_de_cabra', 'lobo', 3), 0.2, 0.5, 'lobo x3'); entre(perdaEmLuta('pe_de_cabra', 'javali', 2), 0.25, 0.65, 'javali x2');
 });
-teste('o Colosso é chefe: mata no corpo a corpo com qualquer arma, mas cai em ≤ 24 golpes/tiros', () => {
-  for (const a of ['pe_de_cabra', 'machado', 'pistola', 'escopeta', 'rifle']) { assert.ok(perdaEmLuta(a, 'colosso', 1) >= 0.8, `colosso x ${a} deveria ser letal de perto`); assert.ok(acoesParaMatar(a, 'colosso') <= 24, `${a} precisa de golpes demais`); }
+teste('o Colosso é chefe: letal de perto com arma branca (≥ 80%) e ≥ 40% com arma de fogo, mas cai em ≤ 24 golpes/tiros', () => {
+  for (const a of ['pe_de_cabra', 'machado', 'pistola', 'escopeta', 'rifle']) { assert.ok(perdaEmLuta(a, 'colosso', 1) >= (ARMAS[a].alvo === 'melee' ? 0.8 : 0.4), `colosso x ${a} deveria ser perigoso de perto`); assert.ok(acoesParaMatar(a, 'colosso') <= 24, `${a} precisa de golpes demais`); }
   assert.ok(acoesParaMatar('escopeta', 'colosso') >= 5, 'o Colosso não pode cair em menos de 5 tiros');
 });
 teste('armas melhores têm ao menos 1,3x o DPS do pé de cabra (progressão que dá gosto)', () => {
@@ -37,13 +38,13 @@ teste('armas melhores têm ao menos 1,3x o DPS do pé de cabra (progressão que 
 teste('qualquer hostil básico leva ≥ 6 s para matar o jogador sozinho (Normal)', () => { for (const id of HOSTIS_BASICOS) assert.ok(100 / dpsInimigo(id, 1) >= 6, `${id} mata em ${(100 / dpsInimigo(id, 1)).toFixed(1)} s`); });
 teste('a dificuldade ordena a perda de vida: Calmo < Normal < Brutal', () => {
   for (const [a, e, n] of [['pe_de_cabra', 'irradiado', 3], ['pe_de_cabra', 'cao', 3], ['faca', 'corredor', 2]] as [string, string, number][]) {
-    const [c, nm, b] = [0, 1, 2].map(d => perdaEmLuta(a, e, n, d)); assert.ok(c < nm && nm < b, `${a} x ${e}: ${c.toFixed(2)} / ${nm.toFixed(2)} / ${b.toFixed(2)}`); entre(c / nm, 0.7, 0.8, 'razão Calmo/Normal'); entre(b / nm, 1.25, 1.35, 'razão Brutal/Normal');
+    const [c, nm, b] = [0, 1, 2].map(d => perdaEmLuta(a, e, n, d)); assert.ok(c < nm && nm < b, `${a} x ${e}: ${c.toFixed(2)} / ${nm.toFixed(2)} / ${b.toFixed(2)}`); entre(c / nm, 0.62, 0.72, 'razão Calmo/Normal'); entre(b / nm, 1.4, 1.55, 'razão Brutal/Normal');
   }
 });
 
 // ================================================================ necessidades e progressão
-teste('sede 100→0 em 12–16 min reais (Normal) e fome em 19–25 min; água é mais urgente que comida', () => {
-  const sede = segundosAteZerar(SEDE_POR_MIN) / 60, fome = segundosAteZerar(FOME_POR_MIN) / 60; entre(sede, 12, 16, 'sede (min)'); entre(fome, 19, 25, 'fome (min)'); assert.ok(sede < fome, 'a sede deve vencer antes da fome');
+teste('sede 100→0 em 19–26 min reais (Normal) e fome em 28–40 min; água é mais urgente que comida', () => {
+  const sede = segundosAteZerar(SEDE_POR_MIN) / 60, fome = segundosAteZerar(FOME_POR_MIN) / 60; entre(sede, 19, 26, 'sede (min)'); entre(fome, 28, 40, 'fome (min)'); assert.ok(sede < fome, 'a sede deve vencer antes da fome');
 });
 teste('Calmo dá ≥ 15% mais tempo que Normal; Brutal ≤ 90% do Normal', () => {
   const t = (d: number) => segundosAteZerar(SEDE_POR_MIN, d); assert.ok(t(0) >= t(1) * 1.15 && t(2) <= t(1) * 0.9, `${t(0).toFixed(0)} / ${t(1).toFixed(0)} / ${t(2).toFixed(0)}`);
@@ -52,9 +53,9 @@ teste('curva de XP: crescente e com ritmo razoável (nível 5 ≈ 440, nível 10
   for (let n = 1; n < 20; n++) assert.ok(xpNivel(n + 1) > xpNivel(n)); entre(xpAcumulado(5), 300, 600, 'XP até nível 5'); entre(xpAcumulado(10), 1200, 2500, 'XP até nível 10');
   assert.equal(nivelPorXp(xpAcumulado(7)), 7); assert.equal(nivelPorXp(xpAcumulado(7) - 1), 6);
 });
-teste('tamanho da invasão: cresce com os dias, cai com a muralha, respeita a dificuldade e os limites', () => {
-  assert.ok(tamanhoRaid(2, 0, 1) <= 3, 'a primeira invasão (dia 2) deve ter ≤ 3 inimigos');
-  for (let d = 2; d < 14; d++) { assert.ok(tamanhoRaid(d + 1, 0) >= tamanhoRaid(d, 0)); for (const m of [0, 1, 2, 3]) entre(tamanhoRaid(d, m), 2, 10, `raid dia ${d} muro ${m}`); }
+teste('tamanho da invasão: só a partir do dia 3, cresce com os dias, cai com a muralha, respeita a dificuldade e os limites', () => {
+  assert.equal(RAID_DIA_MIN, 3); assert.ok(tamanhoRaid(RAID_DIA_MIN, 0, 1) <= 2, 'a primeira invasão deve ter ≤ 2 inimigos (Normal)'); assert.ok(tamanhoRaid(RAID_DIA_MIN, 0, 0) <= 1, 'no Calmo a primeira invasão tem 1 inimigo');
+  for (let d = 2; d < 14; d++) { assert.ok(tamanhoRaid(d + 1, 0) >= tamanhoRaid(d, 0)); for (const m of [0, 1, 2, 3]) entre(tamanhoRaid(d, m), 1, 10, `raid dia ${d} muro ${m}`); }
   for (const d of [3, 6, 9]) { assert.ok(tamanhoRaid(d, 3) <= tamanhoRaid(d, 0) * 0.6 + 1, `a muralha 3 deveria cortar ~60% no dia ${d}`); assert.ok(tamanhoRaid(d, 0, 0) <= tamanhoRaid(d, 0, 1) && tamanhoRaid(d, 0, 1) <= tamanhoRaid(d, 0, 2)); }
 });
 
@@ -69,7 +70,7 @@ teste('alvo de hostis: 0 no abrigo; noite ≥ dia; Calmo ≤ Normal ≤ Brutal; 
     for (const d of [0, 1, 2]) { const dia = alvoHostis(b, ctx({ hora: 12, dif: d })), noite = alvoHostis(b, ctx({ hora: 0, dif: d })); assert.ok(noite >= dia, `${b.id}: noite ${noite} < dia ${dia}`); entre(noite, 0, 9, `${b.id} noite`); }
     if (b.inimigos.length) { const [c, n, br] = [0, 1, 2].map(d => alvoHostis(b, ctx({ hora: 0, dif: d }))); assert.ok(c <= n && n <= br && c < br, `${b.id} dif: ${c}/${n}/${br}`); assert.ok(alvoHostis(b, ctx({ hora: 0, interior: true })) <= alvoHostis(b, ctx({ hora: 0 })), `${b.id} interior`); }
   }
-  const noite = (id: string) => alvoHostis(BIOMAS[id], ctx({ hora: 0 })); assert.ok(noite('cidade') >= noite('ermo') && noite('ermo') >= noite('floresta'), 'cidade ≥ ermo ≥ floresta à noite');
+  const noite = (id: string) => alvoHostis(BIOMAS[id], ctx({ hora: 0 })); assert.ok(noite('cidade') >= noite('floresta') && noite('floresta') >= noite('ermo'), 'cidade ≥ floresta ≥ ermo à noite (cresce com o perigo)');
 });
 teste('alvo de hostis no nível 1 (Normal): ≤ 3 de dia e ≤ 5 de noite em qualquer bioma; cresce com o nível sem estourar', () => {
   for (const b of Object.values(BIOMAS)) { assert.ok(alvoHostis(b, ctx({ hora: 12 })) <= 3, `${b.id} dia`); assert.ok(alvoHostis(b, ctx({ hora: 0 })) <= 5, `${b.id} noite`); assert.ok(alvoHostis(b, ctx({ hora: 0, nivel: 10, dia: 10 })) <= 9); assert.ok(alvoHostis(b, ctx({ hora: 0, nivel: 10 })) >= alvoHostis(b, ctx({ hora: 0, nivel: 1 }))); }
@@ -126,6 +127,17 @@ teste('economia: toda zona tem ≥ 1 dia de água e de comida (soltos, saque e r
   }
 });
 teste('a geração é determinística (mesma seed, mesma população)', () => { const a = zonas('ermo')[0], b = zonas('ermo')[0]; assert.deepEqual(a.spawns, b.spawns); assert.deepEqual(a.soltos, b.soltos); });
+
+// ================================================================ primeiros minutos: o jogo precisa ser acolhedor
+teste('início acolhedor: o kit inicial cobre a primeira meia hora, a vida volta sozinha em poucos minutos e cresce com o nível', () => {
+  const e = estadoInicial('inicio'), agua = (e.inv.agua ?? 0) * (ITENS.agua.sede ?? 0), comida = (e.inv.enlatado ?? 0) * (ITENS.enlatado.fome ?? 0);
+  assert.ok(agua >= 100, `água inicial só repõe ${agua} de sede`); assert.ok(comida >= 100, `comida inicial só repõe ${comida} de fome`);
+  assert.ok((e.inv.bandagem ?? 0) >= 3, 'faltam curativos no começo'); assert.ok(ITENS.bandagem.hp! >= 12, 'a bandagem cura pouco'); assert.ok(e.combustivel >= 8, 'combustível para ao menos 3 viagens');
+  assert.ok(50 / REGEN_VIDA <= 180, `curar 50% leva ${(50 / REGEN_VIDA).toFixed(0)} s`); assert.ok(100 + VIDA_POR_NIVEL * 10 >= 130, 'a vida deve crescer com o nível');
+});
+teste('viagens: o combustível inicial dá para ir e voltar ao Ermo e à Floresta sem precisar achar combustível', () => {
+  const e = estadoInicial('inicio'); let gasto = 0; for (const d of ['ermo', 'floresta']) gasto += 2 * custoViagem('base', d).combustivel; assert.ok(gasto <= e.combustivel, `ida e volta custa ${gasto} de ${e.combustivel}`);
+});
 void DIF;
 
 // ================================================================ NPCs: presença no mundo, falas e troca

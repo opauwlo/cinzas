@@ -43,8 +43,8 @@ export const pesoInv = (inv: Record<string, number>) => pesoDe(inv);
 let tid = 1;
 export const estadoInicial = (seed: string) => ({
   seed, zonaId: 'base', zonaNome: 'Abrigo', biomaId: 'base', minutos: 8 * 60, hp: 100, maxHp: 100, fome: 78, sede: 70, stamina: 100, rad: 0, sangra: false,
-  inv: { agua: 1, bandagem: 2, pe_de_cabra: 1, enlatado: 1 } as Record<string, number>, bau: { tecido: 3, madeira: 4, sucata: 4, enlatado: 2, alcool: 1, garrafa: 2, semente: 2, ficha: 6 } as Record<string, number>,
-  arma: 'pe_de_cabra' as string | null, balas: { municao: 0, cartucho: 0 } as Record<string, number>, mascara: false, combustivel: 6, lanterna: { tem: false, ligada: false, bat: 100 },
+  inv: { agua: 3, bandagem: 4, pe_de_cabra: 1, enlatado: 3, faca: 1 } as Record<string, number>, bau: { tecido: 3, madeira: 4, sucata: 4, enlatado: 2, alcool: 1, garrafa: 2, semente: 2, ficha: 6 } as Record<string, number>,
+  arma: 'pe_de_cabra' as string | null, balas: { municao: 0, cartucho: 0 } as Record<string, number>, mascara: false, combustivel: 8, lanterna: { tem: false, ligada: false, bat: 100 },
   cpm: 18, objIdx: 0, objVal: 0, banner: null, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
   clima: { tipo: 'limpo', chuva: 0, vento: 0.1, neblina: 0, poeira: 0, nuvem: 0.1 } as ClimaHud, interior: false, tanque: 0,
   toasts: [] as Toast[], acao: null, alvo: null, furtivo: false, danoTs: 0, resumo: null, descobertos: ['base'] as string[], dica: null,
@@ -62,10 +62,10 @@ export const useJogo = create<Estado>((set, get) => ({
 }));
 
 // ---- meta-progresso local (o que fica depois da morte)
-export type Meta = { runs: number; melhorTempo: number; abatesTotais: number; sequencia: number; ultimoDia: string; vitorias: number; dicas: string[]; conquistas: string[]; intro: boolean; dif: number; melhorNivel: number };
-const META0: Meta = { runs: 0, melhorTempo: 0, abatesTotais: 0, sequencia: 0, ultimoDia: '', vitorias: 0, dicas: [], conquistas: [], intro: false, dif: 1, melhorNivel: 1 };
+export type Meta = { runs: number; melhorTempo: number; abatesTotais: number; sequencia: number; ultimoDia: string; vitorias: number; dicas: string[]; conquistas: string[]; intro: boolean; dif: number; melhorNivel: number; v?: number };
+const META0: Meta = { runs: 0, melhorTempo: 0, abatesTotais: 0, sequencia: 0, ultimoDia: '', vitorias: 0, dicas: [], conquistas: [], intro: false, dif: 0, melhorNivel: 1, v: 2 };
 export const hoje = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-export function lerMeta(): Meta { try { return { ...META0, ...JSON.parse(localStorage.getItem('cinzas.meta') ?? '{}') }; } catch { return { ...META0 }; } }
+export function lerMeta(): Meta { try { const salvo = JSON.parse(localStorage.getItem('cinzas.meta') ?? '{}'), m: Meta = { ...META0, ...salvo }; if ((salvo.v ?? 1) < 2) { m.v = 2; m.dif = 0; gravarMeta(m); } /* v2: o jogo ficou mais gentil e o padrão passou a ser Calmo */ return m; } catch { return { ...META0 }; } }
 export function gravarMeta(m: Meta) { try { localStorage.setItem('cinzas.meta', JSON.stringify(m)); } catch { /* sem storage */ } }
 export function registrarDia(): Meta {
   const m = lerMeta(); const h = hoje();
@@ -78,7 +78,7 @@ export function registrarDia(): Meta {
 import type { Run } from './sistemas/salvar';
 export function novoRun(seed: string, bonus = false, dif = 1): Run {
   const e = estadoInicial(seed), inv = { ...e.inv }; if (bonus) inv.kit = 1;
-  return { seed, zonaId: 'base', minutos: e.minutos, hp: 100, maxHp: 100, fome: e.fome, sede: e.sede, stamina: 100, rad: 0, sangra: false, radMax: 0, inv, bau: { ...e.bau }, arma: 'pe_de_cabra', balas: { municao: 0, cartucho: 0 }, mascara: false, combustivel: 6, lanterna: { tem: false, ligada: false, bat: 100 },
+  return { seed, zonaId: 'base', minutos: e.minutos, hp: 100, maxHp: 100, fome: e.fome, sede: e.sede, stamina: 100, rad: 0, sangra: false, radMax: 0, inv, bau: { ...e.bau }, arma: 'pe_de_cabra', balas: { municao: 0, cartucho: 0 }, mascara: false, combustivel: 8, lanterna: { tem: false, ligada: false, bat: 100 },
     vasculhados: 0, abates: 0, objIdx: 0, sabeAbrigo: false, descobertos: ['base'], tanque: 0, zonas: {}, viajou: false, craftou: false, noites: 0, dicas: [], tempoDeJogo: 0,
     xp: 0, nivel: 1, pontos: 0, perks: [], st: {}, contratos: [], nContratos: 0, mel: {}, dif, emboscada: null };
 }

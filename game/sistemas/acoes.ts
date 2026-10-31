@@ -13,7 +13,7 @@ import type { Ent } from './ia';
 import { Rng } from '../lib/rng';
 import { cabeNaMochila, sincGrade, adicionar, remover, linhasDe, emGrade } from './grade';
 import { EVENTOS_VIAGEM, type Ajuda, type EventoViagem } from '../dados/eventos';
-import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado } from './progresso';
+import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado, dif } from './progresso';
 
 /** registro para módulos que dependem deste (evita import circular): NPCs ligam aqui seus interativos e comandos */
 export const ganchos: { npc: ((c: Cena, e: Ent) => Interativo) | null; cmd: { agir(c: Cena, a: 'trocar' | 'rumor' | 'sair'): void; comprar(c: Cena, item: string): void; vender(c: Cena, item: string): void } | null } = { npc: null, cmd: null };
@@ -191,8 +191,20 @@ function dormir(c: Cena, horas: number) {
   const s = c.s; useJogo.setState({ painel: null }); c.scene.resume(); c.cameras.main.fadeOut(500, 5, 4, 6);
   c.time.delayedCall(600, () => { const cm = melNivel(s, 'cama'); c.avancar(horas * 60, 0.45); s.hp = Math.min(s.maxHp, s.hp + horas * 6 * [1, 1.5, 2][cm]); if (cm >= 1) s.sangra = false; if (cm >= 2) s.rad = Math.max(0, s.rad - 15); s.stamina = 100; c.salvar(); c.cameras.main.fadeIn(600, 5, 4, 6); toast(`Dormiu ${horas}h. Agora são ${horaStr(s.minutos)}.`, '#8fe36a'); });
 }
+/** Calmo: não existe morte permanente. Você desmaia, perde parte da mochila e acorda no abrigo seis horas depois. */
+function desmaiar(c: Cena, causa: string) {
+  c.morto = true; c.trava = true; sfx.morte(); c.iniciarMorte(); c.cameras.main.fadeOut(900, 20, 0, 0);
+  c.time.delayedCall(1000, () => {
+    const s = c.s, inv = { ...st().inv }, rng = new Rng(`${s.seed}|desmaio|${Math.floor(s.minutos)}`);
+    for (const id of Object.keys(inv)) { if (id === 'radio' || id === s.arma || (ITENS[id]?.tipo === 'equip')) continue; const perde = Math.min(inv[id], Math.floor(inv[id] * 0.4) + (rng.chance(0.4) ? 1 : 0)); if (perde > 0) { inv[id] -= perde; if (inv[id] <= 0) delete inv[id]; } }
+    useJogo.setState({ inv }); sincGrade(); s.inv = { ...st().inv }; s.bau = { ...st().bau };
+    s.hp = Math.max(s.hp, s.maxHp * 0.6); s.fome = Math.max(s.fome, 40); s.sede = Math.max(s.sede, 40); s.sangra = false; s.rad = Math.max(0, s.rad - 30); s.minutos += 360; s.st = s.st ?? {}; s.st.desmaios = (s.st.desmaios ?? 0) + 1;
+    s.px = undefined; s.py = undefined; c.salvar(); toast(`Você desmaiou (${causa.toLowerCase()}) e acordou no abrigo. Perdeu parte da mochila.`, '#d9a02b');
+    c.scene.restart({ run: c.s, zonaId: 'base', esc: c.esc });
+  });
+}
 export function executarMorte(c: Cena, causa: string) {
-  if (c.morto) return; c.morto = true; sfx.morte(); c.iniciarMorte(); c.cameras.main.fadeOut(1100, 20, 0, 0); apagarRun(); useJogo.setState({ temSave: false });
+  if (c.morto) return; if (dif(c.s) === 0) { desmaiar(c, causa); return; } c.morto = true; sfx.morte(); c.iniciarMorte(); c.cameras.main.fadeOut(1100, 20, 0, 0); apagarRun(); useJogo.setState({ temSave: false });
   const J = c.jog, dist = 0;
   c.time.delayedCall(1300, () => { c.sincronizar(); const dias = Math.floor(c.s.minutos / 1440) + 1; useJogo.setState({ resumo: { causa, dias, hora: horaStr(c.s.minutos), abates: c.s.abates, vasculhados: c.s.vasculhados, radMax: Math.round(c.s.radMax), vitoria: false, distAbrigo: dist + Math.round(Math.hypot(J.x - 48, J.y - 85) * 0) + 143, nivel: c.s.nivel, contratos: c.s.st?.contratos ?? 0, conquistas: [...c.novasConquistas] }, tela: 'morte', acao: null, painel: null }); });
 }

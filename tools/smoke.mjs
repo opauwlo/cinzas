@@ -234,6 +234,7 @@ try {
   ok('o abate é contado', contou, JSON.stringify({ antes: abates0, depois: (await estado()).abates }));
   await foto('3-combate');
   // 5b. ataque automático (botão segurado): olha em volta (360°), só bate com alvo ao alcance e nunca fere NPC
+  await ev(() => { window.__cinzas.cena().perkAvisado = 1e9; }); await limpaPaineis(); // o painel de habilidades abre sozinho em momento calmo e pausaria a cena aqui
   const auto1 = await ev(() => { const k = window.__cinzas.cena(), J = k.jog; return { vazio: k.mirarAuto(J.ang, true) === null }; });
   const auto2 = await ev(() => { const k = window.__cinzas.cena(), J = k.jog, e = k.dev('irradiado', -Math.cos(J.ang) * 1.3, -Math.sin(J.ang) * 1.3); e.hp = e.maxHp = 24; return { id: e.id, frente: k.mirarAuto(J.ang) !== null, volta: k.mirarAuto(J.ang, true) !== null }; });
   ok('ataque automático: sem inimigo por perto não há alvo', auto1.vazio === true);
@@ -358,9 +359,14 @@ try {
   s = await ev(() => { const t = window.__cinzas.store.getState(); return { nivel: t.nivel, perks: t.perks.length, tanque: t.mel.tanque }; });
   ok('nível, habilidades e melhorias sobrevivem ao salvar', s.nivel >= 5 && s.perks >= 4 && s.tanque === 1, JSON.stringify(s));
 
-  // 9. morte e tela final
-  await ev(() => { const k = window.__cinzas.cena(); k.s.hp = 1; k.dev('corredor', 0.7, 0.1); k.dev('corredor', -0.7, 0.1); });
-  ok('a morte leva à tela final', await ate(() => window.__cinzas.store.getState().tela === 'morte', 25000));
+  // 9. morte: no Calmo não existe morte permanente (desmaia e acorda no abrigo); no Normal leva à tela final
+  const antesM = await ev(() => { const k = window.__cinzas.cena(); return { zona: k.s.zonaId, itens: Object.values(window.__cinzas.store.getState().inv).reduce((a, b) => a + b, 0) }; });
+  await ev(() => { const k = window.__cinzas.cena(); k.s.dif = 0; k.s.hp = 1; k.dev('corredor', 0.7, 0.1); k.dev('corredor', -0.7, 0.1); });
+  ok('no Calmo morrer não é o fim: desmaia e acorda no abrigo', await ate(() => { const t = window.__cinzas.store.getState(); return t.zonaId === 'base' && t.carga >= 1 && t.tela === 'jogo'; }, 40000), JSON.stringify(antesM));
+  await espera(1200);
+  ok('ao acordar no abrigo a vida volta e a run segue viva', await ev(() => { const t = window.__cinzas.store.getState(); return t.hp >= 50 && t.tela === 'jogo' && t.zonaId === 'base'; }));
+  await ev(() => { const k = window.__cinzas.cena(); k.s.dif = 1; k.s.hp = 1; k.dev('corredor', 0.7, 0.1); k.dev('corredor', -0.7, 0.1); });
+  ok('no Normal a morte leva à tela final', await ate(() => window.__cinzas.store.getState().tela === 'morte', 25000));
   await espera(800); await foto('5-morte');
   ok('a tela final mostra o resumo da run', /sobreviveu|resumo|dia|abates/i.test(await ev(() => document.body.innerText)));
   ok('a tela final mostra nível e conquistas', /n[ií]vel/i.test(await ev(() => document.body.innerText)));

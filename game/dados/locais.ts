@@ -17,5 +17,5 @@ export const localPorId = (id: string) => LOCAIS.find(l => l.id === id)!;
 /** horas de viagem entre dois locais (mínimo 1) e combustível gasto */
 export function custoViagem(a: string, b: string, mecanico = false) {
   const A = localPorId(a), B = localPorId(b), horas = Math.max(1, Math.round(Math.hypot(A.x - B.x, (A.y - B.y) * 1.1) / 9));
-  return { horas, combustivel: Math.max(1, Math.ceil(horas / 1.4) - (mecanico ? 1 : 0)) };
+  return { horas, combustivel: Math.max(1, Math.ceil(horas / 2.2) - (mecanico ? 1 : 0)) };
 }

@@ -29,7 +29,7 @@ import { texturaSolto, ITENS_SOLTOS } from './lib/soltos';
 import type { Solto } from './zona';
 import { iniciarZona, atualizarDiretor, desenharBeacon, setaAirdrop, type Airdrop, type Raid } from './sistemas/diretor';
 import { dif, pk, melNivel, ganharXp, registrar, tickProgresso } from './sistemas/progresso';
-import { MIN_POR_SEG, FOME_POR_MIN, SEDE_POR_MIN, DIF } from './dados/balanco';
+import { MIN_POR_SEG, FOME_POR_MIN, SEDE_POR_MIN, DIF, REGEN_VIDA, VIDA_POR_NIVEL } from './dados/balanco';
 import { alvoHostis, escolherArq, tamanhoGrupo, intervaloSpawn, podeSpawnar, pontoSpawn, tensaoDecai, type CtxSpawn } from './sistemas/spawn';
 
 export { MIN_POR_SEG };
@@ -85,6 +85,7 @@ export class Cena extends Phaser.Scene {
     for (const p of this.zona.props) { if (this.ze.saqueados.includes(p.id)) { p.aberto = true; p.loot = []; for (const i of p.inters) if (i.k === 'saque') i.feito = true; } if (this.ze.desmontados.includes(p.id)) for (const i of p.inters) if (i.k === 'desmontar') i.feito = true; if (this.ze.rasgados.includes(p.id)) for (const i of p.inters) if (i.k === 'rasgar') i.feito = true; }
     for (const f of this.zona.flora) if (this.ze.cortadas.includes(f.id)) f.cortada = true;
     this.zona.spawns = this.zona.spawns.filter(sp => !this.ze.abatidos.includes(sp.id));
+    const manter = [0.6, 1, 1][dif(this.s)]; if (manter < 1) this.zona.spawns = this.zona.spawns.filter(sp => new Rng(`${this.s.seed}|grp|${loc.id}|${sp.grupo}`).f() < manter); /* Calmo: 40% dos grupos nem existem */
     this.clima = new Clima(this.s.seed + '|' + loc.id + '|' + Math.floor(this.s.minutos / 1440), this.bioma, this.s.minutos);
     this.clima.aoRaio = atraso => { this.flashRaio = 1; this.cameras.main.flash(140, 235, 240, 255); trovao(atraso); };
     this.part = new Particulas(); this.recToco = gerarFlora(new Rng('toco'), 'toco', '');
@@ -383,7 +384,7 @@ export class Cena extends Phaser.Scene {
 
   // ------------------------------------------------------------------ necessidades, clima e objetivos
   avancar(min: number, fator = 1) {
-    const s = this.s; s.minutos += min; s.fome = Math.max(0, s.fome - min * FOME_POR_MIN * fator); s.sede = Math.max(0, s.sede - min * SEDE_POR_MIN * fator); if (s.fome > 30 && s.sede > 30) s.hp = Math.min(s.maxHp, s.hp + min * 0.12);
+    const s = this.s; s.minutos += min; s.fome = Math.max(0, s.fome - min * FOME_POR_MIN * fator); s.sede = Math.max(0, s.sede - min * SEDE_POR_MIN * fator); if (s.fome > 30 && s.sede > 30) s.hp = Math.min(s.maxHp, s.hp + min * 0.2);
     s.rad = Math.max(0, s.rad - min * 0.02); this.clima.atualizar(0, s.minutos, false);
   }
   necessidades(dt: number) {
@@ -392,10 +393,10 @@ export class Cena extends Phaser.Scene {
     const rad = this.zona.rad[idx(Math.floor(J.x), Math.floor(J.y))] ?? 0; this.radSuave += (rad - this.radSuave) * Math.min(1, dt * 4);
     let ganho = rad > 0.05 ? Math.pow(rad, 1.2) * 2.4 * mask : 0; if (cl.acida && !this.interior) ganho += cl.chuva * 1.1 * mask;
     if (pk(s, 'imune')) ganho *= 0.6; s.rad = Math.min(100, Math.max(0, s.rad + (ganho > 0 ? ganho * dt : -0.03 * dt))); s.radMax = Math.max(s.radMax, s.rad);
-    s.maxHp = (pk(s, 'pele') ? 115 : 100) - s.rad * 0.5; if (s.hp > s.maxHp) s.hp = s.maxHp;
+    s.maxHp = 100 + VIDA_POR_NIVEL * Math.min(10, (s.nivel ?? 1) - 1) + (pk(s, 'pele') ? 15 : 0) - s.rad * 0.5; if (s.hp > s.maxHp) s.hp = s.maxHp;
     let dreno = 0; if (s.sangra) dreno += 0.7; if (s.fome <= 0) dreno += 0.4; if (s.sede <= 0) dreno += 0.8; if (s.rad >= 100) dreno += 2; if (cl.poeira > 0.4 && !this.interior && mask > 0.9) dreno += 0.12 * cl.poeira;
     if (dreno) { s.hp -= dreno * dt; if (s.hp <= 0) this.morrer(s.sede <= 0 ? 'Morreu de sede' : s.fome <= 0 ? 'Morreu de fome' : s.sangra ? 'Sangrou até a morte' : 'Envenenado pela radiação'); }
-    else if (s.fome > 40 && s.sede > 40 && s.rad < 70) s.hp = Math.min(s.maxHp, s.hp + 0.18 * dt);
+    else if (s.fome > 40 && s.sede > 40 && s.rad < 70) s.hp = Math.min(s.maxHp, s.hp + REGEN_VIDA * dt);
     if (s.lanterna.ligada) { s.lanterna.bat = Math.max(0, s.lanterna.bat - 0.33 * dt); if (s.lanterna.bat <= 0) { s.lanterna.ligada = false; st.toast('A bateria acabou', '#d9a02b'); } }
     const alvoCpm = 18 + this.radSuave * 900 + (cl.acida && !this.interior ? cl.chuva * 120 : 0); st.cpm = st.cpm; this.cpm += (alvoCpm - this.cpm) * Math.min(1, dt * 3); setGeiger(this.cpm); setBatimento(s.hp < 30 && !this.morto);
     if (cl.chuva > 0.2 && this.zona.id === 'base') { const tn = melNivel(s, 'tanque'); s.tanque = Math.min([5, 8, 12][tn], s.tanque + dmin * 0.01 * cl.chuva * [1, 1.5, 2][tn]); }
