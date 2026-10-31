@@ -280,3 +280,10 @@ Pedido do Uwlo: pixel art grande em tamanho normal, visão isométrica como Proj
 - **Luz:** FOV do rot.js, neblina pontilhada (Bayer) no chão, tingimento por objeto, paredes baixas/transparentes quando estão na frente do jogador.
 - **UI:** aço, ferrugem, laranja de aviso e fósforo; cantos em degrau, bisel de 2 px, fontes Silkscreen e VT323, ícones convertidos em pixel art 1-bit. Cápsulas e amarelo saíram.
 - Pendente: sprites feitos por artista (os voxels são o plano B coeso), crafting, física WASM, P2P, PWA, deploy, animação de ataque, corpos mais variados.
+
+## 14. Publicação (31/out/2026)
+
+- Link para abrir no celular (artifact privado do Uwlo): https://claude.ai/artifact/3hrqsZSyzgV1H5xd4GVQJy. Compartilhar pelo menu Share da página.
+- `npm run empacotar` gera `dist-artifact/` (ignorado pelo git): `artifact.html` (fragmento para o Artifact) e `index.html` (documento completo, para testar com `RAIZ=dist-artifact/ node tools/smoke.mjs`). JS, CSS, fontes e ícones vão num arquivo só.
+- GitHub Pages não foi usado: exige mesclar na `main` e ativar Pages nas configurações. Para publicar lá, é preciso `basePath` e prefixo nos caminhos `/icons/...`.
+- O link do artifact não aceita `?estudo=1`: toque 7 vezes no título CINZAS para ligar/desligar o Modo Estudo. O compartilhamento nativo é recusado no artifact; o card abre numa tela para segurar e salvar.

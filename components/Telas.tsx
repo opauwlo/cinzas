@@ -11,7 +11,12 @@ const press = (fn: () => void) => ({ onPointerDown: (e: React.PointerEvent) => {
 export function Menu({ onJogar }: { onJogar: () => void }) {
   const [meta, setMeta] = useState(() => ({ runs: 0, melhorTempo: 0, abatesTotais: 0, sequencia: 0, ultimoDia: '', vitorias: 0 }));
   const [estudo, setEstudo] = useState(false); const [fake, setFake] = useState(3 * 3600 * 1000);
-  const set = useJogo(s => s.set);
+  const set = useJogo(s => s.set); const [toques, setToques] = useState(0); const [aviso, setAviso] = useState('');
+  const alternarEstudo = () => {
+    const n = toques + 1; setToques(n); if (n < 7) return; setToques(0);
+    try { if (localStorage.getItem('cinzas.estudo') === '1') { localStorage.removeItem('cinzas.estudo'); setEstudo(false); setAviso('modo estudo desligado'); } else { localStorage.setItem('cinzas.estudo', '1'); setEstudo(true); setAviso('modo estudo ligado'); } } catch { setAviso('sem armazenamento neste navegador'); }
+    setTimeout(() => setAviso(''), 2500);
+  };
   useEffect(() => { setMeta(registrarDia()); const e = estudoAtivo(); setEstudo(e); if (e) { registrarSequencia(registrarDia().sequencia); } }, []);
   useEffect(() => { if (!estudo) return; const t = setInterval(() => setFake(v => Math.max(0, v - 1000)), 1000); return () => clearInterval(t); }, [estudo]);
   const falta = Math.max(0, 3 - meta.sequencia);
@@ -19,8 +24,8 @@ export function Menu({ onJogar }: { onJogar: () => void }) {
     <main className="tela">
       <div className="col">
         <ArteMenu />
-        <h1 className="titulo">CINZAS</h1>
-        <p className="sub">o mundo acabou em luz</p>
+        <h1 className="titulo" onPointerDown={alternarEstudo}>CINZAS</h1>
+        <p className="sub">{aviso || 'o mundo acabou em luz'}</p>
         <div className="card aco degrau">
           <h3>Mundo de hoje</h3>
           <div className="mini">Seed <b style={{ color: 'var(--osso)' }}>{hoje()}</b>. É o mesmo mapa e o mesmo saque para todo mundo hoje: dá para comparar com amigos.</div>
@@ -37,7 +42,7 @@ export function Menu({ onJogar }: { onJogar: () => void }) {
 }
 
 export function Fim({ vitoria }: { vitoria: boolean }) {
-  const s = useJogo(); const r = s.resumo!; const [meta, setMeta] = useState(lerMeta()); const feito = useRef(false);
+  const s = useJogo(); const r = s.resumo!; const [meta, setMeta] = useState(lerMeta()); const feito = useRef(false); const [cartao, setCartao] = useState<string | null>(null);
   const estudo = !vitoria && estudoAtivo();
   const [info] = useState(() => estudo ? { falta: quaseLa(r.distAbrigo), social: provaSocialFalsa() } : null);
   useEffect(() => {
@@ -63,8 +68,9 @@ export function Fim({ vitoria }: { vitoria: boolean }) {
           <div className="stat"><b>{r.radMax}%</b><span>radiação máx</span></div>
         </div>
         <div className="card mini aco degrau">Seu melhor: <b style={{ color: 'var(--osso)' }}>{horaStr(meta.melhorTempo)}</b> de jogo · {meta.runs} runs · {meta.abatesTotais} abates no total. Morte é permanente: o que fica é a sequência diária e o recorde.</div>
-        <button className="btn aviso grande" {...press(() => { void compartilhar(r, s.seed); })}>Compartilhar meu resultado</button>
+        <button className="btn aviso grande" {...press(() => { void compartilhar(r, s.seed).then(u => { if (u) setCartao(u); }); })}>Compartilhar meu resultado</button>
         <button className="btn" style={{ width: '100%' }} {...press(() => s.set({ tela: 'menu' }))}>Nova run</button>
+        {cartao && <div className="tela sobre" style={{ zIndex: 30 }}><div className="col"><p className="mini" style={{ textAlign: 'center', margin: 0 }}>Segure a imagem para salvar ou compartilhar.</p><img src={cartao} alt="Cartão do resultado" style={{ width: '100%', maxHeight: '68dvh', objectFit: 'contain', imageRendering: 'auto' }} /><button className="btn grande" {...press(() => setCartao(null))}>Fechar</button></div></div>}
         {estudo && <button className="link" {...press(() => s.set({ tela: 'revelacao' }))}>sair sem reviver</button>}
       </div>
     </main>

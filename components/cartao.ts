@@ -15,9 +15,10 @@ export async function gerarCartao(r: Resumo, seed: string): Promise<Blob> {
   g.fillStyle = '#6a5f85'; g.font = '700 34px Nunito, sans-serif'; g.fillText('Consegue chegar mais longe?', 540, 1850);
   return await new Promise<Blob>(res => c.toBlob(b => res(b!), 'image/png'));
 }
-export async function compartilhar(r: Resumo, seed: string) {
+/** Compartilha pelo sistema; se não der, devolve a URL da imagem para a tela mostrar (segurar para salvar). */
+export async function compartilhar(r: Resumo, seed: string): Promise<string | null> {
   const blob = await gerarCartao(r, seed); const f = new File([blob], 'cinzas.png', { type: 'image/png' });
   const texto = `Sobrevivi ${r.dias} dia(s) em CINZAS. Mesmo mundo de hoje para todo mundo. Chega mais longe?`;
-  try { if (navigator.canShare?.({ files: [f] })) { await navigator.share({ files: [f], text: texto, title: 'CINZAS' }); return; } } catch { /* cancelado */ }
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cinzas.png'; a.click();
+  try { if (navigator.canShare?.({ files: [f] })) { await navigator.share({ files: [f], text: texto, title: 'CINZAS' }); return null; } } catch (e) { if ((e as Error)?.name === 'AbortError') return null; }
+  return await new Promise<string>(res => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.readAsDataURL(blob); });
 }

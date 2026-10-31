@@ -8,3 +8,4 @@ vendor/src/
 *.status
 .DS_Store
 tsconfig.tsbuildinfo
+dist-artifact/

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "conceitos": "node tools/conceitos.mjs",
-    "smoke": "node tools/smoke.mjs"
+    "smoke": "node tools/smoke.mjs",
+    "empacotar": "node tools/empacotar.mjs"
   },
   "dependencies": {
     "@fontsource/silkscreen": "^5.3.0",
@@ -25,6 +26,8 @@
   "devDependencies": {
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
     "puppeteer-core": "^25.16.0",
     "typescript": "^7.0.2"
   }

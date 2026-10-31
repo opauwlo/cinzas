@@ -6,6 +6,7 @@ const cache = new Map<string, string>(); const pend = new Map<string, Promise<st
 function gerar(src: string, cor: string, n: number): Promise<string> {
   const k = `${src}|${cor}|${n}`; if (cache.has(k)) return Promise.resolve(cache.get(k)!); if (pend.has(k)) return pend.get(k)!;
   const p = new Promise<string>(res => {
+    const emb = (window as unknown as { __ICONES__?: Record<string, string> }).__ICONES__?.[src.replace(/^\/icons\//, '').replace(/\.svg$/, '')];
     const im = new Image(); im.onload = () => {
       const big = document.createElement('canvas'); big.width = big.height = n * 4; const g = big.getContext('2d')!; g.drawImage(im, 0, 0, n * 4, n * 4);
       const sm = document.createElement('canvas'); sm.width = sm.height = n; const sg = sm.getContext('2d')!; sg.imageSmoothingQuality = 'high'; sg.drawImage(big, 0, 0, n, n);
@@ -17,7 +18,7 @@ function gerar(src: string, cor: string, n: number): Promise<string> {
         else if (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1)) { o.data[i] = 8; o.data[i + 1] = 8; o.data[i + 2] = 9; o.data[i + 3] = 255; }
       }
       sg.putImageData(o, 0, 0); const u = sm.toDataURL(); cache.set(k, u); res(u);
-    }; im.onerror = () => res(''); im.src = src;
+    }; im.onerror = () => res(''); im.src = emb ?? src;
   });
   pend.set(k, p); return p;
 }

@@ -4,7 +4,7 @@ import { readFile, stat, mkdir } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import puppeteer from 'puppeteer-core';
 
-const raiz = new URL('../out/', import.meta.url).pathname;
+const raiz = process.env.RAIZ ?? new URL('../out/', import.meta.url).pathname;
 const shots = process.env.SHOT_DIR; if (shots) await mkdir(shots, { recursive: true });
 const tipos = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ttf': 'font/ttf', '.woff2': 'font/woff2', '.json': 'application/json', '.txt': 'text/plain' };
 const srv = http.createServer(async (req, res) => {
@@ -54,7 +54,7 @@ try {
 
   // vasculhar: vai até o contêiner mais próximo, executa a ação com tempo e confere item
   await pg.evaluate(() => { const c = window.__cinzas.cena(); const a = c.props.filter(o => o.p.loot && o.p.tipo !== 'carro' && o.p.tipo !== 'carro_v').sort((u, v) => Math.hypot(u.p.x - c.jog.x, u.p.y - c.jog.y) - Math.hypot(v.p.x - c.jog.x, v.p.y - c.jog.y))[0].p; c.jog.x = a.x + 0.5; c.jog.y = a.y + 1.6; c.mundo.solido[Math.floor(c.jog.y) * 96 + Math.floor(c.jog.x)] = 0; });
-  await esp(500);
+  await pg.waitForFunction(() => !!window.__cinzas.store.getState().alvo, { timeout: 8000 }).catch(() => {});
   const alvo = await pg.evaluate(() => window.__cinzas.store.getState().alvo); ok(!!alvo, `botão de interagir mostra alvo (“${alvo}”)`);
   const antes = Object.values((await estado(pg)).inv).reduce((a, b) => a + b, 0);
   await pg.evaluate(() => window.__cinzas.ponte.cmd.interagir()); await esp(600); await foto(pg, '3-saque');
