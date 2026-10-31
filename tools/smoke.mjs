@@ -20,7 +20,7 @@ pg.on('pageerror', e => erros.push('PAGEERR ' + String(e.stack ?? e).slice(0, 40
 pg.on('console', m => { if (m.type() === 'error') erros.push('CONERR ' + m.text().slice(0, 300)); });
 
 const espera = ms => new Promise(r => setTimeout(r, ms));
-await pg.evaluateOnNewDocument(() => { window.__semEventos = true; }); // viagens sem sorteio de evento (os eventos são testados à parte, de forma forçada)
+await pg.evaluateOnNewDocument(() => { window.__semEventos = true; window.__viagemRapida = true; }); // viagens sem sorteio de evento (os eventos são testados à parte, de forma forçada) e com a estrada em câmera rápida
 const resultados = [];
 const ok = (nome, cond, detalhe = '') => { resultados.push({ nome, ok: !!cond }); console.log(`${cond ? 'OK  ' : 'FALHA'}  ${nome}${detalhe ? '  — ' + detalhe : ''}`); };
 const foto = async nome => { if (capturas) { await mkdir(capturas, { recursive: true }); await pg.screenshot({ path: join(capturas, nome + '.png') }); } };
@@ -371,12 +371,24 @@ try {
   const idContrato = await ev(() => window.__cinzas.cena().s.contratos[0].id);
 
   await limpaPaineis();
-  // 7d. evento de viagem com decisão (forçado): Frente de poeira → esperar → seguir viagem
-  const min0 = (await estado()).minutos; await ev(() => { window.__cinzas.cena().devEv = 'poeira'; window.__cinzas.ponte.cmd.viajar('base'); });
-  ok('a estrada traz um evento com decisão', await ate(() => window.__cinzas.store.getState().painel === 'evento', 8000)); await foto('4b-evento');
+  // 7d. viagem de jipe com a tela de estrada animada + evento de viagem com decisão (forçado): Frente de poeira → esperar → seguir viagem
+  const min0 = (await estado()).minutos; await ev(() => { window.__viagemRapida = false; window.__cinzas.cena().devEv = 'poeira'; window.__cinzas.ponte.cmd.viajar('base'); });
+  ok('a viagem abre a tela de estrada com origem e destino', await ate(() => { const v = document.querySelector('.viagem'); return !!v && /Ermo Cinzento/.test(v.innerText) && /Abrigo/.test(v.innerText); }, 15000), await ev(() => document.querySelector('.viagem')?.innerText ?? 'sem .viagem'));
+  const quadroViagem = () => ev(() => { const c = document.querySelector('.viagem canvas'); if (!c) return null; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let h = 0; const cores = new Set(); for (let i = 0; i < d.length; i += 4) { const k = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2]; cores.add(k); h = Math.imul(h ^ k, 16777619) | 0; } return { h, cores: cores.size, w: c.width, alt: c.height }; });
+  const progresso = () => ev(() => { const b = document.querySelector('.viagem .trilha i'); return b ? parseFloat(b.style.width) : -1; });
+  const q1 = await quadroViagem(); await espera(700); const q2 = await quadroViagem();
+  ok('a estrada é pixel art animada (muitas cores, quadros diferentes)', !!q1 && !!q2 && q1.cores >= 25 && q1.h !== q2.h, JSON.stringify({ q1, q2 }));
+  await ate(() => { const b = document.querySelector('.viagem .trilha i'); return !!b && parseFloat(b.style.width) >= 8; }, 40000); await foto('4a-viagem');
+  const pr1 = await progresso(); await espera(900); const pr2 = await progresso();
+  ok('o jipe avança: a barra de progresso cresce', pr2 > pr1 || pr2 >= 40, `${pr1}% → ${pr2}%`);
+  await ev(() => { window.__viagemRapida = true; });
+  ok('a estrada traz um evento com decisão', await ate(() => window.__cinzas.store.getState().painel === 'evento', 60000)); await foto('4b-evento');
+  const pe1 = await progresso(); await espera(700); const pe2 = await progresso();
+  ok('diante do evento o jipe fica parado na estrada', (await ev(() => window.__cinzas.store.getState().viagem?.fase)) === 'evento' && pe1 === pe2, `${pe1}% → ${pe2}%`);
   ok('o evento mostra o título e as opções', /frente de poeira/i.test(await ev(() => document.body.innerText)) && await toque('Esperar passar'));
   ok('a escolha mostra o resultado', await ate(() => /duas horas parado/i.test(document.body.innerText), 4000));
   ok('"Seguir viagem" conclui a viagem de volta ao abrigo', await toque('Seguir viagem') && await ate(() => { const t = window.__cinzas.store.getState(); return t.zonaId === 'base' && t.carga >= 1; }, 60000));
+  ok('a tela de viagem some quando o destino está pronto', await ate(() => !document.querySelector('.viagem') && window.__cinzas.store.getState().viagem === null, 15000), await ev(() => JSON.stringify(window.__cinzas.store.getState().viagem)));
   ok('a decisão custou tempo (+2 h)', (await estado()).minutos >= min0 + 120, `${Math.round(min0)} → ${Math.round((await estado()).minutos)}`);
   await espera(1500);
 
@@ -410,6 +422,11 @@ try {
   const bloqueado = await ev(() => { const k = window.__cinzas.cena(), st = window.__cinzas.store; k.s.nivel = 1; st.setState({ nivel: 1 }); const antes = st.getState().zonaId; window.__cinzas.ponte.cmd.viajar('militar'); return { antes, depois: st.getState().zonaId, trava: k.trava }; });
   await espera(600);
   ok('o mapa abre por nível: Posto Militar 14 (nível 8) não abre no nível 1', bloqueado.antes === bloqueado.depois && bloqueado.trava === false, JSON.stringify(bloqueado));
+  // 7g1. mapa de viagem com o sprite pixel art de cada local
+  await ev(() => window.__cinzas.store.setState({ painel: 'mapa' }));
+  const icones = await ate(() => document.querySelectorAll('.icone-local').length >= 6, 8000) && await ev(() => { const l = [...document.querySelectorAll('.icone-local')].map(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 20) n++; return n; }); return { n: l.length, vazios: l.filter(n => n < 60).length }; });
+  ok('o mapa de viagem mostra o sprite pixel art de cada local', !!icones && icones.n >= 6 && icones.vazios === 0, JSON.stringify(icones)); await foto('4f-mapa');
+  await ev(() => window.__cinzas.store.setState({ painel: null }));
   await ev(() => window.__cinzas.cena().devXp(6000)); await ev(() => { window.__cinzas.cena().perkAvisado = 1e9; }); await espera(400); // sobe de nível para liberar os locais temáticos
   // 7g2. colheita no mato: a Floresta Morta tem arbustos vivos, flores e cogumelos que rendem comida, ervas e fibra
   await limpaPaineis();

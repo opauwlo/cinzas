@@ -13,6 +13,7 @@ import { Cartao, fechar, p } from './Cartao';
 import { Diario, PerkPainel, Melhorias, EventoPainel, Ajuda, Intro } from './PaineisMeta';
 import { Mochila } from './Mochila';
 import { Bancada } from './Bancada';
+import IconeLocal from './IconeLocal';
 import { PainelNpc, PainelNota } from './PaineisNpc';
 import { linhasDe, livres } from '../game/sistemas/grade';
 
@@ -81,9 +82,9 @@ function Mapa() {
       <div style={{ position: 'relative' }}>
         <canvas ref={ref} width={100} height={100} className="mapamundi" />
         {LOCAIS.filter(l => l.id !== 'abrigo7' || s.sabeAbrigo || (s.inv.radio ?? 0) > 0).map(l => { const trava = !!bloqueioLocal(l, s.nivel, s.inv); return (
-          <button key={l.id} className="btn" aria-label={l.nome} {...p(() => { setSel(l.id); sfx.ui('clique'); })} style={{ position: 'absolute', left: `${l.x}%`, top: `${l.y}%`, transform: 'translate(-50%,-50%)', width: 34, height: 34, padding: 0, boxShadow: l.id === sel ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #f09a50' : l.id === s.zonaId ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #8fe36a' : undefined }}>
-            {l.id === alvoObj && <span className="estrela">★</span>}<span style={{ width: 14, height: 14, background: COR_BIOMA[l.bioma], boxShadow: '0 0 0 2px #050506', opacity: trava ? 0.35 : 1 }} />
-            <span style={{ position: 'absolute', top: 36, left: '50%', transform: 'translateX(-50%)', font: '17px var(--f-hud)', color: l.id === s.zonaId ? '#8fe36a' : '#cfc7ae', whiteSpace: 'nowrap', textShadow: '0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000' }}>{l.id === s.zonaId ? '▸ ' : ''}{l.nome}{trava ? ` · nv ${l.nivel}` : ''}</span>
+          <button key={l.id} className="btn" aria-label={l.nome} {...p(() => { setSel(l.id); sfx.ui('clique'); })} style={{ position: 'absolute', left: `${l.x}%`, top: `${l.y}%`, transform: 'translate(-50%,-50%)', width: 60, height: 50, padding: 0, boxShadow: l.id === sel ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #f09a50' : l.id === s.zonaId ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #8fe36a' : undefined }}>
+            {l.id === alvoObj && <span className="estrela">★</span>}<IconeLocal id={l.id} travado={trava} />
+            <span style={{ position: 'absolute', top: 52, left: '50%', transform: 'translateX(-50%)', font: '17px var(--f-hud)', color: l.id === s.zonaId ? '#8fe36a' : '#cfc7ae', whiteSpace: 'nowrap', textShadow: '0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000' }}>{l.id === s.zonaId ? '▸ ' : ''}{l.nome}{trava ? ` · nv ${l.nivel}` : ''}</span>
           </button>); })}
       </div>
     </Cartao>

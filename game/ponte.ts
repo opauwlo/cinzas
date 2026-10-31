@@ -9,6 +9,8 @@ export type Cmd = {
   tocarMundo(x: number, y: number): boolean;
   craft(id: string): void; cozinhar(id: string): void; dormir(horas: number): void; bauMover(id: string, qtd: number, paraBau: boolean): void;
   viajar(dest: string): void; salvar(): void; atacarBotao(): void;
+  /** a tela de viagem avisa: o jipe parou no evento / chegou ao fim da rota */
+  viagemMeio(): void; viagemFim(): void;
   npcAgir(a: 'trocar' | 'rumor' | 'sair'): void; npcComprar(item: string): void; npcVender(item: string): void;
   eventoEscolher(i: number): void; eventoFim(): void; escolherPerk(id: string): void; receberContrato(id: number): void; melhorar(id: string): void;
 };

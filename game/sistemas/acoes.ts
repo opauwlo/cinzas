@@ -188,22 +188,34 @@ export function viajar(c: Cena, dest: string) {
   const custo = custoViagem(cur, dest, pk(c.s, 'mecanico')); if (c.s.combustivel < custo.combustivel) { toast(`Combustível insuficiente (${custo.combustivel} necessário).`, '#c9561f'); sfx.ui('erro'); return; }
   c.trava = true; useJogo.setState({ painel: null });
   const rng = new Rng(`${c.s.seed}|ev|${Math.floor(c.s.minutos)}|${dest}`), dia = Math.floor(c.s.minutos / 1440) + 1;
-  const forca = c.devEv, semEv = (globalThis as { __semEventos?: boolean }).__semEventos === true; c.devEv = null;
+  const forca = c.devEv, semEv = (globalThis as { __semEventos?: boolean }).__semEventos === true; c.devEv = null; let temEvento = false;
   if (dest !== 'abrigo7' && (forca || (!semEv && rng.chance(0.45)))) {
     const lista = EVENTOS_VIAGEM.filter(e => e.id !== c.s.ultEv && (e.min ?? 0) <= dia);
-    if (lista.length || forca) {
-      const ev = (forca && EVENTOS_VIAGEM.find(e => e.id === forca)) || rng.pick(lista); c.s.ultEv = ev.id; c.evPend = { dest, custo, ev }; sfx.sinal();
-      useJogo.setState({ painel: 'evento', evento: { titulo: ev.titulo, txt: ev.txt, opcoes: ev.opcoes.map(o => ({ rot: o.rot, ok: !o.req || tem(o.req[0], o.req[1]), dica: o.dica })), resultado: null } }); return;
-    }
+    if (lista.length || forca) { const ev = (forca && EVENTOS_VIAGEM.find(e => e.id === forca)) || rng.pick(lista); c.s.ultEv = ev.id; c.evPend = { dest, custo, ev }; temEvento = true; }
   }
-  concluirViagem(c, dest, custo);
+  // a viagem começa pela tela de estrada: o evento (se houver) abre quando o jipe para e a chegada acontece no fim da rota
+  c.viagemPend = { dest, custo };
+  useJogo.setState({ viagem: { de: cur, para: dest, horas: custo.horas, comb: custo.combustivel, evento: temEvento, fase: 'indo', t0: Date.now(), hora: c.hora(), clima: c.clima.tipo, seed: `${c.s.seed}|${cur}|${dest}|${Math.floor(c.s.minutos)}` } });
+}
+/** o jipe parou no meio da rota: abre o evento de estrada */
+function viagemMeio(c: Cena) {
+  const p = c.evPend, v = st().viagem; if (!p || !v) return; sfx.sinal();
+  useJogo.setState({ painel: 'evento', viagem: { ...v, fase: 'evento' }, evento: { titulo: p.ev.titulo, txt: p.ev.txt, opcoes: p.ev.opcoes.map(o => ({ rot: o.rot, ok: !o.req || tem(o.req[0], o.req[1]), dica: o.dica })), resultado: null } });
+}
+/** fim da rota: gasta combustível e horas e carrega o destino por baixo da tela de viagem */
+function viagemFim(c: Cena) {
+  const p = c.viagemPend, v = st().viagem; if (!p || !v) return; c.viagemPend = null; useJogo.setState({ viagem: { ...v, fase: 'chegando' } }); concluirViagem(c, p.dest, p.custo);
 }
 function eventoEscolher(c: Cena, i: number) {
   const p = c.evPend, ev = st().evento; if (!p || !ev || ev.resultado !== null) return; const op = p.ev.opcoes[i]; if (!op) return;
   if (op.req && !tem(op.req[0], op.req[1])) { toast('Você não tem o que precisa para isso.', '#d9a02b'); sfx.ui('erro'); return; }
   const r = op.res(ajuda(c)); if (r.emboscada) c.s.emboscada = r.emboscada; sfx.ui('ok'); useJogo.setState({ evento: { ...ev, resultado: r.txt, cor: r.cor }, hp: c.s.hp });
 }
-function eventoFim(c: Cena) { const p = c.evPend; if (!p) return; c.evPend = null; useJogo.setState({ painel: null, evento: null }); concluirViagem(c, p.dest, p.custo); }
+function eventoFim(c: Cena) {
+  const p = c.evPend; if (!p) return; c.evPend = null; const v = st().viagem;
+  if (v) { useJogo.setState({ painel: null, evento: null, viagem: { ...v, fase: 'retomando' } }); return; } /* o jipe retoma a estrada e a chegada vem no fim da rota */
+  useJogo.setState({ painel: null, evento: null }); concluirViagem(c, p.dest, p.custo);
+}
 function concluirViagem(c: Cena, dest: string, custo: Custo) {
   const cur = c.s.zonaId; c.scene.resume(); if (cur === 'base') c.s.saiuEm = c.s.minutos;
   c.s.combustivel -= custo.combustivel; c.avancar(custo.horas * 60, 0.6); c.s.viajou = true;
@@ -267,7 +279,7 @@ export function instalarComandos(c: Cena) {
       else { let n = Math.min(qtd, bau[id] ?? 0); while (n > 0 && !cabeNaMochila(id, n)) n--; if (!n) { toast('Sem espaço na mochila.', '#c9561f'); sfx.ui('erro'); return; } bau[id] -= n; if (bau[id] <= 0) delete bau[id]; inv[id] = (inv[id] ?? 0) + n; if (emGrade(id)) grade = adicionar(grade, linhasDe(inv), id, n).g; }
       useJogo.setState({ inv, bau, grade }); sfx.ui('clique'); c.s.inv = inv; c.s.bau = bau;
     },
-    viajar: d => viajar(c, d), salvar: () => c.salvar(), atacarBotao: () => { ponte.entrada.tap++; },
+    viajar: d => viajar(c, d), salvar: () => c.salvar(), atacarBotao: () => { ponte.entrada.tap++; }, viagemMeio: () => viagemMeio(c), viagemFim: () => viagemFim(c),
     npcAgir: a => ganchos.cmd?.agir(c, a), npcComprar: i => ganchos.cmd?.comprar(c, i), npcVender: i => ganchos.cmd?.vender(c, i),
     eventoEscolher: i => eventoEscolher(c, i), eventoFim: () => eventoFim(c), escolherPerk: id => escolherPerk(c, id), receberContrato: id => receberContrato(c, id), melhorar: id => melhorar(c, id),
   };

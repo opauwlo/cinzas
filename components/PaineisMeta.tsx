@@ -91,9 +91,9 @@ export function Melhorias() {
 
 // ---------------------------------------------------------------- evento de viagem (decisão obrigatória)
 export function EventoPainel() {
-  const ev = useJogo(s => s.evento); if (!ev) return null;
+  const ev = useJogo(s => s.evento), naEstrada = useJogo(s => s.viagem !== null); if (!ev) return null;
   return (
-    <Cartao titulo={ev.titulo} larg={520} fixo>
+    <Cartao titulo={ev.titulo} larg={520} fixo embaixo={naEstrada}>
       <div className="card aco degrau mini" style={{ fontSize: 20, lineHeight: 1.25 }}>{ev.txt}</div>
       {ev.resultado === null ? ev.opcoes.map((o, i) => (
         <div key={o.rot} style={{ display: 'grid', gap: 3 }}>

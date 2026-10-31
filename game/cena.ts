@@ -60,7 +60,7 @@ export class Cena extends Phaser.Scene {
   evPend: import('./sistemas/acoes').EvPend | null = null;
   soltos: { s: Solto; spr: Phaser.GameObjects.Image }[] = []; avisoCheia = -99; flN = 0; flT = 0;
   fz = 2; cz = 1; fogLw = 0; fogLh = 0; climaLw = 0; climaLh = 0;
-  tensao = 0; tSpawnUlt = -999; nSpawn = 0; npcDia = 0; toque = toqueNovo();
+  tensao = 0; tSpawnUlt = -999; nSpawn = 0; npcDia = 0; toque = toqueNovo(); viagemPend: { dest: string; custo: { horas: number; combustivel: number } } | null = null;
   airdrop: Airdrop | null = null; raid: Raid | null = null; perkAvisado = 0; novasConquistas: string[] = [];
   tarefas: (() => void)[] = []; totalTarefas = 1; estCache = new Map<string, Quadro>(); recToco!: RecEstatica; pausadoPor = false; noiteAnterior = false; tempo = 0; trava = false; intro = 0;
   _dados!: { run: Run; zonaId: string; esc: number };
@@ -70,7 +70,7 @@ export class Cena extends Phaser.Scene {
     this._dados = { run: d.run, zonaId: d.zonaId, esc: d.esc ?? 2 }; this.s = d.run; this.s.zonaId = d.zonaId;
     this.chunks = new Map(); this.props = []; this.floras = []; this.portas = new Map(); this.ents = []; this.cadaveres = []; this.interativos = []; this.luzes = []; this.tracers = []; this.aneis = []; this.estCache = new Map(); this.recCache = new Map();
     this.lmA.fill(0.9); this.seen.fill(0); this.luzFrame.fill(0); this.pronto = false; this.morto = false; this.vitoria = false; this.acao = null; this.alvoInter = null; this.tempo = 0; this.trava = false; this.intro = 0;
-    this.soltos = []; this.tensao = 0; this.tSpawnUlt = -999; this.toque = toqueNovo(); this.fogW = 0; this.fogH = 0; // a mesma instância da cena é reaproveitada na viagem: força recriar as camadas (as antigas foram destruídas)
+    this.soltos = []; this.tensao = 0; this.tSpawnUlt = -999; this.toque = toqueNovo(); this.viagemPend = null; this.fogW = 0; this.fogH = 0; // a mesma instância da cena é reaproveitada na viagem: força recriar as camadas (as antigas foram destruídas)
   }
   private aoRedimensionar = () => this.criarCamadas();
 

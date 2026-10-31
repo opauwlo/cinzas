@@ -17,6 +17,8 @@ import { atracoes, distanciaAtracoes, lacunas } from '../../game/sistemas/cobert
 import { DIF, FOME_POR_MIN, SEDE_POR_MIN, REGEN_VIDA, RAID_DIA_MIN, VIDA_POR_NIVEL, danoPorAcao, acoesParaMatar, dpsInimigo, perdaEmLuta, segundosAteZerar, tamanhoRaid, xpNivel, xpAcumulado, nivelPorXp } from '../../game/dados/balanco';
 import { planejarNpcs, falaDe, estoqueMascate, vendavel, TIPOS_NPC, type CtxFala } from '../../game/dados/npcs';
 import { OBJETIVOS } from '../../game/dados/objetivos';
+import { criarCenaViagem, marco, ceuEm, texto, larguraTexto, type ClimaViagem } from '../../game/lib/viagem';
+import { novaRota, passoRota, P_PARADA, distTotal, type FaseRota } from '../../game/sistemas/rota';
 import { VALOR, precoCompra, precoVenda } from '../../game/dados/balanco';
 import { GANGUE, TENSAO_LIMITE, alvoHostis, escolherArq, intervaloSpawn, noiteFator, pesosArq, podeSpawnar, pontoSpawn, tamanhoGrupo, tensaoAbate, tensaoDano, tensaoDecai, type CtxSpawn } from '../../game/sistemas/spawn';
 
@@ -259,6 +261,92 @@ teste('troca honesta: comprar sempre custa mais que vender o mesmo item (sem luc
   assert.ok(precoCompra('agua') <= 8, 'água cara demais'); assert.ok(precoCompra('kit') >= 10 && precoCompra('rifle') > precoCompra('pistola') && precoCompra('pistola') > precoCompra('faca'));
   assert.ok(6 >= precoCompra('agua'), 'as 6 fichas iniciais devem comprar ao menos 1 água');
   for (const id of ['ficha', 'radio', 'mochila', 'colete', 'municao', 'cartucho']) assert.ok(!vendavel(id), `${id} não pode ser vendido`);
+});
+
+// ================================================================ viagem de jipe (cena em canvas 2D, testada com um contexto falso)
+function ctx2d() {
+  const r = { n: 0, area: 0, naoInteiro: 0, alfaFora: 0, corRuim: 0, imagens: 0, sig: 0, minX: 1e9, minY: 1e9, maxX: -1e9, maxY: -1e9 }; let alfa = 1, cor = '#000000';
+  const g = {
+    imageSmoothingEnabled: true, globalCompositeOperation: 'source-over',
+    get globalAlpha() { return alfa; }, set globalAlpha(v: number) { alfa = v; },
+    get fillStyle() { return cor; }, set fillStyle(v: string) { cor = v; if (!/^#[0-9a-f]{6}$/.test(v)) r.corRuim++; },
+    fillRect(x: number, y: number, w: number, h: number) {
+      r.n++; r.area += w * h; if (![x, y, w, h].every(Number.isInteger)) r.naoInteiro++; if (!(alfa >= 0 && alfa <= 1)) r.alfaFora++;
+      r.minX = Math.min(r.minX, x); r.minY = Math.min(r.minY, y); r.maxX = Math.max(r.maxX, x + w); r.maxY = Math.max(r.maxY, y + h);
+      r.sig = (Math.imul(r.sig ^ (x * 73856093) ^ (y * 19349663) ^ (w * 83492791) ^ h, 16777619) ^ parseInt(cor.slice(1), 16)) | 0;
+    },
+    clearRect() { /* nada */ }, drawImage() { r.imagens++; },
+  };
+  return { g: g as unknown as CanvasRenderingContext2D, r };
+}
+/** Math.random determinístico durante o teste (a poeira e a fumaça usam sorteio) */
+function semente<T>(fn: () => T): T { const orig = Math.random; let s = 12345; Math.random = () => { s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x80000000; }; try { return fn(); } finally { Math.random = orig; } }
+const CLIMAS_V: ClimaViagem[] = ['limpo', 'nublado', 'vento', 'chuva', 'tempestade', 'neblina', 'poeira', 'acida'];
+const HORAS_V = [0, 4.5, 5.8, 6.7, 9, 12, 15.5, 18, 19.5, 21, 23.5];
+teste('viagem: todo local tem seu marco (sprite da cidade) próprio, dentro do quadro de 128×112, de dia e de noite', () => {
+  const vazio = ctx2d(); marco(vazio.g, 'nao_existe', 24, 96, 0, 0); const padrao = vazio.r.sig;
+  for (const l of LOCAIS) for (const [t, noite] of [[0, 0], [1.7, 1], [3.3, 0.5]] as const) {
+    const o = ctx2d(); marco(o.g, l.id, 24, 96, t, noite);
+    assert.ok(o.r.n >= 12, `${l.id}: marco com poucos pedaços (${o.r.n})`); assert.notEqual(o.r.sig, padrao, `${l.id}: usa o marco genérico`);
+    assert.ok(o.r.minX >= 0 && o.r.minY >= 0 && o.r.maxX <= 128 && o.r.maxY <= 112, `${l.id}: marco sai do quadro (${o.r.minX},${o.r.minY})–(${o.r.maxX},${o.r.maxY})`);
+    assert.equal(o.r.naoInteiro, 0, `${l.id}: coordenadas fracionadas`); assert.equal(o.r.corRuim, 0, `${l.id}: cor inválida`);
+    const sem = ctx2d(); marco(sem.g, l.id, 24, 96, t, noite, false); assert.ok(sem.r.n <= o.r.n, `${l.id}: sem rótulo não pode ter mais pedaços`);
+  }
+});
+teste('viagem: a cena pinta o quadro inteiro, só com inteiros, cores e transparências válidas, em todo par de locais, hora e clima', () => semente(() => {
+  const W_ = 190, H_ = 142; let cenas = 0;
+  LOCAIS.forEach((a, ia) => LOCAIS.forEach((b, ib) => {
+    if (a.id === b.id) return; const k = ia * 11 + ib, clima = CLIMAS_V[k % CLIMAS_V.length], hora = HORAS_V[(k * 3) % HORAS_V.length];
+    const fora = ctx2d(), cena = criarCenaViagem({ de: a.id, para: b.id, hora, clima, seed: `t${k}`, w: W_, h: H_, total: 300, criar: () => ({ alvo: {} as CanvasImageSource, g: fora.g }) });
+    for (const e of [{ t: 0, dist: 0, vel: 0, freio: false, p: 0, obstaculo: false }, { t: 3, dist: 150, vel: 1, freio: false, p: 0.5, obstaculo: false }, { t: 5, dist: 140, vel: 0.3, freio: true, p: 0.46, obstaculo: true }, { t: 9, dist: 330, vel: 0, freio: false, p: 1, obstaculo: false }]) {
+      const o = ctx2d(); cena.desenhar(o.g, e, 1 / 30); cenas++; const rot = `${a.id}>${b.id} ${hora}h ${clima} d=${e.dist}`;
+      assert.equal(o.r.naoInteiro, 0, `${rot}: retângulo com coordenada fracionada/NaN`); assert.equal(o.r.alfaFora, 0, `${rot}: transparência inválida`); assert.equal(o.r.corRuim, 0, `${rot}: cor inválida`);
+      assert.ok(o.r.area >= W_ * H_, `${rot}: não cobre o quadro (área ${o.r.area})`); assert.ok(o.r.imagens >= 1, `${rot}: não desenhou o marco do destino`);
+      assert.ok(o.r.minX >= -400 && o.r.maxX <= W_ + 400, `${rot}: pintou longe demais (${o.r.minX}..${o.r.maxX})`);
+    }
+  }));
+  assert.ok(cenas >= 110 * 4, 'poucas cenas testadas');
+}));
+teste('viagem: a cena se mexe (estrada, jipe e paisagem mudam quando o jipe anda) e fica parada quando o jipe para; é determinística', () => {
+  const mk = () => criarCenaViagem({ de: 'ermo', para: 'cidade', hora: 17, clima: 'limpo', seed: 'anim', w: 190, h: 142, total: 360 });
+  type EV = { t: number; dist: number; vel: number; freio: boolean; p: number; obstaculo: boolean };
+  /** um quadro de uma cena nova, com o sorteio reiniciado (a poeira usa Math.random) */
+  const quadro = (e: EV) => semente(() => { const o = ctx2d(); mk().desenhar(o.g, e, 1 / 30); return o.r.sig; });
+  const e0: EV = { t: 1, dist: 100, vel: 1, freio: false, p: 0.3, obstaculo: false };
+  assert.equal(quadro(e0), quadro(e0), 'mesma entrada, mesmo quadro');
+  const s1 = quadro(e0), s2 = quadro({ ...e0, t: 1.2, dist: 112 }), s3 = quadro({ ...e0, dist: 400, p: 0.9 }); assert.ok(s1 !== s2 && s2 !== s3 && s1 !== s3, 'a cena não anima com a distância');
+  const parado: EV = { t: 2, dist: 100, vel: 0, freio: false, p: 0.3, obstaculo: false }; assert.equal(quadro(parado), quadro({ ...parado }), 'parado e com o mesmo tempo deve repetir');
+  assert.notEqual(quadro(parado), quadro({ ...parado, obstaculo: true }), 'a barricada do evento precisa aparecer');
+});
+teste('viagem: céu e texto de placa — cores válidas em todas as horas; fonte 3×5 sem acento e sem quebrar com caracteres estranhos', () => {
+  for (let h = 0; h < 24; h += 0.25) { const [a, b] = ceuEm(h); for (const c of [a, b]) assert.ok(Number.isInteger(c) && c >= 0 && c <= 0xffffff, `ceuEm(${h}) inválido: ${c}`); }
+  const o = ctx2d(); texto(o.g, 'Pântano Tóxico 12 ☠ ?', 3, 3, 0xffffff); assert.ok(o.r.n > 20 && o.r.naoInteiro === 0); assert.equal(larguraTexto('ABC'), 11);
+});
+
+teste('viagem: a física da rota chega ao fim em todo passo de tempo, para diante do evento UMA vez (sem pular), fica parada enquanto o jogador decide e retoma', () => {
+  const rodar = (dur: number, evento: boolean, dt: number) => {
+    const r = { dur, evento }, e = novaRota(); let fase: FaseRota = 'indo', t = 0, meios = 0, fins = 0, pMeio = -1, velMeio = -1, tMeio = -1, pAnt = 0;
+    for (let n = 0; n < 200000 && fins === 0; n++) {
+      const a = passoRota(e, dt, r, fase); t += dt;
+      assert.ok(e.vel >= 0 && e.vel <= 1.0001, `vel fora de [0,1]: ${e.vel}`); assert.ok(e.p >= pAnt && e.p <= 1, `p não monotônico: ${pAnt} → ${e.p}`); pAnt = e.p;
+      if (a === 'meio') { meios++; pMeio = e.p; velMeio = e.vel; fase = 'evento'; tMeio = t; }
+      if (fase === 'evento' && t - tMeio >= 3) fase = 'retomando';
+      if (a === 'fim') { fins++; fase = 'chegando'; }
+    }
+    return { e, t, meios, fins, pMeio, velMeio };
+  };
+  for (const dur of [4.9, 6, 9]) for (const dt of [1 / 60, 1 / 30, 0.05, 0.4]) for (const evento of [false, true]) {
+    const o = rodar(dur, evento, dt), rot = `dur ${dur} dt ${dt.toFixed(3)} ${evento ? 'com' : 'sem'} evento`;
+    assert.equal(o.fins, 1, `${rot}: não chegou ao fim`); assert.equal(o.meios, evento ? 1 : 0, `${rot}: evento ${o.meios}x`); assert.equal(o.e.p, 1, `${rot}: p final`);
+    assert.ok(o.t <= dur * 2.4 + (evento ? 8 : 3), `${rot}: demorou demais (${o.t.toFixed(1)} s)`); assert.ok(o.t >= dur * 0.9, `${rot}: rápido demais (${o.t.toFixed(1)} s)`);
+    assert.ok(Math.abs(o.e.dist - distTotal(dur)) <= distTotal(dur) * 0.12, `${rot}: distância ${o.e.dist.toFixed(0)} longe de ${distTotal(dur)}`);
+    if (evento) { assert.equal(o.velMeio, 0, `${rot}: não estava parado no evento`); assert.ok(o.pMeio >= P_PARADA - 0.12 && o.pMeio <= P_PARADA + 0.06, `${rot}: parou fora do lugar (p=${o.pMeio.toFixed(2)})`); }
+  }
+  // parado no evento: nada anda enquanto o jogador decide
+  const e = novaRota(), r = { dur: 6, evento: true }; let fase: FaseRota = 'indo', avisos = 0; for (let n = 0; n < 4000 && avisos === 0; n++) if (passoRota(e, 1 / 30, r, fase) === 'meio') { avisos++; fase = 'evento'; }
+  const p0 = e.p, d0 = e.dist; for (let n = 0; n < 900; n++) assert.equal(passoRota(e, 1 / 30, r, 'evento'), null); assert.equal(e.p, p0); assert.equal(e.dist, d0); assert.equal(e.vel, 0);
+  // depois de chegar, o jipe para sozinho
+  const f = novaRota(); let fa: FaseRota = 'indo'; for (let n = 0; n < 4000 && !f.fim; n++) if (passoRota(f, 1 / 30, { dur: 5, evento: false }, fa) === 'fim') fa = 'chegando'; for (let n = 0; n < 120; n++) passoRota(f, 1 / 30, { dur: 5, evento: false }, 'chegando'); assert.equal(f.vel, 0, 'o jipe deve parar na chegada');
 });
 
 // ================================================================ execução

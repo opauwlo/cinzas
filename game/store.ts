@@ -10,6 +10,8 @@ export type Painel = null | 'inv' | 'craft' | 'bau' | 'mapa' | 'cozinha' | 'dorm
 export type DialogoUI = { npcId: number; nome: string; rotulo: string; fala: string; modo: 'fala' | 'troca'; fichas: number; compras: { item: string; q: number; preco: number }[]; vendas: { item: string; q: number; preco: number }[]; msg: string; vende: boolean };
 export type EventoUI = { titulo: string; txt: string; opcoes: { rot: string; ok: boolean; dica?: string }[]; resultado: string | null; cor?: string };
 export type Toast = { id: number; texto: string; cor: string };
+/** viagem de jipe em curso: a tela de estrada (components/Viagem.tsx) conduz; `fase` muda com o evento de estrada e a chegada */
+export type ViagemUI = { de: string; para: string; horas: number; comb: number; evento: boolean; fase: 'indo' | 'evento' | 'retomando' | 'chegando'; t0: number; hora: number; clima: string; seed: string };
 export type Resumo = { causa: string; dias: number; hora: string; abates: number; vasculhados: number; radMax: number; vitoria: boolean; distAbrigo: number; nivel?: number; contratos?: number; conquistas?: string[] };
 export type Configs = { mestre: number; sfx: number; amb: number; mus: number; vibra: boolean; ui: number; escala: number; v?: number; autoMira: boolean; gore: boolean; canhoto: boolean; fps: boolean; /** toque = uma mão (point & click) · manche = duas mãos (manche fixo + botão de ataque) */ controle: 'toque' | 'manche'; /** equalizador: perfil de som e ajuste de graves/agudos em dB */ perfil: Perfil; graves: number; agudos: number };
 export type ClimaHud = { tipo: ClimaId; chuva: number; vento: number; neblina: number; poeira: number; nuvem: number };
@@ -29,7 +31,7 @@ export type Estado = {
   clima: ClimaHud; interior: boolean; tanque: number;
   toasts: Toast[]; acao: { rotulo: string; p: number } | null; alvo: string | null; furtivo: boolean;
   danoTs: number; resumo: Resumo | null; gemas: number; carga: number; descobertos: string[]; dica: string | null; cfg: Configs; temSave: boolean; fps: number;
-  dialogo: DialogoUI | null; nota: { titulo: string; texto: string; extra: string } | null; grade: Peca[]; xp: number; nivel: number; pontos: number; perks: string[]; contratos: Contrato[]; mel: Record<string, number>; conquistas: string[]; evento: EventoUI | null; seta: { dx: number; dy: number; d: number } | null; dif: number;
+  viagem: ViagemUI | null; dialogo: DialogoUI | null; nota: { titulo: string; texto: string; extra: string } | null; grade: Peca[]; xp: number; nivel: number; pontos: number; perks: string[]; contratos: Contrato[]; mel: Record<string, number>; conquistas: string[]; evento: EventoUI | null; seta: { dx: number; dy: number; d: number } | null; dif: number;
   set: (p: Partial<Estado>) => void;
   toast: (texto: string, cor?: string) => void;
 };
@@ -49,7 +51,7 @@ export const estadoInicial = (seed: string) => ({
   cpm: 18, objIdx: 0, objVal: 0, banner: null, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
   clima: { tipo: 'limpo', chuva: 0, vento: 0.1, neblina: 0, poeira: 0, nuvem: 0.1 } as ClimaHud, interior: false, tanque: 0,
   toasts: [] as Toast[], acao: null, alvo: null, furtivo: false, danoTs: 0, resumo: null, descobertos: ['base'] as string[], dica: null,
-  dialogo: null, nota: null as { titulo: string; texto: string; extra: string } | null, grade: [] as Peca[], xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
+  viagem: null as ViagemUI | null, dialogo: null, nota: null as { titulo: string; texto: string; extra: string } | null, grade: [] as Peca[], xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
 });
 
 export const useJogo = create<Estado>((set, get) => ({

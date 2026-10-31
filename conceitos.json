@@ -179,6 +179,31 @@
       "id": 36,
       "nome": "Calmo sem morte permanente",
       "nota": "Dificuldade padrão: ao morrer o jogador desmaia, perde parte da mochila e acorda no abrigo, em vez de perder a run."
+    },
+    {
+      "id": 37,
+      "nome": "Cobertura do mapa medida por transformada de distância",
+      "nota": "Mede o pior ponto e o p95 da distância até algo para fazer (chanfro 3-4); um gerador de pontos de interesse preenche os buracos até 10 tiles e os testes travam o resultado."
+    },
+    {
+      "id": 38,
+      "nome": "Volume equalizado por categoria de som",
+      "nota": "Cada efeito é normalizado pela energia em 200 ms para o nível da sua categoria (com teto de pico), passa por barramentos com ducking, EQ, compressor e limitador, e há perfis para celular, fone e noite."
+    },
+    {
+      "id": 39,
+      "nome": "Viagem de jipe em pixel art procedural",
+      "nota": "Estrada em canvas 2D com paralaxe, céu por hora e clima, bioma que muda no meio da rota e o marco de cada local crescendo no horizonte, sem nenhuma imagem."
+    },
+    {
+      "id": 40,
+      "nome": "Física de rota pura e testável",
+      "nota": "O jipe freia na distância calculada diante do evento de estrada, com qualquer passo de tempo, e nunca pula o evento; roda em Node nos testes."
+    },
+    {
+      "id": 41,
+      "nome": "Colheita de mato com rebrote",
+      "nota": "Toda planta rende algo (baga, erva, cogumelo, fibra), vira tufo e volta depois de 3 dias; tabela testada."
     }
   ],
   "adaptados": [

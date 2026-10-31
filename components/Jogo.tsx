@@ -9,13 +9,14 @@ import { lerRun, temRun, type Run } from '../game/sistemas/salvar';
 import { sincGrade } from '../game/sistemas/grade';
 import { Hud, Sobreposicoes } from './Hud';
 import Controles from './Controles';
+import Viagem from './Viagem';
 import Paineis from './Paineis';
 import { Menu, Fim, Loja, Revelacao, Creditos } from './Telas';
 
 declare global { interface Window { __cinzas?: unknown } }
 
 export default function Jogo() {
-  const tela = useJogo(s => s.tela), painel = useJogo(s => s.painel), carga = useJogo(s => s.carga), cfg = useJogo(s => s.cfg), zonaNome = useJogo(s => s.zonaNome), set = useJogo(s => s.set);
+  const tela = useJogo(s => s.tela), painel = useJogo(s => s.painel), emViagem = useJogo(s => s.viagem !== null), carga = useJogo(s => s.carga), cfg = useJogo(s => s.cfg), zonaNome = useJogo(s => s.zonaNome), set = useJogo(s => s.set);
   const [corrida, setCorrida] = useState(0), mundoRef = useRef<HTMLDivElement>(null), runRef = useRef<Run | null>(null);
   const jogando = tela === 'jogo' || tela === 'morte' || tela === 'vitoria';
 
@@ -35,7 +36,7 @@ export default function Jogo() {
     document.addEventListener('visibilitychange', vis);
     return () => { vivo = false; document.removeEventListener('visibilitychange', vis); ponte.cmd = null; ponte.ref = null; game?.destroy(true); window.__cinzas = undefined; void wake?.release(); };
   }, [corrida, jogando]);
-  useEffect(() => { ponte.cmd?.pausar(painel !== null || tela !== 'jogo'); }, [painel, tela]);
+  useEffect(() => { ponte.cmd?.pausar(painel !== null || tela !== 'jogo' || emViagem); }, [painel, tela, emViagem]);
   const introMostrada = useRef(false), dicaCarga = useMemo(() => DICAS_CARGA[Math.floor(Math.random() * DICAS_CARGA.length)], [corrida]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tela === 'jogo' && carga >= 1 && !introMostrada.current && !lerMeta().intro) { introMostrada.current = true; set({ painel: 'intro' }); } }, [tela, carga, set]);
 
@@ -51,7 +52,8 @@ export default function Jogo() {
       <Sobreposicoes />
       <Controles />
       <Hud />
-      {carga < 1 && <div className="carga"><div className="carga-t">GERANDO O ERMO</div><div className="carga-s">{zonaNome}</div><div className="carga-b"><i style={{ width: `${Math.round(carga * 100)}%` }} /></div><div className="carga-d">{dicaCarga}</div></div>}
+      {carga < 1 && !emViagem && <div className="carga"><div className="carga-t">GERANDO O ERMO</div><div className="carga-s">{zonaNome}</div><div className="carga-b"><i style={{ width: `${Math.round(carga * 100)}%` }} /></div><div className="carga-d">{dicaCarga}</div></div>}
+      {emViagem && <Viagem />}
       <Paineis />
       {tela === 'morte' && useJogo.getState().resumo && <Fim vitoria={false} />}
       {tela === 'vitoria' && useJogo.getState().resumo && <Fim vitoria />}

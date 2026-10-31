@@ -418,5 +418,30 @@ Mais NPCs (médico que cura por fichas, mecânico), contratos dados por NPC, cã
 - Teste de projeto: a campanha só pede um local depois de ter pago o XP do nível dele, e ≥ 50% do XP de cada passo de nível vem da campanha.
 - Ganchos: `cena().devObjetivo('id')`; o smoke usa `devXp` para liberar os locais temáticos.
 
-### Pendências (pedidas e ainda não feitas)
-Som equalizado (`game/dados/sons.ts` já tem a normalização de volume por categoria; falta religar `audio.ts` com EQ/limitador/reverb/ducking), mundo mais cheio (pontos de interesse, mais recursos e interações), mais detalhe visual no cenário e a viagem de carro animada com sprites das cidades.
+### Pendências
+Som equalizado, mundo mais cheio e a viagem de carro animada foram feitos (ver §21); falta o detalhe visual no cenário do jogo.
+
+
+## 21. Mundo cheio, som equalizado e viagem de jipe animada (31/out/2026)
+
+**Pedidos do Uwlo:** "muita área vazia sem nada pra fazer", "mais recursos e interação", "melhorar som, equalizar" e "a viagem de carro não tem sprites das cidades nem animação do carro".
+
+### Mundo cheio (`game/sistemas/cobertura.ts`, `game/zona.ts`, `game/dados/colheita.ts`, `game/dados/notas.ts`)
+- **Medido, não achado:** a distância até a "atração" mais próxima (tudo que dá para usar: caixa, poço, bilhete, planta…) numa transformada de distância chanfro 3-4. Antes: Ermo com o pior ponto a 42 tiles e 95% das células a 24; Refinaria 46, Torre 41, Posto Militar 47. O gerador de pontos de interesse (bloco "POI" antes do jipe em `zona.ts`, até 64 rodadas, `LIM = 10`) preenche os buracos; depois, pior ponto ≤ 16 e p95 ≤ 9,1 em todas as zonas (teste de projeto).
+- 9 modelos de POI (`MODELOS`): acampamento (fogueira), carros acidentados, depósito, cemitério, poço de água limpa, ferro-velho, ruínas com móveis, corpo com bilhete e jardim; `PESO_POI` por bioma; alguns com vigias (irradiado/rastejador). Props voxel novos: poço, pilha de sucata, cruz.
+- **Colheita:** arbusto vivo → baga, flor → erva, cogumelo → cogumelo (+4 de radiação), junco → fibra; a planta vira tufo e volta em 3 dias (`ze.colhidas`). A Floresta passa de 290 plantas colhíveis. Itens novos com ícones próprios em `public/icons/cinzas` (listados em CREDITS).
+- **Ferro-velho:** garimpar (3 usos por visita, às vezes peças). **16 bilhetes e diários** com XP e às vezes algo escondido (painel de leitura, `ze.lidas`). Conquistas: Leitor, Mão boa para o mato, Garimpeiro.
+
+### Som equalizado (`game/dados/sons.ts` puro + `game/audio.ts` reescrito)
+- Cada som é normalizado ao nível da sua categoria (energia em 200 ms, pico ≤ −3 dBFS). Antes: do Colosso a −16 dB ao Geiger a −49 dB (33 dB de espalhamento, clique do menu 15 dB abaixo do tiro). Agora: tiro > pancada > voz > coleta > interface > passo > ambiente, com ≥ 8 dB entre tiro e passo (teste).
+- Cadeia: barramentos (efeitos, interface, ambiente, música) com ducking → EQ (graves/agudos) → compressor → limitador; reverb ao ar livre e interno; sons distantes ficam mais escuros. Config. ganhou **Equalizador**: Equilibrado, Alto-falante do celular, Fone, Noturno + graves/agudos + "Testar som". O `motor` do jipe toca na viagem.
+
+### Viagem de jipe animada (`game/lib/viagem.ts`, `game/sistemas/rota.ts`, `components/Viagem.tsx`, `components/IconeLocal.tsx`)
+- **A cena** (`criarCenaViagem({ de, para, hora, clima, seed, w, h, total, criar }).desenhar(g, estado, dt)`; canvas 2D, pixel art 100% procedural, só retângulos inteiros): céu por hora e clima (sol, lua, estrelas, nuvens, chuva, raio, névoa, poeira), horizonte em 2 camadas de paralaxe que **muda do bioma de origem para o de destino no meio da rota**, placas ("Cidade 7") e postes na beira, asfalto rolando e o **jipe** (rodas girando, suspensão, faróis à noite, luz de freio, fumaça, poeira). O **marco de cada local** (os "sprites das cidades": base, ermo, floresta, cidade, pântano, refinaria, posto, hospital, torre, posto militar e abrigo 7) aparece no horizonte: o da origem fica para trás e o do destino **cresce** até a chegada (pintado fora da tela e desenhado em escala, com névoa).
+- **A física** (`rota.ts`, pura): `passoRota` acelera, cruza a estrada, **freia na distância certa diante da barricada do evento** (nunca pula o evento, com qualquer passo de tempo), espera enquanto o jogador decide, retoma e chega; devolve `'meio'`/`'fim'`.
+- **O fluxo:** `viajar` agora só abre a viagem (`store.viagem`, fases indo/evento/retomando/chegando). `viagemMeio` abre o painel do evento quando o jipe para; `viagemFim` gasta combustível/horas e carrega o destino por baixo; a tela some quando `zonaId === destino && carga ≥ 1` (ou ao sair do jogo, como na vitória). O jogo pausa a cena na viagem e esconde o "GERANDO O ERMO".
+- **O mapa** (`IconeLocal`): cada local mostra o mesmo marco, recortado e sem rótulo, no lugar dos quadrados coloridos.
+- **Testes:** 48 de projeto (marcos de todos os locais cabem no quadro e são distintos; cena válida — inteiros, cores, transparência — em todos os 110 pares de locais × hora × clima; anima quando anda e para quando para; física da rota com vários passos de tempo). Smoke: tela de estrada com origem e destino, quadros diferentes, barra que cresce, parada diante do evento, tela some na chegada, ícones do mapa. Ganchos: `window.__viagemRapida` (câmera rápida), `__semEventos`, `cena().devEv`.
+
+### Pendências
+Mais detalhe visual no cenário do jogo (decalques no chão, partículas de ambiente, luzes e animações), ainda não feito; tudo foi validado em Chrome headless e por modelo numérico, nada num celular real.
