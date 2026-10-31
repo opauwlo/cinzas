@@ -1,101 +1,66 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import nipplejs from 'nipplejs';
-import { criarMundo, type Estado, type Entrada } from './mundo';
-import conceitos from '../conceitos.json';
+import type * as Phaser from 'phaser';
+import { useJogo, estadoInicial, hoje, registrarDia } from '../game/store';
+import { ponte } from '../game/ponte';
+import { iniciarAudio } from '../game/audio';
+import { Topo, Sobreposicoes, Botoes, Painel } from './Hud';
+import Inventario from './Inventario';
+import { Menu, Fim, Loja, Revelacao, Creditos } from './Telas';
 
-const ic = (autor: string, nome: string) => `/icons/${autor}/${nome}.svg`;
-
-type Slot = { icone: string; nome: string; qtd?: number; raridade?: 'incomum' | 'raro' };
-const CINTO: Slot[] = [
-  { icone: ic('lorc', 'bandage-roll'), nome: 'Bandagem', qtd: 3 },
-  { icone: ic('sbed', 'syringe'), nome: 'Antirrad', qtd: 1, raridade: 'incomum' },
-  { icone: ic('delapouite', 'water-bottle'), nome: 'Água', qtd: 2 },
-  { icone: ic('lorc', 'molotov'), nome: 'Molotov', qtd: 1, raridade: 'raro' },
-];
+declare global { interface Window { __cinzas?: unknown } }
 
 export default function Jogo() {
-  const [tela, setTela] = useState<'menu' | 'jogo' | 'creditos'>('menu');
-  const [st, setSt] = useState<Estado>({ x: 0, y: 0, rad: 0, cpm: 18 });
-  const mundoRef = useRef<HTMLDivElement>(null);
-  const zonaRef = useRef<HTMLDivElement>(null);
-  const entrada = useRef<Entrada>({ vx: 0, vy: 0 });
+  const tela = useJogo(s => s.tela); const inv = useJogo(s => s.invAberto); const set = useJogo(s => s.set);
+  const [corrida, setCorrida] = useState(0);
+  const mundoRef = useRef<HTMLDivElement>(null); const esq = useRef<HTMLDivElement>(null); const dir = useRef<HTMLDivElement>(null);
+  const jogando = tela === 'jogo' || tela === 'morte' || tela === 'vitoria';
+
+  const iniciar = async () => {
+    void iniciarAudio();
+    try { await Promise.all(['900 20px Cinzel', '800 20px Nunito', '900 20px Nunito'].map(f => document.fonts.load(f))); } catch { /* segue */ }
+    const meta = registrarDia(); const seed = hoje(); const e = estadoInicial(seed);
+    if (meta.sequencia >= 3) e.inv = { ...e.inv, kit: 1 };
+    set({ ...e, tela: 'jogo' }); setCorrida(c => c + 1);
+  };
 
   useEffect(() => {
-    if (tela !== 'jogo' || !mundoRef.current || !zonaRef.current) return;
-    const game = criarMundo(mundoRef.current, entrada.current, setSt);
-    (window as unknown as { __jogo?: unknown }).__jogo = game;
-    const joy = nipplejs.create({ zone: zonaRef.current, mode: 'dynamic', color: '#c7b377', size: 110, fadeTime: 150 });
-    joy.on('move', (e) => { entrada.current.vx = e.data.vector.x; entrada.current.vy = -e.data.vector.y; });
-    joy.on('end', () => { entrada.current.vx = 0; entrada.current.vy = 0; });
-    return () => { joy.destroy(); game.destroy(true); };
-  }, [tela]);
+    if (!jogando || !corrida || !mundoRef.current || !esq.current || !dir.current) return;
+    let game: Phaser.Game | null = null; let vivo = true; const joys: ReturnType<typeof nipplejs.create>[] = [];
+    const en = ponte.entrada; Object.assign(en, { mx: 0, my: 0, ax: 0, ay: 0, mira: false, atacar: false, correr: false, furtivo: false });
+    import('../game/cena').then(m => {
+      if (!vivo || !mundoRef.current) return;
+      game = m.criarJogo(mundoRef.current, useJogo.getState().seed);
+      window.__cinzas = { game, store: useJogo, ponte, cena: () => game!.scene.getScene('cena') };
+    });
+    const mk = (zone: HTMLElement, lado: 'e' | 'd') => {
+      const j = nipplejs.create({ zone, mode: 'dynamic', color: lado === 'e' ? '#00ffcc' : '#ffd700', size: 112, fadeTime: 120, restOpacity: 0.5 }); joys.push(j);
+      j.on('move', ev => { const f = Math.min(1, (ev.data.distance ?? 0) / 56), v = ev.data.vector; if (lado === 'e') { en.mx = v.x * f; en.my = -v.y * f; } else { en.mira = true; en.ax = v.x * f; en.ay = -v.y * f; } });
+      j.on('end', () => { if (lado === 'e') { en.mx = 0; en.my = 0; } else { en.mira = false; en.ax = 0; en.ay = 0; } });
+    };
+    mk(esq.current, 'e'); mk(dir.current, 'd');
+    return () => { vivo = false; ponte.cmd = null; joys.forEach(j => j.destroy()); game?.destroy(true); window.__cinzas = undefined; };
+  }, [corrida, jogando]);
 
-  if (tela === 'menu') return (
-    <main className="tela">
-      <div className="moldura caixa">
-        <h1 className="titulo">CINZAS</h1>
-        <p className="subtitulo">o mundo acabou em luz</p>
-        <div className="divisor" />
-        <button className="btn-d2" onClick={() => setTela('jogo')}>Sobreviver</button>
-        <button className="btn-d2 sec" onClick={() => setTela('creditos')}>Créditos</button>
-        <p className="dica">mova com o dedo esquerdo · WASD no teclado</p>
-      </div>
-    </main>
-  );
+  useEffect(() => { ponte.cmd?.pausar(inv || tela !== 'jogo'); }, [inv, tela]);
 
-  if (tela === 'creditos') return (
-    <main className="tela">
-      <div className="moldura caixa">
-        <h1 className="titulo" style={{ fontSize: 28 }}>Créditos</h1>
-        <div className="divisor" />
-        <div className="lista">
-          <p><b>Conceitos novos criados: {conceitos.novos.length}</b></p>
-          {conceitos.novos.map(n => <p key={n.id}>#{n.id} {n.nome}</p>)}
-          <p><b>Adaptados de prontos: {conceitos.adaptados.length}</b></p>
-          {conceitos.adaptados.map(n => <p key={n.nome}>{n.nome} — {n.origem}</p>)}
-          <p><b>Ícones:</b> game-icons.net, CC BY 3.0 (Lorc, Delapouite, Sbed, Skoll, Caro Asercion, DarkZaitzev, John Colburn).</p>
-          <p><b>Fontes:</b> Cinzel, Metamorphous, IM Fell English SC, Black Ops One, Share Tech Mono (OFL).</p>
-        </div>
-        <button className="btn-d2 sec" onClick={() => setTela('menu')}>Voltar</button>
-      </div>
-    </main>
-  );
-
-  const hp = 82;
-  const nivelRad = Math.min(100, Math.round(st.rad * 100));
+  if (tela === 'menu') return <Menu onJogar={iniciar} />;
+  if (tela === 'creditos') return <Creditos />;
+  if (tela === 'loja') return <Loja />;
+  if (tela === 'revelacao') return <Revelacao />;
   return (
     <div className="jogo">
+      <Topo />
       <div className="mundo">
         <div ref={mundoRef} style={{ position: 'absolute', inset: 0 }} />
-        <div ref={zonaRef} style={{ position: 'absolute', inset: 0, right: '38%', zIndex: 1 }} />
-        <div className="local">Ermo · Cratera 7</div>
-        <div className="geiger"><img src={ic('lorc', 'radioactive')} alt="" />{st.cpm} CPM</div>
-        <div className="acoes">
-          <button className="btn" aria-label="Vasculhar"><img src={ic('delapouite', 'backpack')} alt="" /></button>
-          <button className="btn" aria-label="Correr"><img src={ic('lorc', 'sprint')} alt="" /></button>
-        </div>
+        <div ref={esq} className="zona esq" /><div ref={dir} className="zona dir" />
+        <Sobreposicoes /><Botoes />
       </div>
-      <div className="painel">
-        <div className="moldura" />
-        <div className="orbe hp"><div className="liquido" style={{ ['--nivel' as string]: `${hp}%` }} /><span className="num">{hp}/100</span></div>
-        <div className="centro">
-          <div className="barras">
-            <div className="barra fome" style={{ ['--p' as string]: '71%' }}><i /><span>Fome</span></div>
-            <div className="barra sede" style={{ ['--p' as string]: '54%' }}><i /><span>Sede</span></div>
-          </div>
-          <div className="cinto">
-            {CINTO.map((s, i) => (
-              <button key={s.nome} className={`slot ${s.raridade ?? ''}`} aria-label={s.nome}>
-                <span className="tecla">{i + 1}</span>
-                <img src={s.icone} alt="" />
-                {s.qtd ? <span className="qtd">{s.qtd}</span> : null}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="orbe rad"><div className="liquido" style={{ ['--nivel' as string]: `${nivelRad}%` }} /><span className="num">{nivelRad}% rad</span></div>
-      </div>
+      <Painel />
+      {inv && tela === 'jogo' && <Inventario />}
+      {tela === 'morte' && useJogo.getState().resumo && <Fim vitoria={false} />}
+      {tela === 'vitoria' && useJogo.getState().resumo && <Fim vitoria />}
     </div>
   );
 }

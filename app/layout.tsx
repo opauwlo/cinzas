@@ -2,8 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import '@fontsource/cinzel/400.css';
 import '@fontsource/cinzel/700.css';
 import '@fontsource/cinzel/900.css';
-import '@fontsource/metamorphous/400.css';
-import '@fontsource/im-fell-english-sc/400.css';
+import '@fontsource/nunito/700.css';
+import '@fontsource/nunito/800.css';
+import '@fontsource/nunito/900.css';
 import './fonts.css';
 import './globals.css';
 
@@ -17,7 +18,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#0b0907',
+  themeColor: '#0c0914',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

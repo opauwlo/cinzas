@@ -1,16 +1,90 @@
 {
   "novos": [
-    { "id": 1, "nome": "Orbe de radiação no lugar da mana", "nota": "Orbe de líquido do D2 adaptado: mostra radiação acumulada e fica verde Geiger." },
-    { "id": 2, "nome": "Layout sem sobreposição", "nota": "Mundo e painel são caixas separadas (flex); HUD só flutua com botões do polegar e o local." },
-    { "id": 3, "nome": "Luz do jogador + manchas de radiação do mesmo ruído", "nota": "O mesmo ruído simplex pinta o chão e alimenta o contador Geiger." },
-    { "id": 4, "nome": "Contador de conceitos novos", "nota": "Este contador: tools/conceitos.mjs e tela de créditos." }
+    {
+      "id": 1,
+      "nome": "Orbe de radiação no lugar da mana",
+      "nota": "Orbe do D2 adaptado: radiação acumulada, verde Geiger; reduz a vida máxima."
+    },
+    {
+      "id": 2,
+      "nome": "Layout sem sobreposição",
+      "nota": "Topo, mundo e painel são caixas separadas; só botões do polegar ficam nas bordas."
+    },
+    {
+      "id": 3,
+      "nome": "Contador de conceitos novos",
+      "nota": "tools/conceitos.mjs e tela Créditos."
+    },
+    {
+      "id": 4,
+      "nome": "Arte procedural do ermo (tiles, props e personagens em canvas)",
+      "nota": "Sem pacote CC0 top-down pós-nuclear acessível, então geramos com contorno, sombra e luz de cima."
+    },
+    {
+      "id": 5,
+      "nome": "Loot determinístico pela seed com raridade real",
+      "nota": "Cada contêiner é sorteado na geração: mesmo mundo e mesmo saque para todos no dia."
+    },
+    {
+      "id": 6,
+      "nome": "Regra de formas: cápsula = seguro, polígono cortado = perigo",
+      "nota": "Todo CTA e chip é cápsula; moodles críticos viram losango/recorte pulsando."
+    },
+    {
+      "id": 7,
+      "nome": "Modo Estudo com Revelação (mostrado x verdade)",
+      "nota": "Reproduz técnicas sombrias de propósito, sem cobrança real, e registra cada uma para a reportagem."
+    },
+    {
+      "id": 8,
+      "nome": "Contador Geiger ligado ao mesmo ruído que pinta o chão",
+      "nota": "A mancha verde do chão e o clique do Geiger vêm do mesmo mapa de radiação."
+    }
   ],
   "adaptados": [
-    { "nome": "Estética Diablo 2 (orbes, cinto, moldura de pedra, cores de raridade)", "origem": "referência de design; CSS próprio sobre padrões comuns" },
-    { "nome": "Fontes Cinzel, Metamorphous, IM Fell English SC", "origem": "@fontsource (OFL)" },
-    { "nome": "Ícones", "origem": "game-icons.net (CC BY 3.0), tingidos de ouro por filtro CSS" },
-    { "nome": "Joystick virtual", "origem": "nipplejs (MIT)" },
-    { "nome": "Render e câmera", "origem": "Phaser 4.2.1 (MIT)" },
-    { "nome": "Ruído e RNG com seed", "origem": "simplex-noise, alea (MIT)" }
+    {
+      "nome": "Estética Diablo 2 (orbes, moldura, cores de raridade)",
+      "origem": "referência de design; CSS e canvas próprios sobre padrões comuns"
+    },
+    {
+      "nome": "Visão em cone com memória de mapa estilo Project Zomboid",
+      "origem": "rot-js FOV (BSD-3) + mapa de luz próprio"
+    },
+    {
+      "nome": "Pathfinding A* e shadowcasting",
+      "origem": "rot-js (BSD-3)"
+    },
+    {
+      "nome": "Moodles de status",
+      "origem": "conceito do Project Zomboid, ícones game-icons.net"
+    },
+    {
+      "nome": "Fontes Cinzel e Nunito",
+      "origem": "@fontsource (OFL)"
+    },
+    {
+      "nome": "Ícones",
+      "origem": "game-icons.net (CC BY 3.0), tingidos por filtro CSS"
+    },
+    {
+      "nome": "Joystick virtual",
+      "origem": "nipplejs (MIT)"
+    },
+    {
+      "nome": "Render e câmera",
+      "origem": "Phaser 4.2.1 (MIT)"
+    },
+    {
+      "nome": "SFX procedural",
+      "origem": "ZzFX (MIT)"
+    },
+    {
+      "nome": "Estado da UI",
+      "origem": "zustand (MIT)"
+    },
+    {
+      "nome": "Ruído e RNG com seed",
+      "origem": "simplex-noise, alea (MIT)"
+    }
   ]
 }

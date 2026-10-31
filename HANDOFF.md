@@ -262,3 +262,11 @@ Use este plano se ficar sem npm, ou se preferir Box2D a Rapier.
 - **Contador de conceitos novos:** `conceitos.json` + `npm run conceitos` + tela Créditos. Hoje: 4 novos.
 - `npm run smoke` (precisa de `npm run build` antes; `SHOT_DIR` para screenshots): passa.
 - Falta do §10: física WASM, colisão real, cone de visão, inimigos, saque, áudio, P2P, PWA, deploy.
+
+## 12. Segunda rodada (sessão de Code, 31/out/2026)
+
+- Jogo jogável: mundo 96x96 com seed diária (ruas, prédios, carros, crateras, abrigo), visão em cone com memória (rot-js), dia/noite, lanterna, 3 inimigos com A* e ruído, saque com tempo e loot pré-sorteado pela seed, fome/sede/radiação/sangramento, combate corpo a corpo e pistola, inventário, objetivos encadeados, morte permanente com card de compartilhar, Geiger/batimento/háptico.
+- HUD estilo Zomboid (moodles, ação com barra) sobre visual D2; regra de formas: cápsula = seguro, polígono cortado = perigo.
+- **Modo Estudo** (`?estudo=1`): quase-vitória fabricada, prova social falsa, cronômetro falso, desconto fictício, ancoragem e aversão à perda; sem cobrança; termina na Revelação. Ver `CLAUDE.md`.
+- Arte: tiles, props e personagens são procedurais (`game/arte.ts`). **Pendente: trocar por sprites detalhados CC0 (Kenney Topdown Shooter, OpenGameArt) — o download foi bloqueado pelo classificador; aguardando liberação do Uwlo.**
+- Falta: física WASM, crafting, pathfinding para mais inimigos, saque de inimigos, P2P, PWA, deploy.
