@@ -13,6 +13,22 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
+  # Teste de fumaça em Chrome headless, em paralelo e sem travar a publicação (usa a build SEM subcaminho).
+  teste:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Smoke test (Chrome headless)
+        run: node tools/smoke.mjs
+        env:
+          CHROME: /usr/bin/google-chrome
   build:
     runs-on: ubuntu-latest
     steps:
@@ -26,11 +42,6 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
-      - name: Smoke test (Chrome headless)
-        run: node tools/smoke.mjs
-        env:
-          CHROME: /usr/bin/google-chrome
-        continue-on-error: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out
