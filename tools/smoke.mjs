@@ -375,10 +375,10 @@ try {
   const min0 = (await estado()).minutos; await ev(() => { window.__viagemRapida = false; window.__cinzas.cena().devEv = 'poeira'; window.__cinzas.ponte.cmd.viajar('base'); });
   ok('a viagem abre a tela de estrada com origem e destino', await ate(() => { const v = document.querySelector('.viagem'); return !!v && /Ermo Cinzento/.test(v.innerText) && /Abrigo/.test(v.innerText); }, 15000), await ev(() => document.querySelector('.viagem')?.innerText ?? 'sem .viagem'));
   const quadroViagem = () => ev(() => { const c = document.querySelector('.viagem canvas'); if (!c) return null; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let h = 0; const cores = new Set(); for (let i = 0; i < d.length; i += 4) { const k = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2]; cores.add(k); h = Math.imul(h ^ k, 16777619) | 0; } return { h, cores: cores.size, w: c.width, alt: c.height }; });
-  const progresso = () => ev(() => { const b = document.querySelector('.viagem .trilha i'); return b ? parseFloat(b.style.width) : -1; });
+  const progresso = () => ev(() => { const b = document.querySelector('.vj-trilha i'); return b ? parseFloat(b.style.width) : -1; });
   const q1 = await quadroViagem(); await espera(700); const q2 = await quadroViagem();
   ok('a estrada é pixel art animada (muitas cores, quadros diferentes)', !!q1 && !!q2 && q1.cores >= 25 && q1.h !== q2.h, JSON.stringify({ q1, q2 }));
-  await ate(() => { const b = document.querySelector('.viagem .trilha i'); return !!b && parseFloat(b.style.width) >= 8; }, 40000); await foto('4a-viagem');
+  await ate(() => { const b = document.querySelector('.vj-trilha i'); return !!b && parseFloat(b.style.width) >= 8; }, 40000); await foto('4a-viagem');
   const pr1 = await progresso(); await espera(900); const pr2 = await progresso();
   ok('o jipe avança: a barra de progresso cresce', pr2 > pr1 || pr2 >= 40, `${pr1}% → ${pr2}%`);
   await ev(() => { window.__viagemRapida = true; });

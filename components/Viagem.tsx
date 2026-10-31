@@ -45,11 +45,11 @@ export default function Viagem() {
   if (!v) return null; const de = localPorId(v.de), para = localPorId(v.para), dica = DICAS[Math.abs(v.t0) % DICAS.length], chegando = v.fase === 'chegando';
   return (
     <div className={`viagem ${saindo ? 'some' : ''}`} onPointerDown={e => e.stopPropagation()}>
-      <div className="topo"><h2>VIAGEM DE JIPE</h2><div className="rota"><span>{de.nome}</span> <i>›››</i> <span>{para.nome}</span></div><div className="sub">{v.horas} h · combustível −{v.comb}</div></div>
-      <div className="tela" ref={box}><canvas ref={cv} /></div>
-      <div className="base">
-        <div className="trilha-box"><IconeLocal id={v.de} w={44} h={36} /><div className="trilha"><b style={{ left: `${Math.round(pr * 100)}%` }} /><i style={{ width: `${Math.round(pr * 100)}%` }} /></div><IconeLocal id={v.para} w={44} h={36} /></div>
-        <div className="dica">{v.fase === 'evento' ? 'Algo bloqueia a estrada…' : chegando ? (carga < 1 ? `Chegando a ${para.nome}… gerando o terreno ${Math.round(carga * 100)}%` : `Chegando a ${para.nome}…`) : dica}</div>
+      <div className="vj-topo"><h2>VIAGEM DE JIPE</h2><div className="vj-rota"><span>{de.nome}</span> <i>›››</i> <span>{para.nome}</span></div><div className="vj-sub">{v.horas} h · combustível −{v.comb}</div></div>
+      <div className="vj-tela" ref={box}><canvas ref={cv} /></div>
+      <div className="vj-base">
+        <div className="vj-trilha-box"><IconeLocal id={v.de} w={44} h={36} /><div className="vj-trilha"><b style={{ left: `${Math.round(pr * 100)}%` }} /><i style={{ width: `${Math.round(pr * 100)}%` }} /></div><IconeLocal id={v.para} w={44} h={36} /></div>
+        <div className="vj-dica">{v.fase === 'evento' ? 'Algo bloqueia a estrada…' : chegando ? (carga < 1 ? `Chegando a ${para.nome}… gerando o terreno ${Math.round(carga * 100)}%` : `Chegando a ${para.nome}…`) : dica}</div>
       </div>
     </div>
   );

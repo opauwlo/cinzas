@@ -81,11 +81,12 @@ function Mapa() {
       </div>}>
       <div style={{ position: 'relative' }}>
         <canvas ref={ref} width={100} height={100} className="mapamundi" />
-        {LOCAIS.filter(l => l.id !== 'abrigo7' || s.sabeAbrigo || (s.inv.radio ?? 0) > 0).map(l => { const trava = !!bloqueioLocal(l, s.nivel, s.inv); return (
-          <button key={l.id} className="btn" aria-label={l.nome} {...p(() => { setSel(l.id); sfx.ui('clique'); })} style={{ position: 'absolute', left: `${l.x}%`, top: `${l.y}%`, transform: 'translate(-50%,-50%)', width: 60, height: 50, padding: 0, boxShadow: l.id === sel ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #f09a50' : l.id === s.zonaId ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #8fe36a' : undefined }}>
-            {l.id === alvoObj && <span className="estrela">★</span>}<IconeLocal id={l.id} travado={trava} />
-            <span style={{ position: 'absolute', top: 52, left: '50%', transform: 'translateX(-50%)', font: '17px var(--f-hud)', color: l.id === s.zonaId ? '#8fe36a' : '#cfc7ae', whiteSpace: 'nowrap', textShadow: '0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000' }}>{l.id === s.zonaId ? '▸ ' : ''}{l.nome}{trava ? ` · nv ${l.nivel}` : ''}</span>
-          </button>); })}
+        {LOCAIS.filter(l => l.id !== 'abrigo7' || s.sabeAbrigo || (s.inv.radio ?? 0) > 0).map(l => { const trava = !!bloqueioLocal(l, s.nivel, s.inv), aqui = l.id === s.zonaId; return (
+          <div key={l.id} className="no-mapa" style={{ left: `${l.x}%`, top: `${l.y}%` }}>
+            <button className="btn" aria-label={l.nome} {...p(() => { setSel(l.id); sfx.ui('clique'); })} style={{ width: '100%', height: '100%', padding: 0, boxShadow: l.id === sel ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #f09a50' : aqui ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #8fe36a' : undefined }}><IconeLocal id={l.id} travado={trava} /></button>
+            {l.id === alvoObj && <span className="estrela">★</span>}
+            <span className="no-mapa-n" style={{ color: aqui ? '#8fe36a' : '#cfc7ae' }}>{aqui ? '▸ ' : ''}{l.nome}{trava ? ` · nv ${l.nivel}` : ''}</span>
+          </div>); })}
       </div>
     </Cartao>
   );
