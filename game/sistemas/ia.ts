@@ -13,13 +13,17 @@ import { sfx } from '../audio';
 import { T, idx, dentro, W, H } from '../zona';
 import { mostrarCadaver } from './acoes';
 import { registrar, ganharXp, pk, DIF, dif } from './progresso';
+import { tensaoDano, tensaoAbate } from './spawn';
 
+import type { Oferta, TipoNpc } from '../dados/npcs';
+export type NpcInfo = { tipo: TipoNpc; nome: string; casa: { x: number; y: number }; id: string; falou: boolean; ferido: boolean; estoque?: Oferta[]; rumores?: number };
 export type Ent = {
   id: number; sid: number | null; arq: Arq; rec: Record<string, unknown> & { falta?: string[]; arma?: string }; x: number; y: number; z: number; ang: number; hp: number; maxHp: number;
   estado: 'ocioso' | 'investiga' | 'persegue' | 'foge' | 'morto' | 'voando'; alvo: { x: number; y: number } | null; caminho: [number, number][]; tCam: number;
   cd: number; atk: number; atkDur: number; atkOk: boolean; dano: number; morrT: number; tSent: number; semVer: number; vagar: number; kx: number; ky: number; fase: number; dir: number;
   spr: Phaser.GameObjects.Image; som: Phaser.GameObjects.Image; lvl: number; grupo: number; faccao?: number; vivo: boolean; remover?: boolean; ultQ?: Quadro; clip: string;
   tiroCd: number; mult: number; vozT: number; fugaT: number; voaT: number; cadaver?: boolean; alpha: number;
+  npc?: NpcInfo; bolha?: Phaser.GameObjects.Text;
 };
 let EID = 1;
 
@@ -36,7 +40,7 @@ const ehRanged = (e: Ent) => e.arq.ia === 'ranged' && ['pistola', 'escopeta', 'r
 
 // ---------------------------------------------------------------- dano
 export function machucarJogador(c: Cena, dano: number, sangra: number, de?: { x: number; y: number }) {
-  if (c.morto) return; const st = useJogo.getState(), colete = st.inv.colete ? 0.75 : 1; dano *= colete * (pk(c.s, 'pele') ? 0.85 : 1) * DIF.dano[dif(c.s)]; c.s.hp -= dano; c.jog.dano = 0.22;
+  if (c.morto) return; const st = useJogo.getState(), colete = st.inv.colete ? 0.75 : 1; dano *= colete * (pk(c.s, 'pele') ? 0.85 : 1) * DIF.dano[dif(c.s)]; c.s.hp -= dano; c.tensao = tensaoDano(c.tensao, dano); c.jog.dano = 0.22;
   if (Math.random() < sangra && !c.s.sangra) { c.s.sangra = true; st.toast('Você está sangrando', '#c9561f'); }
   c.texto(c.jog.x, c.jog.y - 0.3, '-' + Math.round(dano), '#d9472b'); c.cameras.main.shake(140, 0.006); sfx.dano(); useJogo.setState({ danoTs: Date.now() });
   if (st.cfg.gore) { const [px, py] = proj(c.jog.x, c.jog.y, 18), dx = de ? c.jog.x - de.x : 0, dy = de ? c.jog.y - de.y : 0, m = Math.hypot(dx, dy) || 1; c.part.sangue(px, py, 18, dx / m, dy / m, 5); }
@@ -56,8 +60,9 @@ export function ferir(c: Cena, e: Ent, dano: number, de: number, corta = false) 
   if (e.hp <= 0) matar(c, e);
 }
 function matar(c: Cena, e: Ent) {
-  e.vivo = false; e.estado = 'morto'; e.morrT = 0; e.atk = 0; c.s.abates++; if (e.sid !== null) c.ze.abatidos.push(e.sid);
-  registrar(c, 'abate', 1, { arq: e.arq.id }); if (e.arq.id === 'colosso') registrar(c, 'colossos'); if (['saqueador', 'filho', 'miliciano'].includes(e.arq.id)) registrar(c, 'gangue'); ganharXp(c, e.arq.xp, false);
+  e.vivo = false; e.estado = 'morto'; e.morrT = 0; e.atk = 0; c.s.abates++; c.tensao = tensaoAbate(c.tensao); if (e.sid !== null) c.ze.abatidos.push(e.sid);
+  e.bolha?.destroy(); e.bolha = undefined; if (e.npc) { c.ze.npcMortos = [...(c.ze.npcMortos ?? []), e.npc.id]; c.s.traiu = true; c.s.abates--; }
+  else registrar(c, 'abate', 1, { arq: e.arq.id }); if (e.arq.id === 'colosso') registrar(c, 'colossos'); if (['saqueador', 'filho', 'miliciano'].includes(e.arq.id)) registrar(c, 'gangue'); ganharXp(c, e.arq.xp, false);
   e.som.setAlpha(0); sfx.voz(e.arq.voz, 0, 0, 0.5); c.cadaveres.push(e); if (c.cadaveres.length > 40) { const o = c.cadaveres.shift()!; o.remover = true; o.spr.destroy(); o.som.destroy(); }
   if (e.arq.drops.length || e.arq.ia === 'passivo') mostrarCadaver(c, e);
 }
@@ -120,6 +125,8 @@ export function atualizarEnt(c: Cena, e: Ent, dt: number, noite: number) {
     if (e.estado === 'voando') { e.voaT += dt; e.z = Math.min(46, e.z + 40 * dt); const a = Math.atan2(-dy, -dx) + Math.sin(e.voaT * 2) * 0.4; e.x += Math.cos(a) * 3.2 * dt; e.y += Math.sin(a) * 3.2 * dt; e.ang = a; e.fase += dt * 9; if (e.voaT > 5) { e.remover = true; e.spr.destroy(); e.som.destroy(); } }
     return;
   }
+  // ---- NPC (mascate, sobrevivente, viajante)
+  if (arq.ia === 'npc' && e.npc) { atualizarNpc(c, e, dt); return; }
   // ---- passivo (caça)
   if (arq.ia === 'passivo') {
     if (e.estado !== 'foge' && dist < arq.visao * (c.ambient < 0.4 ? 0.5 : 1) * (ponte_corre() ? 1.3 : 1) && c.temLOS(e.x, e.y, J.x, J.y)) { e.estado = 'foge'; e.fugaT = 5; }
@@ -157,6 +164,37 @@ export function atualizarEnt(c: Cena, e: Ent, dt: number, noite: number) {
     if (arq.ia === 'colosso') { c.cameras.main.shake(260, 0.012); const [px, py] = proj(e.x + Math.cos(e.ang) * 1.5, e.y + Math.sin(e.ang) * 1.5); c.part.poeira(px, py, 14); if (dist < 2.6) { machucarJogador(c, arq.dano * (0.8 + Math.random() * 0.4), 0.3, e); J.x += Math.cos(e.ang) * 0.4; J.y += Math.sin(e.ang) * 0.4; } }
     else if (dist < alc * 1.5) machucarJogador(c, arq.dano * (0.8 + Math.random() * 0.4), arq.modelo === 'quad' ? 0.35 : arq.id === 'escorpiao' ? 0.5 : 0.08, e);
   }
+}
+/** NPC: fica perto de casa, olha para o jogador, foge de hostis (e de quem o ataca; atacar NPC queima a reputação) */
+function atualizarNpc(c: Cena, e: Ent, dt: number) {
+  const J = c.jog, n = e.npc!, arq = e.arq, dist = Math.hypot(J.x - e.x, J.y - e.y);
+  if (e.dano > 0 && !n.ferido) { n.ferido = true; c.s.traiu = true; c.s.st!.npcFerido = (c.s.st!.npcFerido ?? 0) + 1; useJogo.getState().toast(`Você atacou ${n.nome}. Os mascates vão ficar sabendo.`, '#e0553f'); }
+  let ax = 0, ay = 0, ameaca = false;
+  if (n.ferido) { ax = J.x; ay = J.y; ameaca = true; }
+  else for (const o of c.ents) if (o.vivo && o.arq.hostil && Math.abs(o.x - e.x) < 9 && Math.abs(o.y - e.y) < 9 && Math.hypot(o.x - e.x, o.y - e.y) < 8) { ax = o.x; ay = o.y; ameaca = true; break; }
+  if (ameaca) { e.estado = 'foge'; e.fugaT = 3; }
+  if (e.estado === 'foge') {
+    e.fugaT -= dt; e.ang += ang(Math.atan2(e.y - ay, e.x - ax) - e.ang) * Math.min(1, dt * 10); e.alvo = null;
+    const sx = Math.cos(e.ang) * arq.corre * dt, sy = Math.sin(e.ang) * arq.corre * dt, r = Math.min(arq.raio, 0.42); if (!c.colide(e.x + sx, e.y, r)) e.x += sx; if (!c.colide(e.x, e.y + sy, r)) e.y += sy; e.fase += arq.corre * dt * 1.6;
+    if (e.fugaT <= 0 && !ameaca) e.estado = 'ocioso'; bolhaNpc(c, e, dist); return;
+  }
+  if (dist < 6 && c.temLOS(e.x, e.y, J.x, J.y)) e.ang += ang(Math.atan2(J.y - e.y, J.x - e.x) - e.ang) * Math.min(1, dt * 5);
+  const raio = n.tipo === 'acampado' ? 1.6 : n.tipo === 'mascate' ? 4 : 12;
+  e.vagar -= dt;
+  if (e.vagar <= 0) {
+    e.vagar = n.tipo === 'viajante' ? 5 + Math.random() * 6 : 4 + Math.random() * 6;
+    if (dist < 3.5 && n.tipo !== 'viajante') e.alvo = null;
+    else if (Math.random() < (n.tipo === 'acampado' ? 0.3 : 0.7)) { const tx = Math.floor(n.casa.x + (Math.random() - 0.5) * 2 * raio), ty = Math.floor(n.casa.y + (Math.random() - 0.5) * 2 * raio); if (dentro(tx, ty) && !c.solidoEm(tx, ty) && c.zona.tipos[idx(tx, ty)] !== T.PORTA) { e.alvo = { x: tx + 0.5, y: ty + 0.5 }; e.caminho = []; e.tCam = 0; } }
+    else e.alvo = null;
+  }
+  if (e.alvo) seguir(c, e, arq.vel * (n.tipo === 'viajante' ? 1.1 : 0.8), dt);
+  bolhaNpc(c, e, dist);
+}
+/** "…" sobre quem ainda não conversou, enquanto você está por perto */
+function bolhaNpc(c: Cena, e: Ent, dist: number) {
+  const n = e.npc!, quer = !n.falou && !n.ferido && dist < 9;
+  if (quer && !e.bolha) e.bolha = c.add.text(0, 0, '…', { fontFamily: 'VT323, monospace', fontSize: '22px', color: '#ffe9a0', stroke: '#0a0908', strokeThickness: 4 }).setOrigin(0.5).setDepth(95500);
+  if (e.bolha) { if (!quer) { e.bolha.destroy(); e.bolha = undefined; } else { const [px, py] = proj(e.x, e.y, 62 + Math.sin(c.tempo * 3 + e.id) * 2); e.bolha.setPosition(Math.round(px), Math.round(py)); } }
 }
 const ponte_corre = () => ponte.entrada.correr;
 const ponte_furtivo = () => ponte.entrada.furtivo;

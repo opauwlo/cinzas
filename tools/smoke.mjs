@@ -98,6 +98,33 @@ try {
   ok('com machado o rótulo mostra o rendimento', rotulos.com && /madeira/i.test(rotulos.com) && !/precisa/i.test(rotulos.com), JSON.stringify(rotulos));
   await ev(() => { const st = window.__cinzas.store, t = st.getState(), i = { ...t.inv }; delete i.machado; st.setState({ inv: i }); });
 
+  // 4a1. NPC mascate: conversa contextual, troca honesta por fichas e reputação ao atacar
+  const npcInfo = await ev(() => { const k = window.__cinzas.cena(), e = k.devNpc('mascate'); k.s.hp = 100; const st = window.__cinzas.store, i = st.getState().inv; st.setState({ inv: { ...i, ficha: 30, sucata: 5 } }); return { id: e.id, nome: e.npc.nome }; });
+  ok('o NPC aparece com o rótulo "Falar com"', await ev(() => !!window.__cinzas.cena().interativos.find(i => /Falar com/i.test(i.rot))));
+  await ev(() => { const k = window.__cinzas.cena(), it = k.interativos.find(i => /Falar com/i.test(i.rot)); k.devIrPara(it); k.alvoInter = it; window.__cinzas.ponte.cmd.interagir(); });
+  ok('conversar abre o diálogo com o NPC', await ate(() => window.__cinzas.store.getState().painel === 'dialogo', 4000) && (await ev(() => document.body.innerText)).toLowerCase().includes(npcInfo.nome.toLowerCase()));
+  const fala = await ev(() => window.__cinzas.store.getState().dialogo); ok('a fala é contextual e não vazia', fala && fala.fala.length > 20 && fala.vende === true, fala?.fala);
+  await foto('4a1-npc');
+  ok('"Trocar suprimentos" abre a troca com 8 ofertas', await toque('Trocar suprimentos') && await ate(() => { const d = window.__cinzas.store.getState().dialogo; return d && d.modo === 'troca' && d.compras.length === 8; }, 3000));
+  const antesC = await ev(() => { const t = window.__cinzas.store.getState(), d = t.dialogo, o = d.compras[0]; return { item: o.item, preco: o.preco, fichas: t.inv.ficha ?? 0, q: t.inv[o.item] ?? 0 }; });
+  await toque('^Comprar'); await espera(400);
+  const depoisC = await ev(item => { const t = window.__cinzas.store.getState(); return { fichas: t.inv.ficha ?? 0, q: t.inv[item] ?? 0 }; }, antesC.item);
+  ok('comprar troca fichas pelo item, pelo preço exato', depoisC.fichas === antesC.fichas - antesC.preco && depoisC.q === antesC.q + 1, JSON.stringify({ antesC, depoisC }));
+  const antesV = await ev(() => { const t = window.__cinzas.store.getState(), v = t.dialogo.vendas[0]; return { item: v.item, preco: v.preco, fichas: t.inv.ficha ?? 0, q: t.inv[v.item] ?? 0 }; });
+  await toque('^Vender'); await espera(400);
+  const depoisV = await ev(item => { const t = window.__cinzas.store.getState(); return { fichas: t.inv.ficha ?? 0, q: t.inv[item] ?? 0 }; }, antesV.item);
+  ok('vender troca o item por fichas, pelo preço exato', depoisV.fichas === antesV.fichas + antesV.preco && depoisV.q === antesV.q - 1, JSON.stringify({ antesV, depoisV }));
+  await ev(() => window.__cinzas.ponte.cmd.npcAgir('sair')); ok('"Despedir" fecha a conversa', await ate(() => window.__cinzas.store.getState().painel === null, 3000));
+  await espera(1300); // a grade reconcilia o que o teste escreveu direto no inventário (rede de segurança de 1 s)
+  ok('a grade continua coerente depois da troca', await ev(() => { const t = window.__cinzas.store.getState(), soma = {}; for (const p of t.grade) soma[p.id] = (soma[p.id] ?? 0) + p.q; return Object.entries(t.inv).every(([id, q]) => ['mochila', 'colete'].includes(id) || soma[id] === q) && Object.entries(soma).every(([id, q]) => t.inv[id] === q); }));
+  await ev(() => { const k = window.__cinzas.cena(), e = k.ents.find(x => x.npc); e.dano = 0.4; });
+  ok('atacar o NPC o faz fugir e queima a reputação', await ate(() => { const k = window.__cinzas.cena(), e = k.ents.find(x => x.npc); return e.estado === 'foge' && k.s.traiu === true; }, 4000));
+  ok('NPC ferido não pode mais ser abordado', await ev(() => { const k = window.__cinzas.cena(), e = k.ents.find(x => x.npc); return !k.interativos.find(i => /Falar com/i.test(i.rot))?.ok() || e.npc.ferido; }));
+  await ev(() => { const k = window.__cinzas.cena(); for (const e of k.ents) if (e.npc) { e.vivo = false; e.remover = true; e.spr.destroy(); e.som.destroy(); e.bolha?.destroy(); } k.ents = k.ents.filter(e => !e.npc); const e2 = k.devNpc('mascate'); e2.npc.id = 'base:outro'; const it = k.interativos.find(i => /Falar com/i.test(i.rot)); window.__diag = { acao: k.acao ? k.acao.rotulo : null, morto: k.morto, n: k.interativos.filter(i => /Falar com/i.test(i.rot)).length, ok: it?.ok(), estado: e2.estado, ferido: e2.npc.ferido }; k.devIrPara(it); window.__diag.alc = k.alcancavel(it); k.alvoInter = it; window.__cinzas.ponte.cmd.interagir(); });
+  const recusa = await ate(() => { const d = window.__cinzas.store.getState().dialogo; return d && d.vende === false && /negocia/i.test(d.fala); }, 4000);
+  ok('depois de atacar alguém, o mascate se recusa a negociar', recusa, recusa ? '' : JSON.stringify(await ev(() => { const t = window.__cinzas.store.getState(); return { painel: t.painel, d: t.dialogo && { fala: t.dialogo.fala, vende: t.dialogo.vende }, traiu: window.__cinzas.cena().s.traiu, xp: t.xp, nivel: t.nivel, pontos: t.pontos, diag: window.__diag }; })));
+  await ev(() => { window.__cinzas.ponte.cmd.npcAgir('sair'); const k = window.__cinzas.cena(); k.s.traiu = false; for (const e of k.ents) if (e.npc) { e.vivo = false; e.remover = true; e.spr.destroy(); e.som.destroy(); e.bolha?.destroy(); } k.ents = k.ents.filter(e => !e.npc); k.montarInterativosDev?.(); });
+
   // 4a. interação não atravessa parede: o baú está dentro da casa
   const paredes = await ev(() => {
     const k = window.__cinzas.cena(), it = k.interativos.find(i => /baú do abrigo/i.test(i.rot)); if (!it) return null; const r0 = it.r; it.r = 8; const out = {};
@@ -211,6 +238,19 @@ try {
   await ev(() => { const k = window.__cinzas.cena(); k.s.vasculhados = Math.max(k.s.vasculhados, 5); });
   ok('cumprir o objetivo mostra o banner e avança', await ate(() => { const t = window.__cinzas.store.getState(); return !!t.banner && /objetivo cumprido/i.test(t.banner.titulo); }, 6000));
   await foto('4a-banner');
+
+  // 7a2. diretor de população: de noite repõe inimigos variados, longe do jogador, e a tensão segura a reposição
+  const spawn = await ev(() => {
+    const k = window.__cinzas.cena(), J = k.jog; k.s.minutos = Math.floor(k.s.minutos / 1440) * 1440 + 1440 + 23 * 60; k.s.nivel = 5; const vistos = new Set(); let dmin = 99, grupos = 0;
+    for (let i = 0; i < 40; i++) { for (const e of k.ents) if (e.arq.hostil && e.vivo) { e.vivo = false; e.estado = 'morto'; } k.tSpawnUlt = -999; k.tensao = 0; const n0 = k.ents.length; if (k.spawnDinamico()) { grupos++; for (const e of k.ents.slice(n0)) { vistos.add(e.arq.id); dmin = Math.min(dmin, Math.hypot(e.x - J.x, e.y - J.y)); } } }
+    k.tensao = 1; k.tSpawnUlt = -999; for (const e of k.ents) if (e.arq.hostil && e.vivo) { e.vivo = false; e.estado = 'morto'; } const segurou = !k.spawnDinamico();
+    return { vistos: [...vistos], dmin, grupos, segurou, alvo: k.hostisPerto() };
+  });
+  ok('o diretor repõe inimigos de noite (vários grupos)', spawn.grupos >= 10, JSON.stringify(spawn));
+  ok('a reposição traz variedade de inimigos', spawn.vistos.length >= 2, spawn.vistos.join(','));
+  ok('os inimigos repostos nascem longe do jogador (≥ 13 tiles)', spawn.dmin >= 13, String(spawn.dmin));
+  ok('com tensão alta (acabou de apanhar) nada novo aparece', spawn.segurou === true);
+  await ev(() => { const k = window.__cinzas.cena(); k.tensao = 0; for (const e of k.ents) if (e.arq.hostil && e.vivo) { e.vivo = false; e.estado = 'morto'; } });
 
   // 7b. saque de um contêiner no Ermo
   const vas0 = await ev(() => window.__cinzas.store.getState().vasculhados);

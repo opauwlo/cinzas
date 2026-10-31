@@ -12,6 +12,7 @@ import { Cartao, fechar, p } from './Cartao';
 import { Diario, PerkPainel, Melhorias, EventoPainel, Ajuda, Intro } from './PaineisMeta';
 import { Mochila } from './Mochila';
 import { Bancada } from './Bancada';
+import { PainelNpc } from './PaineisNpc';
 import { linhasDe, livres } from '../game/sistemas/grade';
 
 function Linha({ id, qtd, acoes }: { id: string; qtd: number; acoes: React.ReactNode }) {
@@ -139,7 +140,7 @@ export default function Paineis() {
   switch (painel) {
     case 'inv': return <Mochila />; case 'craft': return <Bancada />; case 'bau': return <Bau />; case 'cozinha': return <Cozinha />; case 'dormir': return <Dormir />;
     case 'mapa': return <Mapa />; case 'mapaZona': return <MapaZona />; case 'diario': return <Diario />; case 'config': return <Config />; case 'pausa': return <Pausa />;
-    case 'perk': return <PerkPainel />; case 'melhorias': return <Melhorias />; case 'evento': return <EventoPainel />; case 'ajuda': return <Ajuda />; case 'intro': return <Intro />;
+    case 'perk': return <PerkPainel />; case 'melhorias': return <Melhorias />; case 'evento': return <EventoPainel />; case 'ajuda': return <Ajuda />; case 'intro': return <Intro />; case 'dialogo': return <PainelNpc />;
     default: return null;
   }
 }

@@ -5,7 +5,8 @@ import type { Contrato } from './sistemas/contratos';
 import type { Peca } from './sistemas/grade';
 
 export type Tela = 'menu' | 'jogo' | 'morte' | 'vitoria' | 'creditos' | 'loja' | 'revelacao';
-export type Painel = null | 'inv' | 'craft' | 'bau' | 'mapa' | 'cozinha' | 'dormir' | 'pausa' | 'config' | 'diario' | 'mapaZona' | 'perk' | 'melhorias' | 'evento' | 'ajuda' | 'intro';
+export type Painel = null | 'inv' | 'craft' | 'bau' | 'mapa' | 'cozinha' | 'dormir' | 'pausa' | 'config' | 'diario' | 'mapaZona' | 'perk' | 'melhorias' | 'evento' | 'ajuda' | 'intro' | 'dialogo';
+export type DialogoUI = { npcId: number; nome: string; rotulo: string; fala: string; modo: 'fala' | 'troca'; fichas: number; compras: { item: string; q: number; preco: number }[]; vendas: { item: string; q: number; preco: number }[]; msg: string; vende: boolean };
 export type EventoUI = { titulo: string; txt: string; opcoes: { rot: string; ok: boolean; dica?: string }[]; resultado: string | null; cor?: string };
 export type Toast = { id: number; texto: string; cor: string };
 export type Resumo = { causa: string; dias: number; hora: string; abates: number; vasculhados: number; radMax: number; vitoria: boolean; distAbrigo: number; nivel?: number; contratos?: number; conquistas?: string[] };
@@ -27,7 +28,7 @@ export type Estado = {
   clima: ClimaHud; interior: boolean; tanque: number;
   toasts: Toast[]; acao: { rotulo: string; p: number } | null; alvo: string | null; furtivo: boolean;
   danoTs: number; resumo: Resumo | null; gemas: number; carga: number; descobertos: string[]; dica: string | null; cfg: Configs; temSave: boolean; fps: number;
-  grade: Peca[]; xp: number; nivel: number; pontos: number; perks: string[]; contratos: Contrato[]; mel: Record<string, number>; conquistas: string[]; evento: EventoUI | null; seta: { dx: number; dy: number; d: number } | null; dif: number;
+  dialogo: DialogoUI | null; grade: Peca[]; xp: number; nivel: number; pontos: number; perks: string[]; contratos: Contrato[]; mel: Record<string, number>; conquistas: string[]; evento: EventoUI | null; seta: { dx: number; dy: number; d: number } | null; dif: number;
   set: (p: Partial<Estado>) => void;
   toast: (texto: string, cor?: string) => void;
 };
@@ -42,12 +43,12 @@ export const pesoInv = (inv: Record<string, number>) => pesoDe(inv);
 let tid = 1;
 export const estadoInicial = (seed: string) => ({
   seed, zonaId: 'base', zonaNome: 'Abrigo', biomaId: 'base', minutos: 8 * 60, hp: 100, maxHp: 100, fome: 78, sede: 70, stamina: 100, rad: 0, sangra: false,
-  inv: { agua: 1, bandagem: 2, pe_de_cabra: 1, enlatado: 1 } as Record<string, number>, bau: { tecido: 3, madeira: 4, sucata: 4, enlatado: 2, alcool: 1, garrafa: 2, semente: 2 } as Record<string, number>,
+  inv: { agua: 1, bandagem: 2, pe_de_cabra: 1, enlatado: 1 } as Record<string, number>, bau: { tecido: 3, madeira: 4, sucata: 4, enlatado: 2, alcool: 1, garrafa: 2, semente: 2, ficha: 6 } as Record<string, number>,
   arma: 'pe_de_cabra' as string | null, balas: { municao: 0, cartucho: 0 } as Record<string, number>, mascara: false, combustivel: 6, lanterna: { tem: false, ligada: false, bat: 100 },
   cpm: 18, objIdx: 0, objVal: 0, banner: null, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
   clima: { tipo: 'limpo', chuva: 0, vento: 0.1, neblina: 0, poeira: 0, nuvem: 0.1 } as ClimaHud, interior: false, tanque: 0,
   toasts: [] as Toast[], acao: null, alvo: null, furtivo: false, danoTs: 0, resumo: null, descobertos: ['base'] as string[], dica: null,
-  grade: [] as Peca[], xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
+  dialogo: null, grade: [] as Peca[], xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
 });
 
 export const useJogo = create<Estado>((set, get) => ({

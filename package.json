@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "conceitos": "node tools/conceitos.mjs",
+    "teste": "node tools/testes.mjs",
     "smoke": "node tools/smoke.mjs",
     "empacotar": "node tools/empacotar.mjs",
     "icones": "node tools/icones.mjs"

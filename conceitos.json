@@ -144,6 +144,21 @@
       "id": 29,
       "nome": "Ritmo e rendimento visíveis na coleta",
       "nota": "Rótulos dizem o que a fonte rende e o que falta (ex.: 'Cortar árvore (madeira ×3–5)' / 'precisa de machado'); cada batida tem som e partículas do material."
+    },
+    {
+      "id": 30,
+      "nome": "Diretor de população com tensão e metas de balanço testáveis",
+      "nota": "Quantos inimigos, quais, em que grupo e com que intervalo vêm de funções puras (hora, bioma, nível, dificuldade); depois de apanhar a reposição para até a tensão baixar. As metas de dificuldade viram testes que rodam em Node."
+    },
+    {
+      "id": 31,
+      "nome": "NPCs com rotina, fuga e reputação, com comércio honesto por fichas",
+      "nota": "Mascate, sobrevivente e viajante nascem por seed+dia, olham para você, fogem de hostis e de quem os ataca (queima a reputação); preços à vista, comprar sempre custa mais que vender."
+    },
+    {
+      "id": 32,
+      "nome": "Reservatórios de água limpa como fonte de recurso",
+      "nota": "Cada bioma tem fontes finitas (4 usos por visita) que enchem garrafa ou matam a sede; em áreas radioativas a água cobra um pouco de radiação."
     }
   ],
   "adaptados": [

@@ -15,6 +15,8 @@ import { cabeNaMochila, sincGrade, adicionar, remover, linhasDe, emGrade } from 
 import { EVENTOS_VIAGEM, type Ajuda, type EventoViagem } from '../dados/eventos';
 import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado } from './progresso';
 
+/** registro para módulos que dependem deste (evita import circular): NPCs ligam aqui seus interativos e comandos */
+export const ganchos: { npc: ((c: Cena, e: Ent) => Interativo) | null; cmd: { agir(c: Cena, a: 'trocar' | 'rumor' | 'sair'): void; comprar(c: Cena, item: string): void; vender(c: Cena, item: string): void } | null } = { npc: null, cmd: null };
 export type Interativo = { x: number; y: number; r: number; rot: string; dur: number; ruido?: number; alt?: number; /** casas ocupadas pela própria peça [x, y, larg, alt]: não contam como obstáculo */ pegada?: [number, number, number, number]; ok: () => boolean; exec: () => void };
 const st = () => useJogo.getState();
 const FERR = ['pe_de_cabra', 'machado', 'facao', 'faca', 'taco'];
@@ -60,11 +62,13 @@ export function montarInterativos(c: Cena) {
         case 'cama': if (c.zona.id === 'base') v = { x: cx, y: cy, r, rot: 'Dormir', dur: 0, alt, ok: () => true, exec: () => painel('dormir') }; break;
         case 'jipe': v = { x: cx, y: cy, r: r + 0.6, rot: it.rot, dur: 0, alt, ok: () => true, exec: () => painel('mapa') }; break;
         case 'tanque': v = { x: cx, y: cy, r, rot: it.rot, dur: it.dur, alt, ok: () => true, exec: () => { const s = c.s, n = Math.min(Math.floor(s.tanque), st().inv.garrafa ?? 0); if (n <= 0) { toast(s.tanque < 1 ? 'O tanque está vazio. Espere chover.' : 'Precisa de garrafas vazias.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Enchendo garrafas', it.dur, () => { for (let i = 0; i < n; i++) { if (!tirar('garrafa')) break; dar(c, 'agua', 1, true); } s.tanque -= n; toast(`+ ${n} água limpa`, '#8fe36a'); sfx.beber(); }); } }; break;
+        case 'fonte': v = { x: cx, y: cy, r, get rot() { const n = usosFonte(c, p); return n <= 0 ? 'Reservatório seco' : tem('garrafa') ? `Encher garrafa (${n} restantes)` : `Beber no reservatório (${n} restantes)`; }, dur: it.dur, alt, ok: () => usosFonte(c, p) > 0, exec: () => beberFonte(c, p, it.dur) }; break;
         case 'horta': v = { x: cx, y: cy, r, rot: it.rot, dur: it.dur, alt, ok: () => true, exec: () => cuidarHorta(c, p) }; break;
       }
       if (v) { v.pegada = [p.x, p.y, p.w, p.h]; c.interativos.push(v); }
     }
   }
+  for (const e of c.ents) if (e.npc && e.vivo && ganchos.npc) c.interativos.push(ganchos.npc(c, e));
   for (const fl of c.floras) if (fl.f.cortavel) { const f = fl.f; c.interativos.push({ x: f.x, y: f.y, r: 1.5, get rot() { return (st().inv.machado || c.s.arma === 'machado') ? 'Cortar árvore (madeira ×3–5)' : 'Cortar árvore — precisa de machado'; }, dur: 3.2, ruido: 8, alt: 52, pegada: [Math.floor(f.x), Math.floor(f.y), 1, 1], ok: () => !f.cortada, exec: () => { const mach = st().inv.machado || c.s.arma === 'machado'; if (!mach) { toast('Precisa de um machado.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Cortando árvore', 3.2, () => { f.cortada = true; c.ze.cortadas.push(f.id); const i = idx(Math.floor(f.x), Math.floor(f.y)); f.solido = false; c.zona.solido[i] = 0; c.setQ(fl.spr, c.est(c.recToco)); dar(c, 'madeira', ri(3, 5)); sfx.achado(); c.cameras.main.shake(120, 0.004); }, 8, 'cortar'); } }); }
 }
 const acharPs = (c: Cena, p: Prop) => c.props.find(x => x.p === p);
@@ -83,6 +87,16 @@ export function mostrarCadaver(c: Cena, e: Ent) {
 export function aguaInter(c: Cena): Interativo | null {
   const J = c.jog; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = Math.floor(J.x) + dx, y = Math.floor(J.y) + dy; if (c.tipoEm(x, y) === T.AGUA_RASA && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) < 1.7) return { x: x + 0.5, y: y + 0.5, r: 1.8, get rot() { return tem('garrafa') ? 'Coletar água (turva)' : 'Coletar água — precisa de garrafa vazia'; }, dur: 1.5, alt: 4, ok: () => true, exec: () => { if (!tem('garrafa')) { toast('Precisa de uma garrafa vazia.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Coletando água', 1.5, () => { if (tirar('garrafa')) dar(c, 'agua_suja', 1); sfx.beber(); }, undefined, 'agua'); } }; }
   return null;
+}
+
+// ---------------------------------------------------------------- reservatórios de água limpa (4 usos por visita; beber direto ou encher garrafa)
+const usosFonte = (c: Cena, p: Prop) => c.ze.fontes[p.id] ?? 4;
+function beberFonte(c: Cena, p: Prop, dur: number) {
+  const n = usosFonte(c, p); if (n <= 0) return; const enche = tem('garrafa'), rad = Math.max(0, (c.bioma.rad - 0.9) * 6);
+  iniciarAcao(c, enche ? 'Enchendo garrafa' : 'Bebendo', dur, () => {
+    c.ze.fontes[p.id] = n - 1; if (enche) { if (tirar('garrafa')) dar(c, 'agua', 1); } else { c.s.sede = Math.min(100, c.s.sede + 28); sfx.beber(); }
+    if (rad > 0) { c.s.rad = Math.min(100, c.s.rad + rad); toast('A água tem gosto de ferrugem.', '#d9a02b'); }
+  }, undefined, 'agua');
 }
 
 // ---------------------------------------------------------------- horta
@@ -213,6 +227,7 @@ export function instalarComandos(c: Cena) {
       useJogo.setState({ inv, bau, grade }); sfx.ui('clique'); c.s.inv = inv; c.s.bau = bau;
     },
     viajar: d => viajar(c, d), salvar: () => c.salvar(), atacarBotao: () => { ponte.entrada.tap++; },
+    npcAgir: a => ganchos.cmd?.agir(c, a), npcComprar: i => ganchos.cmd?.comprar(c, i), npcVender: i => ganchos.cmd?.vender(c, i),
     eventoEscolher: i => eventoEscolher(c, i), eventoFim: () => eventoFim(c), escolherPerk: id => escolherPerk(c, id), receberContrato: id => receberContrato(c, id), melhorar: id => melhorar(c, id),
   };
   void armaDe; void W;

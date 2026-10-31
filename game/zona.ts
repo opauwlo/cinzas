@@ -14,7 +14,7 @@ export const T = { TERRA: 0, ESTRADA: 1, CALCADA: 2, MADEIRA: 3, AZULEJO: 4, PAR
 export const idx = (x: number, y: number) => y * W + x;
 export const dentro = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H;
 
-export type InterKind = 'saque' | 'cortar' | 'desmontar' | 'bau' | 'bancada' | 'cama' | 'fogueira' | 'jipe' | 'horta' | 'bunker' | 'tanque' | 'rasgar' | 'esfolar';
+export type InterKind = 'saque' | 'cortar' | 'desmontar' | 'bau' | 'bancada' | 'cama' | 'fogueira' | 'jipe' | 'horta' | 'bunker' | 'tanque' | 'rasgar' | 'esfolar' | 'fonte';
 export type Interacao = { k: InterKind; rot: string; dur: number; ruido?: number; requer?: string[]; feito?: boolean };
 export type Luz = { r: number; cor: number; f: number; noite: boolean };
 export type Prop = { id: number; rec: RecProp; x: number; y: number; w: number; h: number; solido: boolean; loot?: string[]; aberto?: boolean; inters: Interacao[]; luz?: Luz; especial?: boolean; estado?: number };
@@ -51,7 +51,7 @@ const MOBILIA: Record<string, string[]> = {
 
 /** o que aparece solto no chão por bioma (peso) e quantos por zona: passar por cima coleta */
 const SOLTOS: Record<string, [string, number][]> = {
-  base: [['madeira', 5], ['sucata', 3], ['tecido', 2]], ermo: [['sucata', 5], ['tecido', 3], ['madeira', 3], ['enlatado', 1]], cidade: [['sucata', 5], ['tecido', 4], ['enlatado', 2], ['eletronico', 1]],
+  base: [['madeira', 5], ['sucata', 3], ['tecido', 2]], ermo: [['sucata', 5], ['tecido', 3], ['madeira', 3], ['enlatado', 1], ['legume', 3]], cidade: [['sucata', 5], ['tecido', 4], ['enlatado', 2], ['eletronico', 1]],
   floresta: [['madeira', 7], ['legume', 3], ['tecido', 1]], industrial: [['sucata', 7], ['eletronico', 2], ['tecido', 1]], pantano: [['legume', 4], ['madeira', 3], ['tecido', 2]],
 };
 const N_SOLTOS: Record<string, number> = { base: 16, ermo: 34, cidade: 32, floresta: 46, industrial: 32, pantano: 30 };
@@ -215,6 +215,7 @@ export function gerarZona(id: string, biomaId: string, seed: string, nome?: stri
   if (rng.chance(B.colosso)) { for (let t = 0; t < 30; t++) { const x = ri(8, W - 8), y = ri(8, H - 20); if (spawnLivre(x, y) && !perto(x, y, jogador.x, jogador.y, 34)) { spawns.push({ id: sid++, arq: 'colosso', x, y, grupo: gid++ }); pois.push({ id: 'colosso', tipo: 'colosso', nome: 'Covil do Colosso', x, y, r: 14 }); break; } } }
 
   if (TEMA?.garante) { const alvo = props.find(p => p.loot && p.loot.length && p.rec.n !== 'carro'); if (alvo) alvo.loot!.push(TEMA.garante); }
+  for (let k = 0, t = 0; k < (B.fontes ?? 0) && t < 120; t++) { const x = ri(6, W - 8), y = ri(6, H - 8); if (perto(x, y, jogador.x, jogador.y, 8)) continue; const p = prop('tanque_agua', x, y, 0, { semLoot: true, v: 1 }); if (p) { p.inters.push({ k: 'fonte', rot: 'Água do reservatório', dur: 1.2 }); k++; } }
   // jipe do jogador
   const j = prop('carro', jipe.x, jipe.y, 0, { v: 4 + 5 * 3, d: 0.1, semLoot: true }); if (j) { j.inters.push({ k: 'jipe', rot: 'Usar o jipe (viajar)', dur: 0.3 }); }
   return { id, nome: nome ?? B.nome, bioma: biomaId, seed, tipos, rad, solido, opaco, estilo, props, flora, spawns, predios, pois, jogador, jipe, soltos: fazerSoltos() };

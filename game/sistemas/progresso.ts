@@ -11,10 +11,10 @@ import type { Run } from './salvar';
 import { sincGrade } from './grade';
 
 export const pk = (s: { perks?: string[] }, id: string) => !!s.perks?.includes(id);
-export const xpNivel = (n: number) => 50 + 40 * (n - 1);
+export { xpNivel, DIF } from '../dados/balanco';
+import { DIF, xpNivel } from '../dados/balanco';
 export const DIF_NOMES = ['Calmo', 'Normal', 'Brutal'] as const;
 /** multiplicadores por dificuldade: dano recebido, fome/sede, XP, população dinâmica, tamanho das invasões */
-export const DIF = { dano: [0.75, 1, 1.3], fome: [0.8, 1, 1.2], xp: [0.9, 1, 1.25], spawn: [0.7, 1, 1.4], raid: [0.8, 1, 1.35], chanceRaid: [0.35, 0.5, 0.7] } as const;
 export const dif = (s: Run) => s.dif ?? 1;
 export const melNivel = (s: Run, id: string) => s.mel?.[id] ?? 0;
 const toast = (t: string, cor?: string) => useJogo.getState().toast(t, cor);

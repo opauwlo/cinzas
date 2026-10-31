@@ -24,6 +24,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Testes de lógica e balanço (Node)
+        run: npm run teste
       - run: npm run build
       - name: Smoke test (Chrome headless)
         run: node tools/smoke.mjs

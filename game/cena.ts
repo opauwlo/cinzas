@@ -17,6 +17,7 @@ import { ARQS, type Arq } from './dados/criaturas';
 import { useJogo, horaStr, OBJETIVOS } from './store';
 import { sincGrade } from './sistemas/grade';
 import { avancarObjetivos, objetivoAtual } from './sistemas/objetivos';
+import { popularNpcs, tickNpcs, criarNpc } from './sistemas/npcs';
 import { ponte } from './ponte';
 import { sfx, ambiente, setGeiger, setBatimento, aplicarVolumes, trovao } from './audio';
 import { Clima, luzDia, gradeCor, sombraSol } from './sistemas/clima';
@@ -27,9 +28,11 @@ import { montarInterativos, instalarComandos, aguaInter, tickHortas, ticarAcao, 
 import { texturaSolto, ITENS_SOLTOS } from './lib/soltos';
 import type { Solto } from './zona';
 import { iniciarZona, atualizarDiretor, desenharBeacon, setaAirdrop, type Airdrop, type Raid } from './sistemas/diretor';
-import { DIF, dif, pk, melNivel, ganharXp, registrar, tickProgresso } from './sistemas/progresso';
+import { dif, pk, melNivel, ganharXp, registrar, tickProgresso } from './sistemas/progresso';
+import { MIN_POR_SEG, FOME_POR_MIN, SEDE_POR_MIN, DIF } from './dados/balanco';
+import { alvoHostis, escolherArq, tamanhoGrupo, intervaloSpawn, podeSpawnar, pontoSpawn, tensaoDecai, type CtxSpawn } from './sistemas/spawn';
 
-export const MIN_POR_SEG = 1440 / (14 * 60);
+export { MIN_POR_SEG };
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
 export { ang, dirTela, proj };
 let FAB: Fabrica | null = null;
@@ -56,6 +59,7 @@ export class Cena extends Phaser.Scene {
   evPend: import('./sistemas/acoes').EvPend | null = null;
   soltos: { s: Solto; spr: Phaser.GameObjects.Image }[] = []; avisoCheia = -99; flN = 0; flT = 0;
   fz = 2; cz = 1; fogLw = 0; fogLh = 0; climaLw = 0; climaLh = 0;
+  tensao = 0; tSpawnUlt = -999; nSpawn = 0; npcDia = 0;
   airdrop: Airdrop | null = null; raid: Raid | null = null; perkAvisado = 0; novasConquistas: string[] = [];
   tarefas: (() => void)[] = []; totalTarefas = 1; estCache = new Map<string, Quadro>(); recToco!: RecEstatica; pausadoPor = false; noiteAnterior = false; tempo = 0; trava = false; intro = 0;
   _dados!: { run: Run; zonaId: string; esc: number };
@@ -65,7 +69,7 @@ export class Cena extends Phaser.Scene {
     this._dados = { run: d.run, zonaId: d.zonaId, esc: d.esc ?? 2 }; this.s = d.run; this.s.zonaId = d.zonaId;
     this.chunks = new Map(); this.props = []; this.floras = []; this.portas = new Map(); this.ents = []; this.cadaveres = []; this.interativos = []; this.luzes = []; this.tracers = []; this.aneis = []; this.estCache = new Map(); this.recCache = new Map();
     this.lmA.fill(0.9); this.seen.fill(0); this.luzFrame.fill(0); this.pronto = false; this.morto = false; this.vitoria = false; this.acao = null; this.alvoInter = null; this.tempo = 0; this.trava = false; this.intro = 0;
-    this.soltos = []; this.fogW = 0; this.fogH = 0; // a mesma instância da cena é reaproveitada na viagem: força recriar as camadas (as antigas foram destruídas)
+    this.soltos = []; this.tensao = 0; this.tSpawnUlt = -999; this.fogW = 0; this.fogH = 0; // a mesma instância da cena é reaproveitada na viagem: força recriar as camadas (as antigas foram destruídas)
   }
   private aoRedimensionar = () => this.criarCamadas();
 
@@ -75,7 +79,7 @@ export class Cena extends Phaser.Scene {
     if (!FAB) FAB = new Fabrica(reg, rem); else FAB.vincular(reg, rem); this.fab = FAB;
     this.esc = this._dados.esc; this.cameras.main.setRoundPixels(true);
     const loc = localPorId(this.s.zonaId); this.bioma = biomaDe(loc.bioma, loc.tema); this.zona = gerarZona(loc.id, loc.bioma, this.s.seed, loc.nome, loc.tema);
-    this.ze = this.s.zonas[loc.id] ??= novoZEstado(); this.ze.coletados ??= [];
+    this.ze = this.s.zonas[loc.id] ??= novoZEstado(); this.ze.coletados ??= []; this.ze.fontes ??= {};
     for (const it of ITENS_SOLTOS) if (!this.textures.exists('solto_' + it)) this.textures.addCanvas('solto_' + it, texturaSolto(it));
     if (this.ze.ultima && this.s.minutos - this.ze.ultima > 3 * 1440) { const h = this.ze.hortas, f = this.ze.fogueiras; Object.assign(this.ze, novoZEstado(), { hortas: h, fogueiras: f }); }
     for (const p of this.zona.props) { if (this.ze.saqueados.includes(p.id)) { p.aberto = true; p.loot = []; for (const i of p.inters) if (i.k === 'saque') i.feito = true; } if (this.ze.desmontados.includes(p.id)) for (const i of p.inters) if (i.k === 'desmontar') i.feito = true; if (this.ze.rasgados.includes(p.id)) for (const i of p.inters) if (i.k === 'rasgar') i.feito = true; }
@@ -148,7 +152,7 @@ export class Cena extends Phaser.Scene {
     const ult = this.s.zonas[loc.id]; void ult; this.ze.ultima = this.s.minutos; this.interior = false;
     this.events.once('shutdown', () => { ponte.cmd = null; this.scale.off('resize', this.aoRedimensionar); });
     this.pronto = true; useJogo.setState({ carga: 1 }); this.sincronizar(); this.salvar(); this.intro = 1; this.cameras.main.fadeIn(500, 5, 4, 6);
-    if (loc.id !== 'base') useJogo.getState().toast('Chegada: ' + loc.nome, '#8fe36a'); this.verPois(); iniciarZona(this);
+    if (loc.id !== 'base') useJogo.getState().toast('Chegada: ' + loc.nome, '#8fe36a'); this.verPois(); iniciarZona(this); popularNpcs(this);
   }
   fov!: InstanceType<typeof ROT.FOV.PreciseShadowcasting>; clarao!: Phaser.GameObjects.Image;
   /** coleta de itens soltos: é só passar por cima (se couber na mochila) */
@@ -168,6 +172,12 @@ export class Cena extends Phaser.Scene {
   /** auxiliar de teste (playtests headless): cria uma criatura perto do jogador */
   dev(arq: string, dx: number, dy: number, grupo = -1, faccao?: number) { return criarEnt(this, arq, this.jog.x + dx, this.jog.y + dy, null, grupo, faccao); }
   devXp(n: number) { ganharXp(this, n); }
+  /** (teste) cria um NPC ao lado do jogador */
+  devNpc(tipo: 'mascate' | 'acampado' | 'viajante') {
+    const J = this.jog; let px = J.x + 0.1, py = J.y;
+    busca: for (const r of [1.8, 2.4, 3.2]) for (let a = 0; a < 6.28; a += 0.5) { const x = J.x + Math.cos(a) * r, y = J.y + Math.sin(a) * r; if (!this.colide(x, y, 0.3) && this.temLOS(J.x, J.y, x, y)) { px = x; py = y; break busca; } }
+    const e = criarNpc(this, tipo, px, py, tipo === 'mascate' ? 'Tião, o Mascate' : tipo === 'acampado' ? 'Dona Marlene' : 'Joana da Estrada'); montarInterativos(this); return e;
+  }
   /** forçadores de teste: 'raid' (invasão agora) e 'airdrop' (na próxima zona); devEv = id do evento de viagem */
   devForcar: string | null = null; devEv: string | null = null;
   criarCamadas() {
@@ -295,8 +305,8 @@ export class Cena extends Phaser.Scene {
       s.minutos += dt * MIN_POR_SEG; const h = this.hora(); this.ambient = luzDia(h) * (1 - this.clima.nuvem * 0.05);
       this.jogador(dt); this.necessidades(dt); this.atualizarSoltos();
     }
-    const noite = 1 - this.ambient; this.tSpawn += dt;
-    if (!this.morto && this.tSpawn > 45) { this.tSpawn = 0; this.spawnDinamico(); }
+    const noite = 1 - this.ambient; this.tSpawn += dt; this.tensao = tensaoDecai(this.tensao, dt);
+    if (!this.morto && this.tSpawn > 4) { this.tSpawn = 0; this.spawnDinamico(); }
     const J = this.jog; this.clima.atualizar(dt, s.minutos, this.interior);
     for (const e of this.ents) { if (Math.abs(e.x - J.x) < 36 && Math.abs(e.y - J.y) < 36) atualizarEnt(this, e, dt, noite); }
     this.ents = this.ents.filter(e => !e.remover); this.separar();
@@ -304,15 +314,24 @@ export class Cena extends Phaser.Scene {
     this.tPortas += dt; if (this.tPortas > 0.5) { this.tPortas = 0; for (const [i, d] of this.portas) if (d.aberta) { d.t += 0.5; const x = i % W, y = Math.floor(i / W); if (d.t > 4 && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) > 6 && !this.ents.some(e => e.vivo && Math.hypot(e.x - x - 0.5, e.y - y - 0.5) < 1.2)) this.fecharPorta(i); } }
     this.tSync += dt; if (this.tSync > 0.1) { this.tSync = 0; this.sincronizar(); }
     this.tSave += dt; if (this.tSave > 30 && !this.morto) { this.tSave = 0; this.salvar(); }
-    this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); avancarObjetivos(this); atualizarDiretor(this, 1); sincGrade(); }
+    this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); avancarObjetivos(this); tickNpcs(this); atualizarDiretor(this, 1); sincGrade(); }
   }
   separar() {
     const at = this.ents.filter(e => e.vivo && e.arq.hostil && Math.abs(e.x - this.jog.x) < 20 && Math.abs(e.y - this.jog.y) < 20);
     for (let i = 0; i < at.length; i++) for (let j = i + 1; j < at.length; j++) { const a = at[i], b = at[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), m = (a.arq.raio + b.arq.raio) * 1.5; if (d > 0 && d < m) { const f = (m - d) * 0.5; if (!this.colide(a.x - dx / d * f, a.y, 0.28)) a.x -= dx / d * f; if (!this.colide(a.x, a.y - dy / d * f, 0.28)) a.y -= dy / d * f; if (!this.colide(b.x + dx / d * f, b.y, 0.28)) b.x += dx / d * f; if (!this.colide(b.x, b.y + dy / d * f, 0.28)) b.y += dy / d * f; } }
   }
+  /** contexto para o diretor de população (ver sistemas/spawn.ts) */
+  ctxSpawn(): CtxSpawn { const s = this.s, cl = this.clima; return { hora: this.hora(), nivel: s.nivel ?? 1, dia: Math.floor(s.minutos / 1440) + 1, dif: dif(s), interior: this.interior, neblina: cl.neblina, chuva: cl.chuva, noBase: this.zona.id === 'base' }; }
+  hostisPerto() { const J = this.jog; return this.ents.filter(e => e.vivo && e.arq.hostil && Math.hypot(e.x - J.x, e.y - J.y) < 25).length; }
+  /** reposição de inimigos: quantidade, tipo, grupo e ritmo vêm do diretor; aqui só se acha o ponto e se criam as entidades */
   spawnDinamico() {
-    const J = this.jog, perto = this.ents.filter(e => e.vivo && e.arq.hostil && Math.hypot(e.x - J.x, e.y - J.y) < 25).length; if (!this.bioma.inimigos.length || perto >= Math.round(4 * DIF.spawn[dif(this.s)]) || this.ents.length > 140) return;
-    for (let t = 0; t < 20; t++) { const a = Math.random() * 6.28, r = 14 + Math.random() * 8, x = Math.floor(J.x + Math.cos(a) * r), y = Math.floor(J.y + Math.sin(a) * r); if (!dentro(x, y) || this.solidoEm(x, y) || this.zona.tipos[idx(x, y)] === T.PORTA || this.luzFrame[idx(x, y)] > 0.1) continue; const n = 1 + Math.floor(Math.random() * 2); const arq = this.bioma.inimigos[0][0]; for (let k = 0; k < n; k++) criarEnt(this, arq, x + 0.5 + k * 0.4, y + 0.5, null, -1); break; }
+    const J = this.jog, ctx = this.ctxSpawn(), hostis = this.hostisPerto(), alvo = alvoHostis(this.bioma, ctx);
+    if (!podeSpawnar({ agora: this.tempo, hostis, alvo, total: this.ents.length, tensao: this.tensao, ultimo: this.tSpawnUlt, intervalo: intervaloSpawn(ctx) })) return false;
+    const rng = new Rng(`${this.s.seed}|spawn|${this.nSpawn++}|${Math.floor(this.s.minutos)}`), arq = escolherArq(rng, this.bioma, ctx), n = tamanhoGrupo(rng, arq, ctx, alvo - hostis);
+    const pt = pontoSpawn(rng, J.x, J.y, J.ang, (x, y) => dentro(x, y) && !this.solidoEm(x, y) && this.zona.tipos[idx(x, y)] !== T.PORTA && this.luzFrame[idx(x, y)] <= 0.1, 14, 24);
+    if (!pt) return false; const g = 6000 + this.nSpawn;
+    for (let k = 0; k < n; k++) criarEnt(this, arq, pt[0] + 0.5 + k * 0.4, pt[1] + 0.5, null, g);
+    this.tSpawnUlt = this.tempo; return true;
   }
 
   // ------------------------------------------------------------------ jogador
@@ -360,12 +379,12 @@ export class Cena extends Phaser.Scene {
 
   // ------------------------------------------------------------------ necessidades, clima e objetivos
   avancar(min: number, fator = 1) {
-    const s = this.s; s.minutos += min; s.fome = Math.max(0, s.fome - min * 0.052 * fator); s.sede = Math.max(0, s.sede - min * 0.085 * fator); if (s.fome > 30 && s.sede > 30) s.hp = Math.min(s.maxHp, s.hp + min * 0.12);
+    const s = this.s; s.minutos += min; s.fome = Math.max(0, s.fome - min * FOME_POR_MIN * fator); s.sede = Math.max(0, s.sede - min * SEDE_POR_MIN * fator); if (s.fome > 30 && s.sede > 30) s.hp = Math.min(s.maxHp, s.hp + min * 0.12);
     s.rad = Math.max(0, s.rad - min * 0.02); this.clima.atualizar(0, s.minutos, false);
   }
   necessidades(dt: number) {
     const s = this.s, J = this.jog, dmin = dt * MIN_POR_SEG, st = useJogo.getState(), cl = this.clima, mask = s.mascara && st.inv.mascara ? 0.35 : 1;
-    const fm = DIF.fome[dif(s)] * (pk(s, 'estomago') ? 0.7 : 1); s.fome = Math.max(0, s.fome - dmin * 0.052 * fm); s.sede = Math.max(0, s.sede - dmin * 0.085 * fm);
+    const fm = DIF.fome[dif(s)] * (pk(s, 'estomago') ? 0.7 : 1); s.fome = Math.max(0, s.fome - dmin * FOME_POR_MIN * fm); s.sede = Math.max(0, s.sede - dmin * SEDE_POR_MIN * fm);
     const rad = this.zona.rad[idx(Math.floor(J.x), Math.floor(J.y))] ?? 0; this.radSuave += (rad - this.radSuave) * Math.min(1, dt * 4);
     let ganho = rad > 0.05 ? Math.pow(rad, 1.2) * 2.4 * mask : 0; if (cl.acida && !this.interior) ganho += cl.chuva * 1.1 * mask;
     if (pk(s, 'imune')) ganho *= 0.6; s.rad = Math.min(100, Math.max(0, s.rad + (ganho > 0 ? ganho * dt : -0.03 * dt))); s.radMax = Math.max(s.radMax, s.rad);

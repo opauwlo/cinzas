@@ -218,3 +218,6 @@ body { font-family: var(--f-txt); font-size: 16px; line-height: 1.35; }
 .relogio .s { gap: 5px; min-width: 0; } .relogio .s span:last-child { max-width: calc(78px * var(--u)); overflow: hidden; text-overflow: ellipsis; }
 .eq small { font-size: 13px; }
 .relogio .s { font-size: calc(10px * var(--u)); letter-spacing: .02em; } .relogio .s span:last-child { max-width: calc(92px * var(--u)); }
+
+/* ---- conversa com NPCs ---- */
+.fala p { margin: 0; font: 400 17px/1.45 var(--f-txt); color: var(--osso); } .fala .msg { margin-top: var(--sp3); padding-top: var(--sp2); border-top: 1px solid #0d0e10; font: 600 15px var(--f-txt); color: var(--ambar); }

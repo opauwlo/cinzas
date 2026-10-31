@@ -12,6 +12,7 @@ import { ITENS } from '../dados/itens';
 import { criarEnt } from './ia';
 import { montarInterativos } from './acoes';
 import { DIF, dif, melNivel, ganharXp, registrar } from './progresso';
+import { tamanhoRaid } from '../dados/balanco';
 export { airdropColetado } from './progresso';
 
 const ID_AIRDROP = 910000;
@@ -22,7 +23,7 @@ const toast = (t: string, cor?: string) => useJogo.getState().toast(t, cor);
 const dia = (c: Cena) => Math.floor(c.s.minutos / 1440) + 1;
 
 /** acha um ponto livre (a pé) numa faixa de distância do jogador */
-function pontoLivre(c: Cena, rng: Rng, dmin: number, dmax: number, tent = 80): [number, number] | null {
+export function pontoLivre(c: Cena, rng: Rng, dmin: number, dmax: number, tent = 80): [number, number] | null {
   const J = c.jog;
   for (let i = 0; i < tent; i++) {
     const a = rng.f() * Math.PI * 2, r = rng.range(dmin, dmax), x = Math.floor(J.x + Math.cos(a) * r), y = Math.floor(J.y + Math.sin(a) * r);
@@ -102,7 +103,7 @@ export function atualizarDiretor(c: Cena, _dt: number) {
   toast('Rádio: movimento suspeito ao norte do abrigo. Prepare-se!', '#e0b83a'); sfx.sinal();
   c.time.delayedCall(forcar ? 1200 : 9000, () => {
     if (c.zona.id !== 'base' || c.morto) return;
-    const n = Math.max(2, Math.min(10, Math.round((2 + d * 0.9) * (1 - 0.2 * melNivel(s, 'muro')) * DIF.raid[dif(s)]))), grupo = 8000 + d;
+    const n = tamanhoRaid(d, melNivel(s, 'muro'), dif(s)), grupo = 8000 + d;
     const tipos: [string, number][] = d < 4 ? [['irradiado', 5], ['corredor', 2]] : d < 7 ? [['irradiado', 4], ['corredor', 3], ['saqueador', 2]] : [['irradiado', 3], ['corredor', 3], ['saqueador', 3], ['filho', 2]];
     const base = pontoLivre(c, rng, 26, 34) ?? pontoLivre(c, rng, 20, 40); if (!base) return;
     for (let i = 0; i < n; i++) { const a = rng.peso(tipos); spawnGrupo(c, rng, a, 1, base, grupo, true, a === 'saqueador' ? 0 : a === 'filho' ? 1 : undefined); }

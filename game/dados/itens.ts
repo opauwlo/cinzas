@@ -44,6 +44,7 @@ export const ITENS: Record<string, Item> = {
   colete: I({ id: 'colete', nome: 'Colete improvisado', peso: 2, raridade: 'incomum', icone: ic('darkzaitzev', 'hooded-figure'), tipo: 'equip', desc: 'Reduz o dano recebido em 25%.' }),
   mochila: I({ id: 'mochila', nome: 'Mochila grande', peso: 1, raridade: 'incomum', icone: ic('delapouite', 'backpack'), tipo: 'equip', desc: 'Aumenta a capacidade em 10 kg.' }),
   kit_fogueira: I({ id: 'kit_fogueira', nome: 'Kit de fogueira', peso: 2, raridade: 'comum', icone: ic('lorc', 'campfire'), tipo: 'ferramenta', desc: 'Acende uma fogueira onde você está.' }),
+  ficha: I({ id: 'ficha', nome: 'Ficha de racionamento', peso: 0.01, raridade: 'comum', icone: ic('lorc', 'gears'), tom: '#d9a02b', tipo: 'material', desc: 'A moeda dos mascates. Troque por suprimentos.' }),
   radio: I({ id: 'radio', nome: 'Rádio de campanha', peso: 0.9, raridade: 'raro', icone: ic('delapouite', 'walkie-talkie'), tipo: 'especial', desc: 'Capta o sinal do Abrigo 7.' }),
 };
 
@@ -95,18 +96,18 @@ export type Container = 'geladeira' | 'armario' | 'caixa' | 'ferramentas' | 'car
 export const TABELAS: Record<Container, string[]> = {
   geladeira: ['agua', 'enlatado', 'carne_crua', 'pao', 'agua', 'enlatado', 'legume', 'garrafa'],
   armario: ['bandagem', 'kit', 'antirrad', 'lanterna', 'mascara', 'pe_de_cabra', 'pao', 'enlatado', 'bateria', 'tecido', 'alcool'],
-  caixa: ['enlatado', 'pao', 'bandagem', 'bateria', 'municao', 'agua', 'facao', 'tecido', 'sucata', 'garrafa'],
+  caixa: ['enlatado', 'pao', 'bandagem', 'bateria', 'municao', 'agua', 'ficha', 'facao', 'tecido', 'sucata', 'garrafa'],
   ferramentas: ['pe_de_cabra', 'facao', 'bateria', 'municao', 'lanterna', 'sucata', 'sucata', 'machado', 'faca', 'eletronico'],
   carro: ['bateria', 'municao', 'agua', 'bandagem', 'pistola', 'kit', 'antirrad', 'combustivel', 'sucata', 'garrafa'],
   caixote_militar: ['municao', 'municao', 'cartucho', 'bandagem', 'kit', 'rifle', 'escopeta', 'pistola', 'mascara', 'antirrad'],
   prateleira: ['enlatado', 'pao', 'agua', 'garrafa', 'alcool', 'tecido', 'bateria', 'bandagem'],
   estante: ['tecido', 'tecido', 'semente', 'pao', 'alcool'],
   guarda_roupa: ['tecido', 'tecido', 'tecido', 'colete', 'mochila', 'tecido'],
-  mala: ['tecido', 'enlatado', 'bandagem', 'agua', 'semente', 'radio'],
+  mala: ['tecido', 'enlatado', 'bandagem', 'agua', 'semente', 'ficha', 'radio'],
   bomba: ['combustivel', 'combustivel', 'alcool'],
   lixeira: ['sucata', 'garrafa', 'tecido', 'pao', 'sucata'],
-  bau_gangue: ['municao', 'cartucho', 'pistola', 'escopeta', 'kit', 'facao', 'machado', 'enlatado', 'antirrad', 'combustivel', 'eletronico'],
-  balcao: ['enlatado', 'bateria', 'municao', 'alcool', 'eletronico'],
+  bau_gangue: ['ficha', 'ficha', 'municao', 'cartucho', 'pistola', 'escopeta', 'kit', 'facao', 'machado', 'enlatado', 'antirrad', 'combustivel', 'eletronico'],
+  balcao: ['enlatado', 'bateria', 'municao', 'alcool', 'ficha', 'eletronico'],
   bancada_velha: ['sucata', 'eletronico', 'bateria', 'faca', 'martelo_x', 'alcool'],
 };
 export function sortearLoot(tipo: Container, rng: () => number, extra: string[] = []): string[] {

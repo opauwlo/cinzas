@@ -306,7 +306,7 @@ Pedido do Uwlo: pixel art grande em tamanho normal, visão isométrica como Proj
 Base (abrigo com cama, baú, bancada, fogão, horta, tanque de chuva) → jipe → mapa → viagem (gasta combustível e horas) → saque/combate/gangues/colosso → volta. Salva sozinho (continuar no menu). Vitória: rádio de campanha → Abrigo 7.
 
 ### Testes e ferramentas
-- `npm run build` e depois `npm run smoke`: 88 verificações em Chrome headless (menu, manifesto PWA, introdução, base, movimento, estações, interação bloqueada por parede, fabricar, cozinhar, baú, sono, melhorias, XP e habilidades, conquistas, combate, climas, viagem, evento de viagem, contratos, invasão, lançamento de suprimentos, locais temáticos, salvar/continuar, morte, Modo Estudo). ~4 min em GL por software. Capturas: `node tools/smoke.mjs <pasta>`.
+- `npm run teste` (lógica e balanço, em Node, ~3 s) e `npm run build` + `npm run smoke` (navegador, 100+ verificações) em Chrome headless (menu, manifesto PWA, introdução, base, movimento, estações, interação bloqueada por parede, fabricar, cozinhar, baú, sono, melhorias, XP e habilidades, conquistas, combate, climas, viagem, evento de viagem, contratos, invasão, lançamento de suprimentos, locais temáticos, salvar/continuar, morte, Modo Estudo). ~4 min em GL por software. Capturas: `node tools/smoke.mjs <pasta>`.
 - Para depurar no console: `window.__cinzas` (`cena()`, `store`, `ponte`) e `cena().dev('lobo', 3, 0)` cria criatura perto do jogador.
 - `tools/icones.mjs` gera `public/pwa/*`. `tools/empacotar.mjs`/`entrada.tsx` (artifact em arquivo único) são **legado: não usar mais**.
 
@@ -369,4 +369,29 @@ Base (abrigo com cama, baú, bancada, fogão, horta, tanque de chuva) → jipe �
 - **Fonte:** Pixelify Sans (OFL) para texto e rótulos; Silkscreen só no logo e títulos (16/32/56 px, múltiplos da grade de 8); VT323 só em números do HUD. Sem texto abaixo de 12 px; botões em caixa baixa.
 - **Espaçamento:** escala 4/8/12/16/24 (`--sp1..5`), alvos de toque de 40–54 px, HUD com mais respiro, relógio que nunca encosta nos botões do canto. Camada de overrides no fim de `app/globals.css`.
 - Pendências: parênteses da Pixelify Sans parecem chaves (peculiaridade do glifo); fontes de água limpa (poços/cisternas) e mais tipos de nó de coleta (minério, ervas medicinais).
+
+## 19. Balanceamento, spawn de monstros e NPCs (31/out/2026)
+
+**Pedido do Uwlo:** balancear a dificuldade, lógica e testes do spawn de monstros, mundo mais vivo com NPCs, testes de dificuldade e balanceamento.
+
+### Testes de balanço (`npm run teste`, ~3 s, sem navegador)
+`tools/testes.mjs` empacota `tools/testes/principal.ts` com esbuild e roda 31 testes. As **metas de projeto** estão como número e quebram o teste se um ajuste estragar o equilíbrio:
+- **Combate** (`game/dados/balanco.ts`): 1 irradiado custa 8–30% da vida com o pé de cabra; 3 juntos 45–90%; matilhas/javali do começo não matam no corpo a corpo; Colosso é letal de perto com qualquer arma e cai em ≤ 24 golpes; armas melhores têm ≥ 1,3× o DPS; Calmo < Normal < Brutal (×0,75 / ×1 / ×1,3).
+- **Necessidades:** sede 100→0 em 12–16 min reais (Normal), fome em 19–25 min (`FOME_POR_MIN = 0.044`, `SEDE_POR_MIN = 0.07`).
+- **Mundo:** a ameaça da zona cresce ≥ 5% por degrau de perigo; nada nasce a < 22 tiles da chegada; Colosso raro; toda zona tem ≥ 1 dia de água e comida (Ermo e Floresta ≥ 1,5 dia de água).
+- **Spawn** (`game/sistemas/spawn.ts`, puro): alvo de hostis por hora/bioma/nível/dia/dificuldade (0 no abrigo, noite ≥ dia, ≤ 3 de dia e ≤ 5 de noite no nível 1), intervalo, escolha de arquétipo (sem gangues antes do nível 3, corredores crescem à noite), tamanho de grupo, ponto de nascimento no anel 14–24 (60% atrás de quem olha) e **tensão** (depois de apanhar a reposição para; alívio em ≤ 25 s).
+- **NPCs:** planejamento determinístico, frequências por tipo, falas válidas para todo objetivo/clima/hora, estoque válido, troca sem lucro infinito.
+Para balancear: mexa nos números (`balanco.ts`, `criaturas.ts`, `biomas.ts`, `meta.ts`), rode `npm run teste` e leia qual meta quebrou.
+
+### O que foi reajustado
+Irradiado 12→10 de dano e cd 1,2; cão 9→7; lobo hp 34, dano 9, cd 1; javali 14 de dano; fome/sede mais lentas; invasão `(1,5 + 0,8·dia)·(1−0,2·muralha)` (dia 2 = 3); densidades por bioma e tema (Ermo 0,8, Floresta 1,0, Pântano 1,6, Refinaria 1,6, Hospital 1,5, Posto 0,95). **Reservatórios de água limpa** (`Bioma.fontes`, 4 usos, enchem garrafa ou matam a sede) e **legumes soltos** no Ermo resolveram a falta de comida/água das primeiras zonas.
+
+### NPCs (`game/dados/npcs.ts` puro + `game/sistemas/npcs.ts`)
+Mascate (visita o abrigo a cada 3 dias; troca por **fichas**), sobrevivente acampado (fogueira própria, dá dica do objetivo atual e um presente na 1ª conversa) e viajante (anda pelo mapa). IA: olham para você, vagam por perto, **fogem de hostis e de quem os ataca** (atacar NPC marca `Run.traiu`: os mascates se recusam a negociar). "…" sobre quem ainda não falou. Ficha: item de 1×1 (pilha 99) achado em caixas, balcões, malas e baús de gangue; o baú do abrigo começa com 6. Preços: comprar = valor×1,35, vender = valor×0,55 (`VALOR` em `balanco.ts`).
+
+### Ganchos de teste
+`cena().devNpc('mascate'|'acampado'|'viajante')`, `cena().spawnDinamico()` (+ `tSpawnUlt`, `tensao`), `cena().hostisPerto()`.
+
+### Pendências
+Mais NPCs (médico que cura por fichas, mecânico), contratos dados por NPC, cão companheiro, testar o equilíbrio em partidas longas no celular e ajustar as metas.
 

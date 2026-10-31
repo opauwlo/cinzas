@@ -1,0 +1,167 @@
+// Testes de lógica e de BALANÇO (rodam em Node, sem navegador): `npm run teste`.
+// Cada meta de dificuldade do jogo está aqui como número; se um ajuste quebrar o equilíbrio, o teste falha dizendo qual.
+import assert from 'node:assert/strict';
+import { ARQS } from '../../game/dados/criaturas';
+import { ARMAS, ITENS } from '../../game/dados/itens';
+import { BIOMAS } from '../../game/dados/biomas';
+import { LOCAIS } from '../../game/dados/locais';
+import { Rng } from '../../game/lib/rng';
+import { gerarZona } from '../../game/zona';
+import { DIF, FOME_POR_MIN, SEDE_POR_MIN, danoPorAcao, acoesParaMatar, dpsInimigo, perdaEmLuta, segundosAteZerar, tamanhoRaid, xpNivel, xpAcumulado, nivelPorXp } from '../../game/dados/balanco';
+import { planejarNpcs, falaDe, estoqueMascate, vendavel, TIPOS_NPC, type CtxFala } from '../../game/dados/npcs';
+import { OBJETIVOS } from '../../game/dados/objetivos';
+import { VALOR, precoCompra, precoVenda } from '../../game/dados/balanco';
+import { GANGUE, TENSAO_LIMITE, alvoHostis, escolherArq, intervaloSpawn, noiteFator, pesosArq, podeSpawnar, pontoSpawn, tamanhoGrupo, tensaoAbate, tensaoDano, tensaoDecai, type CtxSpawn } from '../../game/sistemas/spawn';
+
+const casos: { nome: string; fn: () => void }[] = [];
+const teste = (nome: string, fn: () => void) => casos.push({ nome, fn });
+const entre = (v: number, a: number, b: number, rot: string) => assert.ok(v >= a && v <= b, `${rot}: ${v.toFixed(2)} fora de [${a}, ${b}]`);
+const ctx = (o: Partial<CtxSpawn> = {}): CtxSpawn => ({ hora: 12, nivel: 1, dia: 2, dif: 1, interior: false, neblina: 0, chuva: 0, noBase: false, ...o });
+const HOSTIS_BASICOS = ['irradiado', 'corredor', 'rastejador', 'cao', 'lobo', 'javali', 'rato', 'barata', 'escorpiao', 'aranha'];
+
+// ================================================================ combate
+teste('um irradiado sozinho custa 8–30% da vida com o pé de cabra', () => entre(perdaEmLuta('pe_de_cabra', 'irradiado', 1), 0.08, 0.3, 'perda 1 irradiado'));
+teste('3 irradiados ao mesmo tempo são perigosos mas sobrevivíveis (45–90%)', () => entre(perdaEmLuta('pe_de_cabra', 'irradiado', 3), 0.45, 0.9, 'perda 3 irradiados'));
+teste('matilhas e javalis do começo não matam no corpo a corpo', () => {
+  entre(perdaEmLuta('pe_de_cabra', 'corredor', 2), 0.2, 0.5, 'corredor x2'); entre(perdaEmLuta('pe_de_cabra', 'cao', 3), 0.3, 0.6, 'cão x3');
+  entre(perdaEmLuta('pe_de_cabra', 'lobo', 3), 0.3, 0.65, 'lobo x3'); entre(perdaEmLuta('pe_de_cabra', 'javali', 2), 0.4, 0.85, 'javali x2');
+});
+teste('o Colosso é chefe: mata no corpo a corpo com qualquer arma, mas cai em ≤ 24 golpes/tiros', () => {
+  for (const a of ['pe_de_cabra', 'machado', 'pistola', 'escopeta', 'rifle']) { assert.ok(perdaEmLuta(a, 'colosso', 1) >= 0.8, `colosso x ${a} deveria ser letal de perto`); assert.ok(acoesParaMatar(a, 'colosso') <= 24, `${a} precisa de golpes demais`); }
+  assert.ok(acoesParaMatar('escopeta', 'colosso') >= 5, 'o Colosso não pode cair em menos de 5 tiros');
+});
+teste('armas melhores têm ao menos 1,3x o DPS do pé de cabra (progressão que dá gosto)', () => {
+  const dps = (id: string) => danoPorAcao(id) / ARMAS[id].cd, base = dps('pe_de_cabra');
+  for (const a of ['facao', 'machado', 'pistola', 'escopeta', 'rifle']) assert.ok(dps(a) >= base * 1.3, `${a} tem DPS ${dps(a).toFixed(1)} vs ${base.toFixed(1)}`);
+});
+teste('qualquer hostil básico leva ≥ 6 s para matar o jogador sozinho (Normal)', () => { for (const id of HOSTIS_BASICOS) assert.ok(100 / dpsInimigo(id, 1) >= 6, `${id} mata em ${(100 / dpsInimigo(id, 1)).toFixed(1)} s`); });
+teste('a dificuldade ordena a perda de vida: Calmo < Normal < Brutal', () => {
+  for (const [a, e, n] of [['pe_de_cabra', 'irradiado', 3], ['pe_de_cabra', 'cao', 3], ['faca', 'corredor', 2]] as [string, string, number][]) {
+    const [c, nm, b] = [0, 1, 2].map(d => perdaEmLuta(a, e, n, d)); assert.ok(c < nm && nm < b, `${a} x ${e}: ${c.toFixed(2)} / ${nm.toFixed(2)} / ${b.toFixed(2)}`); entre(c / nm, 0.7, 0.8, 'razão Calmo/Normal'); entre(b / nm, 1.25, 1.35, 'razão Brutal/Normal');
+  }
+});
+
+// ================================================================ necessidades e progressão
+teste('sede 100→0 em 12–16 min reais (Normal) e fome em 19–25 min; água é mais urgente que comida', () => {
+  const sede = segundosAteZerar(SEDE_POR_MIN) / 60, fome = segundosAteZerar(FOME_POR_MIN) / 60; entre(sede, 12, 16, 'sede (min)'); entre(fome, 19, 25, 'fome (min)'); assert.ok(sede < fome, 'a sede deve vencer antes da fome');
+});
+teste('Calmo dá ≥ 15% mais tempo que Normal; Brutal ≤ 90% do Normal', () => {
+  const t = (d: number) => segundosAteZerar(SEDE_POR_MIN, d); assert.ok(t(0) >= t(1) * 1.15 && t(2) <= t(1) * 0.9, `${t(0).toFixed(0)} / ${t(1).toFixed(0)} / ${t(2).toFixed(0)}`);
+});
+teste('curva de XP: crescente e com ritmo razoável (nível 5 ≈ 440, nível 10 ≈ 1.9 mil)', () => {
+  for (let n = 1; n < 20; n++) assert.ok(xpNivel(n + 1) > xpNivel(n)); entre(xpAcumulado(5), 300, 600, 'XP até nível 5'); entre(xpAcumulado(10), 1200, 2500, 'XP até nível 10');
+  assert.equal(nivelPorXp(xpAcumulado(7)), 7); assert.equal(nivelPorXp(xpAcumulado(7) - 1), 6);
+});
+teste('tamanho da invasão: cresce com os dias, cai com a muralha, respeita a dificuldade e os limites', () => {
+  assert.ok(tamanhoRaid(2, 0, 1) <= 3, 'a primeira invasão (dia 2) deve ter ≤ 3 inimigos');
+  for (let d = 2; d < 14; d++) { assert.ok(tamanhoRaid(d + 1, 0) >= tamanhoRaid(d, 0)); for (const m of [0, 1, 2, 3]) entre(tamanhoRaid(d, m), 2, 10, `raid dia ${d} muro ${m}`); }
+  for (const d of [3, 6, 9]) { assert.ok(tamanhoRaid(d, 3) <= tamanhoRaid(d, 0) * 0.6 + 1, `a muralha 3 deveria cortar ~60% no dia ${d}`); assert.ok(tamanhoRaid(d, 0, 0) <= tamanhoRaid(d, 0, 1) && tamanhoRaid(d, 0, 1) <= tamanhoRaid(d, 0, 2)); }
+});
+
+// ================================================================ diretor de spawn (puro)
+teste('noite fator: 1 de madrugada, 0 ao meio-dia, rampa suave no fim da tarde e no amanhecer', () => {
+  assert.equal(noiteFator(0), 1); assert.equal(noiteFator(23), 1); assert.equal(noiteFator(12), 0); assert.equal(noiteFator(9), 0);
+  for (let h = 17; h < 22; h += 0.5) assert.ok(noiteFator(h + 0.5) >= noiteFator(h)); for (let h = 4.5; h < 8; h += 0.5) assert.ok(noiteFator(h + 0.5) <= noiteFator(h));
+});
+teste('alvo de hostis: 0 no abrigo; noite ≥ dia; Calmo ≤ Normal ≤ Brutal; interior < exterior; limite 9', () => {
+  for (const b of Object.values(BIOMAS)) {
+    assert.equal(alvoHostis(b, ctx({ noBase: true })), 0);
+    for (const d of [0, 1, 2]) { const dia = alvoHostis(b, ctx({ hora: 12, dif: d })), noite = alvoHostis(b, ctx({ hora: 0, dif: d })); assert.ok(noite >= dia, `${b.id}: noite ${noite} < dia ${dia}`); entre(noite, 0, 9, `${b.id} noite`); }
+    if (b.inimigos.length) { const [c, n, br] = [0, 1, 2].map(d => alvoHostis(b, ctx({ hora: 0, dif: d }))); assert.ok(c <= n && n <= br && c < br, `${b.id} dif: ${c}/${n}/${br}`); assert.ok(alvoHostis(b, ctx({ hora: 0, interior: true })) <= alvoHostis(b, ctx({ hora: 0 })), `${b.id} interior`); }
+  }
+  const noite = (id: string) => alvoHostis(BIOMAS[id], ctx({ hora: 0 })); assert.ok(noite('cidade') >= noite('ermo') && noite('ermo') >= noite('floresta'), 'cidade ≥ ermo ≥ floresta à noite');
+});
+teste('alvo de hostis no nível 1 (Normal): ≤ 3 de dia e ≤ 5 de noite em qualquer bioma; cresce com o nível sem estourar', () => {
+  for (const b of Object.values(BIOMAS)) { assert.ok(alvoHostis(b, ctx({ hora: 12 })) <= 3, `${b.id} dia`); assert.ok(alvoHostis(b, ctx({ hora: 0 })) <= 5, `${b.id} noite`); assert.ok(alvoHostis(b, ctx({ hora: 0, nivel: 10, dia: 10 })) <= 9); assert.ok(alvoHostis(b, ctx({ hora: 0, nivel: 10 })) >= alvoHostis(b, ctx({ hora: 0, nivel: 1 }))); }
+});
+teste('intervalo de reposição: mais curto à noite e em dificuldade alta; sempre entre 20 e 90 s', () => {
+  assert.ok(intervaloSpawn(ctx({ hora: 0 })) < intervaloSpawn(ctx({ hora: 12 }))); assert.ok(intervaloSpawn(ctx({ dif: 2 })) < intervaloSpawn(ctx({ dif: 1 })) && intervaloSpawn(ctx({ dif: 1 })) < intervaloSpawn(ctx({ dif: 0 })));
+  for (const h of [0, 6, 12, 18]) for (const d of [0, 1, 2]) entre(intervaloSpawn(ctx({ hora: h, dif: d })), 20, 90, `intervalo ${h}h dif ${d}`);
+});
+teste('escolha de arquétipo: sem gangues no nível 1, com gangues na cidade no nível 5, sempre válido e determinístico', () => {
+  const amostra = (bi: string, c: CtxSpawn, n = 6000, seed = 'a') => { const r = new Rng(seed), cont: Record<string, number> = {}; for (let i = 0; i < n; i++) { const a = escolherArq(r, BIOMAS[bi], c); assert.ok(BIOMAS[bi].inimigos.some(([id]) => id === a) && ARQS[a], `arq inválido ${a}`); cont[a] = (cont[a] ?? 0) + 1; } return cont; };
+  const n1 = amostra('cidade', ctx({ nivel: 1 })), n5 = amostra('cidade', ctx({ nivel: 5 }));
+  assert.equal(GANGUE.reduce((s, g) => s + (n1[g] ?? 0), 0), 0, 'gangue no nível 1'); assert.ok(GANGUE.reduce((s, g) => s + (n5[g] ?? 0), 0) > 0, 'gangue no nível 5');
+  const dia = amostra('ermo', ctx({ hora: 12 })), noite = amostra('ermo', ctx({ hora: 0 })); assert.ok((noite.corredor ?? 0) >= (dia.corredor ?? 0) * 1.3, 'corredores deveriam crescer à noite'); assert.ok((dia.irradiado ?? 0) > (dia.corredor ?? 0) * 2, 'o comum deve ser o irradiado');
+  assert.deepEqual(amostra('ermo', ctx(), 200, 'x'), amostra('ermo', ctx(), 200, 'x'));
+  for (const b of Object.values(BIOMAS)) for (const [id] of pesosArq(b, ctx({ nivel: 6 }))) assert.ok(ARQS[id], `${b.id}: ${id}`);
+});
+teste('tamanho do grupo: ≥ 1, ≤ 2 antes do nível 3, nunca passa da meta e Colosso é sempre 1', () => {
+  const r = new Rng('g'); for (let i = 0; i < 500; i++) { for (const a of HOSTIS_BASICOS) { assert.ok(tamanhoGrupo(r, a, ctx({ nivel: 1 }), 5) <= 2); const f = r.int(1, 4); assert.ok(tamanhoGrupo(r, a, ctx({ nivel: 6 }), f) >= 1 && tamanhoGrupo(r, a, ctx({ nivel: 6 }), f) <= Math.max(1, f)); } assert.equal(tamanhoGrupo(r, 'colosso', ctx({ nivel: 9 }), 6), 1); }
+});
+teste('quando segurar: tensão alta, meta cumprida, intervalo não passou ou população cheia', () => {
+  const ok = { agora: 100, hostis: 1, alvo: 3, total: 40, tensao: 0.2, ultimo: 40, intervalo: 30 };
+  assert.ok(podeSpawnar(ok)); assert.ok(!podeSpawnar({ ...ok, tensao: 0.9 })); assert.ok(!podeSpawnar({ ...ok, hostis: 3 })); assert.ok(!podeSpawnar({ ...ok, alvo: 0 })); assert.ok(!podeSpawnar({ ...ok, ultimo: 90 })); assert.ok(!podeSpawnar({ ...ok, total: 140 }));
+});
+teste('tensão: um golpe forte segura a reposição e o alívio chega em ≤ 25 s', () => {
+  let t = tensaoDano(0, 30); assert.ok(t >= 0.35 && t <= TENSAO_LIMITE, 'um golpe só não deve travar o jogo'); t = tensaoDano(t, 30); assert.ok(t > TENSAO_LIMITE, 'dois golpes fortes seguram a reposição'); assert.ok(tensaoAbate(0) > 0 && tensaoDano(0.95, 90) <= 1);
+  let seg = 0; t = 1; while (t > TENSAO_LIMITE && seg < 120) { t = tensaoDecai(t, 1); seg++; } assert.ok(seg <= 25, `levou ${seg} s para aliviar`);
+});
+teste('ponto de reposição: dentro do anel, só em terreno válido, 60% atrás de quem olha, nulo se nada serve', () => {
+  const r = new Rng('p'); let atras = 0, tot = 0;
+  for (let i = 0; i < 400; i++) { const p = pontoSpawn(r, 50, 50, 0, () => true, 14, 24); assert.ok(p); const d = Math.hypot(p![0] - 50, p![1] - 50); entre(d, 13, 25.5, 'distância'); tot++; if (p![0] < 50) atras++; }
+  assert.ok(atras / tot > 0.5, `só ${(atras / tot * 100).toFixed(0)}% atrás`); assert.equal(pontoSpawn(r, 50, 50, 0, () => false), null); assert.ok(pontoSpawn(r, 50, 50, 0, (x) => x > 60, 14, 24, 200));
+});
+
+// ================================================================ mundo: população e economia (zonas geradas por seed)
+const SEEDS = Array.from({ length: 10 }, (_, i) => `balanco${i}`), ZONAS = LOCAIS.filter(l => l.id !== 'base' && l.id !== 'abrigo7');
+const zonas = (id: string) => { const l = LOCAIS.find(x => x.id === id)!; return SEEDS.map(s => gerarZona(l.id, l.bioma, s, l.nome, l.tema)); };
+const ameaca = (z: ReturnType<typeof gerarZona>) => z.spawns.reduce((s, sp) => s + (ARQS[sp.arq].hostil ? Math.sqrt(ARQS[sp.arq].hp * dpsInimigo(sp.arq)) : 0), 0);
+const media = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
+teste('a ameaça das zonas cresce com o perigo (≥ 5% por degrau)', () => {
+  const por: Record<number, number[]> = {}; for (const l of ZONAS) (por[l.perigo] ??= []).push(media(zonas(l.id).map(ameaca)));
+  const m = [1, 2, 3, 4].map(p => media(por[p])); for (let i = 1; i < m.length; i++) assert.ok(m[i] >= m[i - 1] * 1.05, `perigo ${i + 1} (${m[i].toFixed(0)}) deveria passar perigo ${i} (${m[i - 1].toFixed(0)}) em ≥ 5%`);
+});
+teste('nenhum hostil nasce a menos de 22 tiles de onde o jogador chega; população ≤ 110 hostis', () => {
+  for (const l of ZONAS) for (const z of zonas(l.id)) { let n = 0; for (const sp of z.spawns) { if (!ARQS[sp.arq].hostil) continue; n++; assert.ok(Math.hypot(sp.x - z.jogador.x, sp.y - z.jogador.y) >= 22 - 1e-6, `${l.id}: ${sp.arq} nasce perto`); } assert.ok(n <= 110, `${l.id} tem ${n} hostis`); }
+});
+teste('o Colosso é raro (≤ 30% das zonas), exceto na Refinaria (perigo 4, ≤ 70%)', () => { for (const l of ZONAS) { const c = zonas(l.id).filter(z => z.spawns.some(s => s.arq === 'colosso')).length; assert.ok(c <= (l.perigo >= 4 ? 7 : 3), `${l.id}: Colosso em ${c}/10 zonas`); } });
+teste('economia: toda zona tem ≥ 1 dia de água e de comida (soltos, saque e reservatórios); Ermo e Floresta ≥ 1,5 dia de água', () => {
+  const NEC_SEDE = SEDE_POR_MIN * 1440, NEC_FOME = FOME_POR_MIN * 1440;
+  for (const l of ZONAS) {
+    const zs = zonas(l.id), sede = media(zs.map(z => z.props.reduce((s, p) => s + (p.loot ?? []).reduce((a, i) => a + (ITENS[i]?.sede ?? 0), 0) + (p.inters.some(i => i.k === 'fonte') ? 4 * 28 : 0), 0)));
+    const fome = media(zs.map(z => z.props.reduce((s, p) => s + (p.loot ?? []).reduce((a, i) => a + (ITENS[i]?.fome ?? 0), 0), 0) + z.soltos.reduce((s, o) => s + (ITENS[o.item]?.fome ?? 0) * o.q, 0)));
+    assert.ok(sede >= NEC_SEDE, `${l.id}: água para ${(sede / NEC_SEDE).toFixed(2)} dia`); if (!['industrial', 'militar'].includes(l.id)) assert.ok(fome >= NEC_FOME, `${l.id}: comida para ${(fome / NEC_FOME).toFixed(2)} dia`);
+    if (['ermo', 'floresta'].includes(l.id)) assert.ok(sede >= NEC_SEDE * 1.5, `${l.id}: água só para ${(sede / NEC_SEDE).toFixed(2)} dia`);
+  }
+});
+teste('a geração é determinística (mesma seed, mesma população)', () => { const a = zonas('ermo')[0], b = zonas('ermo')[0]; assert.deepEqual(a.spawns, b.spawns); assert.deepEqual(a.soltos, b.soltos); });
+void DIF;
+
+// ================================================================ NPCs: presença no mundo, falas e troca
+teste('NPCs: planejamento determinístico, no máximo 3 por zona e sem NPC onde não faz sentido', () => {
+  for (const l of LOCAIS) for (let d = 1; d <= 9; d++) {
+    const a = planejarNpcs('npc1', l.id, l.perigo, d), b = planejarNpcs('npc1', l.id, l.perigo, d); assert.deepEqual(a, b); assert.ok(a.length <= 3);
+    if (['abrigo7', 'militar'].includes(l.id)) assert.equal(a.length, 0, `${l.id} não tem NPC`);
+    if (l.id === 'pantano') assert.ok(a.every(n => n.tipo === 'viajante'), 'o pântano só tem viajante');
+    for (const n of a) { assert.ok(TIPOS_NPC.includes(n.tipo) && n.nome.length > 3); }
+  }
+});
+teste('o mascate visita o abrigo a cada 3 dias (e só ele)', () => { for (let d = 1; d <= 12; d++) { const p = planejarNpcs('npc2', 'base', 0, d); assert.equal(p.length, d % 3 === 0 ? 1 : 0, `dia ${d}`); if (p.length) assert.equal(p[0].tipo, 'mascate'); } });
+teste('o mundo é vivo: ≥ 80% das visitas a zonas comuns têm algum NPC; mascate ~35%, acampado ~55%, viajante ~45%', () => {
+  const zonas = ZONAS.filter(l => !['militar', 'pantano'].includes(l.id)); let comAlgum = 0, tot = 0; const cont: Record<string, number> = { mascate: 0, acampado: 0, viajante: 0 };
+  for (const l of zonas) for (let i = 0; i < 60; i++) { const p = planejarNpcs(`vida${i}`, l.id, l.perigo, 1 + (i % 9)); tot++; if (p.length) comAlgum++; for (const n of p) cont[n.tipo]++; }
+  assert.ok(comAlgum / tot >= 0.8, `só ${(comAlgum / tot * 100).toFixed(0)}% das visitas têm NPC`); entre(cont.mascate / tot, 0.2, 0.45, 'mascate'); entre(cont.acampado / tot, 0.45, 0.65, 'acampado'); entre(cont.viajante / tot, 0.35, 0.55, 'viajante');
+});
+teste('falas: sempre não vazias e curtas, para todo tipo, objetivo, clima e hora; o acampado dá a dica do objetivo; traidor perde o comércio', () => {
+  const r = new Rng('fala'), base: CtxFala = { hora: 12, clima: 'limpo', objId: 'jipe', dia: 2, nivel: 1, zonaId: 'ermo', traiu: false, raidRecente: false };
+  for (const t of TIPOS_NPC) for (const o of OBJETIVOS) for (const cl of ['limpo', 'chuva', 'tempestade', 'neblina', 'poeira', 'acida', 'vento']) for (const h of [2, 12, 21]) { const f = falaDe(t, { ...base, objId: o.id, clima: cl, hora: h }, r); assert.ok(f.length > 15 && f.length <= 260, `${t}/${o.id}: "${f}"`); }
+  let achou = 0; for (let i = 0; i < 40; i++) if (/Torre de Rádio/.test(falaDe('acampado', { ...base, objId: 'radio' }, new Rng('x' + i)))) achou++; assert.equal(achou, 40, 'o acampado sempre dá a dica do rádio');
+  assert.match(falaDe('mascate', { ...base, traiu: true }, r), /não negocia/); assert.match(falaDe('viajante', { ...base, raidRecente: true }, r), /tiros/);
+});
+teste('estoque do mascate: 8 ofertas únicas e válidas, básicos sempre, combustível ≤ 1, determinístico', () => {
+  for (let i = 0; i < 100; i++) { const e = estoqueMascate(new Rng('est' + i), 1 + i % 9); assert.equal(e.length, 8); assert.equal(new Set(e.map(o => o.item)).size, 8); for (const b of ['agua', 'enlatado', 'bandagem', 'municao']) assert.ok(e.some(o => o.item === b), `falta ${b}`); for (const o of e) { assert.ok(ITENS[o.item] && (VALOR[o.item] ?? 0) > 0 && o.q >= 1); if (o.item === 'combustivel') assert.equal(o.q, 1); } }
+  assert.deepEqual(estoqueMascate(new Rng('a'), 3), estoqueMascate(new Rng('a'), 3));
+});
+teste('troca honesta: comprar sempre custa mais que vender o mesmo item (sem lucro infinito) e preços sensatos', () => {
+  for (const id of Object.keys(VALOR)) { if (id === 'ficha') continue; assert.ok(precoCompra(id) > precoVenda(id), `${id}: compra ${precoCompra(id)} ≤ venda ${precoVenda(id)}`); }
+  assert.ok(precoCompra('agua') <= 8, 'água cara demais'); assert.ok(precoCompra('kit') >= 10 && precoCompra('rifle') > precoCompra('pistola') && precoCompra('pistola') > precoCompra('faca'));
+  assert.ok(6 >= precoCompra('agua'), 'as 6 fichas iniciais devem comprar ao menos 1 água');
+  for (const id of ['ficha', 'radio', 'mochila', 'colete', 'municao', 'cartucho']) assert.ok(!vendavel(id), `${id} não pode ser vendido`);
+});
+
+// ================================================================ execução
+let falhas = 0; const t0 = Date.now();
+for (const c of casos) { try { c.fn(); console.log('  ok   ' + c.nome); } catch (e) { falhas++; console.log('  FALHA ' + c.nome + '\n        ' + String((e as Error).message).split('\n')[0]); } }
+console.log(`\n${casos.length - falhas}/${casos.length} testes passaram em ${((Date.now() - t0) / 1000).toFixed(1)} s.`);
+process.exitCode = falhas ? 1 : 0;
