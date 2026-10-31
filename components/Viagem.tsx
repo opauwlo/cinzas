@@ -42,6 +42,10 @@ export default function Viagem() {
     if (!v) return; const pronto = v.fase === 'chegando' && zonaId === v.para && carga >= 1, fora = tela !== 'jogo';
     if (!pronto && !fora) return; setSaindo(true); const id = window.setTimeout(() => useJogo.setState({ viagem: null }), 650); return () => window.clearTimeout(id);
   }, [v, carga, zonaId, tela]);
+  // relógio de segurança: se a chegada demorar demais (aparelho muito lento), a tela de viagem cede ao carregamento normal em vez de prender o jogador
+  useEffect(() => {
+    if (v?.fase !== 'chegando') return; const id = window.setTimeout(() => useJogo.setState({ viagem: null }), 60000); return () => window.clearTimeout(id);
+  }, [v?.fase]);
   if (!v) return null; const de = localPorId(v.de), para = localPorId(v.para), dica = DICAS[Math.abs(v.t0) % DICAS.length], chegando = v.fase === 'chegando';
   return (
     <div className={`viagem ${saindo ? 'some' : ''}`} onPointerDown={e => e.stopPropagation()}>
