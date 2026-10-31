@@ -133,8 +133,8 @@ try {
   const depoisV = await ev(item => { const t = window.__cinzas.store.getState(); return { fichas: t.inv.ficha ?? 0, q: t.inv[item] ?? 0 }; }, antesV.item);
   ok('vender troca o item por fichas, pelo preço exato', depoisV.fichas === antesV.fichas + antesV.preco && depoisV.q === antesV.q - 1, JSON.stringify({ antesV, depoisV }));
   await ev(() => window.__cinzas.ponte.cmd.npcAgir('sair')); ok('"Despedir" fecha a conversa', await ate(() => window.__cinzas.store.getState().painel === null, 3000));
-  await espera(1300); // a grade reconcilia o que o teste escreveu direto no inventário (rede de segurança de 1 s)
-  ok('a grade continua coerente depois da troca', await ev(() => { const t = window.__cinzas.store.getState(), soma = {}; for (const p of t.grade) soma[p.id] = (soma[p.id] ?? 0) + p.q; return Object.entries(t.inv).every(([id, q]) => ['mochila', 'colete'].includes(id) || soma[id] === q) && Object.entries(soma).every(([id, q]) => t.inv[id] === q); }));
+  // a grade reconcilia o que o teste escreveu direto no inventário (rede de segurança de 1 s de jogo): espera por condição, não por tempo
+  ok('a grade continua coerente depois da troca', await ate(() => { const t = window.__cinzas.store.getState(), soma = {}; for (const p of t.grade) soma[p.id] = (soma[p.id] ?? 0) + p.q; return Object.entries(t.inv).every(([id, q]) => ['mochila', 'colete'].includes(id) || soma[id] === q) && Object.entries(soma).every(([id, q]) => t.inv[id] === q); }, 12000));
   await ev(() => { const k = window.__cinzas.cena(), e = k.ents.find(x => x.npc); e.dano = 0.4; });
   ok('atacar o NPC o faz fugir e queima a reputação', await ate(() => { const k = window.__cinzas.cena(), e = k.ents.find(x => x.npc); return e.estado === 'foge' && k.s.traiu === true; }, 4000));
   ok('NPC ferido não pode mais ser abordado', await ev(() => { const k = window.__cinzas.cena(), e = k.ents.find(x => x.npc); return !k.interativos.find(i => /Falar com/i.test(i.rot))?.ok() || e.npc.ferido; }));
@@ -205,11 +205,16 @@ try {
   await ev(() => { const st = window.__cinzas.store, i = st.getState().inv; st.setState({ inv: { ...i, sucata: 14, madeira: 8, garrafa: 3, tecido: 4, alcool: 2, bandagem: 3 } }); });
   await ev(() => window.__cinzas.ponte.cmd.melhorar('tanque')); await espera(300);
   ok('melhorar o tanque gasta materiais e sobe de nível', (await ev(() => window.__cinzas.store.getState().mel.tanque)) === 1);
-  const antesBancada = await ev(() => window.__cinzas.store.getState().inv.kit ?? 0); await ev(() => window.__cinzas.ponte.cmd.craft('r_kit')); await espera(200);
+  const antesBancada = await ev(() => window.__cinzas.store.getState().inv.kit ?? 0);
+  await ev(() => { window.__cinzas.cena().s.nivel = 4; }); // o kit médico é receita de nível 4: aqui o que se testa primeiro é o nível da BANCADA
+  await ev(() => window.__cinzas.ponte.cmd.craft('r_kit')); await espera(200);
   ok('receita avançada só funciona depois da melhoria da bancada', (await ev(() => window.__cinzas.store.getState().inv.kit ?? 0)) === antesBancada);
   await ev(() => window.__cinzas.ponte.cmd.melhorar('bancada')); await espera(300);
-  await ev(() => window.__cinzas.ponte.cmd.craft('r_kit')); await espera(200);
-  ok('bancada nível 2 fabrica kit médico', (await ev(() => window.__cinzas.store.getState().inv.kit ?? 0)) === antesBancada + 1);
+  await ev(() => { window.__cinzas.cena().s.nivel = 1; }); await ev(() => window.__cinzas.ponte.cmd.craft('r_kit')); await espera(200);
+  ok('a receita também pede o nível do jogador (kit médico: nível 4)', (await ev(() => window.__cinzas.store.getState().inv.kit ?? 0)) === antesBancada);
+  await ev(() => { window.__cinzas.cena().s.nivel = 4; }); await ev(() => window.__cinzas.ponte.cmd.craft('r_kit')); await espera(200);
+  ok('bancada nível 2 e jogador nível 4 fabricam kit médico', (await ev(() => window.__cinzas.store.getState().inv.kit ?? 0)) === antesBancada + 1);
+  await ev(() => { window.__cinzas.cena().s.nivel = 1; });
 
   // 4d. XP, nível e escolha de habilidade
   const xp0 = await ev(() => window.__cinzas.store.getState().xp);
