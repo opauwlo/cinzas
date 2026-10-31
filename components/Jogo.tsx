@@ -19,7 +19,7 @@ export default function Jogo() {
   const [corrida, setCorrida] = useState(0), mundoRef = useRef<HTMLDivElement>(null), runRef = useRef<Run | null>(null);
   const jogando = tela === 'jogo' || tela === 'morte' || tela === 'vitoria';
 
-  useEffect(() => { const c = lerCfg(); set({ cfg: c, temSave: temRun() }); aplicarVolumes({ mestre: c.mestre, sfx: c.sfx, amb: c.amb, mus: c.mus, vibra: c.vibra }); }, [set]);
+  useEffect(() => { const c = lerCfg(); set({ cfg: c, temSave: temRun() }); aplicarVolumes({ mestre: c.mestre, sfx: c.sfx, amb: c.amb, mus: c.mus, vibra: c.vibra, perfil: c.perfil, graves: c.graves, agudos: c.agudos }); }, [set]);
   const iniciar = async (nova: boolean) => {
     void iniciarAudio();
     try { await Promise.all(['700 16px Silkscreen', '400 18px VT323', '400 16px "Pixelify Sans"', '600 16px "Pixelify Sans"'].map(f => document.fonts.load(f))); } catch { /* segue */ }

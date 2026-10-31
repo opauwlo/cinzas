@@ -8,17 +8,19 @@ import { sortearLoot, type Container } from './dados/itens';
 import { BIOMAS } from './dados/biomas';
 import { biomaDe, TEMAS } from './dados/meta';
 import { ARQS, GRUPO, FACCOES } from './dados/criaturas';
+import { NOTAS } from './dados/notas';
+import { atracoes, distanciaAtracoes } from './sistemas/cobertura';
 
 export const W = 96, H = 96;
 export const T = { TERRA: 0, ESTRADA: 1, CALCADA: 2, MADEIRA: 3, AZULEJO: 4, PAREDE: 5, PORTA: 6, JANELA: 7, ENTULHO: 8, LINHA_H: 9, LINHA_V: 10, CONCRETO: 11, GRAMA: 12, AREIA: 13, LAMA: 14, FLORESTA: 15, METAL: 16, AGUA_RASA: 17, AGUA_FUNDA: 18, RUINA: 19 } as const;
 export const idx = (x: number, y: number) => y * W + x;
 export const dentro = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H;
 
-export type InterKind = 'saque' | 'cortar' | 'desmontar' | 'bau' | 'bancada' | 'cama' | 'fogueira' | 'jipe' | 'horta' | 'bunker' | 'tanque' | 'rasgar' | 'esfolar' | 'fonte';
-export type Interacao = { k: InterKind; rot: string; dur: number; ruido?: number; requer?: string[]; feito?: boolean };
+export type InterKind = 'saque' | 'cortar' | 'desmontar' | 'bau' | 'bancada' | 'cama' | 'fogueira' | 'jipe' | 'horta' | 'bunker' | 'tanque' | 'rasgar' | 'esfolar' | 'fonte' | 'garimpar' | 'nota';
+export type Interacao = { k: InterKind; rot: string; dur: number; ruido?: number; requer?: string[]; feito?: boolean; /** índice do bilhete em NOTAS (k = nota) */ nota?: number };
 export type Luz = { r: number; cor: number; f: number; noite: boolean };
 export type Prop = { id: number; rec: RecProp; x: number; y: number; w: number; h: number; solido: boolean; loot?: string[]; aberto?: boolean; inters: Interacao[]; luz?: Luz; especial?: boolean; estado?: number };
-export type FloraObj = { id: number; rec: RecFlora; x: number; y: number; solido: boolean; cortavel: boolean; cortada?: boolean };
+export type FloraObj = { id: number; rec: RecFlora; x: number; y: number; solido: boolean; cortavel: boolean; cortada?: boolean; /** colhida (bagas, ervas…): volta depois de 3 dias */ colhida?: boolean };
 export type Spawn = { id: number; arq: string; x: number; y: number; faccao?: number; grupo: number };
 export type Poi = { id: string; tipo: string; nome: string; x: number; y: number; r: number };
 export type Predio = { x: number; y: number; w: number; h: number; tipo: string };
@@ -97,9 +99,9 @@ export function gerarZona(id: string, biomaId: string, seed: string, nome?: stri
   }
 
   // ---- prédios
-  const prop = (n: string, x: number, y: number, o: 0 | 1 = 0, op: { v?: number; d?: number; solido?: boolean; especial?: boolean; semLoot?: boolean; forcaLoot?: boolean } = {}): Prop | null => {
+  const prop = (n: string, x: number, y: number, o: 0 | 1 = 0, op: { v?: number; d?: number; sem?: number; solido?: boolean; especial?: boolean; semLoot?: boolean; forcaLoot?: boolean } = {}): Prop | null => {
     const [w, h] = dimProp(n, o); for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (!dentro(i, j) || ocupado[idx(i, j)] || solido[idx(i, j)] || tipos[idx(i, j)] === T.PORTA) return null;
-    const rec: RecProp = { tipo: 'prop', n, v: op.v ?? ri(0, 5), d: op.d ?? rng.f(), o, sem: ri(1, 99999) }, sol = op.solido ?? true, p: Prop = { id: pid++, rec, x, y, w, h, solido: sol, inters: [] };
+    const rec: RecProp = { tipo: 'prop', n, v: op.v ?? ri(0, 5), d: op.d ?? rng.f(), o, sem: op.sem ?? ri(1, 99999) }, sol = op.solido ?? true, p: Prop = { id: pid++, rec, x, y, w, h, solido: sol, inters: [] };
     for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) { ocupado[idx(i, j)] = 1; if (sol) solido[idx(i, j)] = 1; }
     const tp = CONT[n]; if (tp && !op.semLoot) { p.loot = sortearLoot(tp, () => rng.f(), TEMA && n !== 'lixeira' && rng.chance(TEMA.chance) ? [rng.pick(TEMA.extra)] : []); p.aberto = false; p.inters.push({ k: 'saque', rot: 'Vasculhar ' + ROTULO[n], dur: DUR[n] ?? 2, ruido: 3 }); }
     if (n === 'cama' || n === 'sofa') p.inters.push({ k: 'rasgar', rot: 'Rasgar ' + (n === 'cama' ? 'colchão' : 'sofá'), dur: 1.8, ruido: 3 });
@@ -216,6 +218,47 @@ export function gerarZona(id: string, biomaId: string, seed: string, nome?: stri
 
   if (TEMA?.garante) { const alvo = props.find(p => p.loot && p.loot.length && p.rec.n !== 'carro'); if (alvo) alvo.loot!.push(TEMA.garante); }
   for (let k = 0, t = 0; k < (B.fontes ?? 0) && t < 120; t++) { const x = ri(6, W - 8), y = ri(6, H - 8); if (perto(x, y, jogador.x, jogador.y, 8)) continue; const p = prop('tanque_agua', x, y, 0, { semLoot: true, v: 1 }); if (p) { p.inters.push({ k: 'fonte', rot: 'Água do reservatório', dur: 1.2 }); k++; } }
+  // ---- pontos de interesse: preenchem os "buracos" do mapa para que nenhum lugar fique a mais de ~11 tiles de algo para fazer
+  {
+    /** props de POI usam poucas variantes (v, d, sem) para reaproveitar sprites e carregar rápido */
+    const pp = (n: string, x: number, y: number, o: 0 | 1 = 0, op: { solido?: boolean; semLoot?: boolean } = {}) => prop(n, x, y, o, { v: ri(0, 2), d: ri(1, 2) * 0.35, sem: ri(1, 2), ...op });
+    const ori = () => rng.pick([0, 1] as const), nota = (p: Prop | null) => { if (p) p.inters.unshift({ k: 'nota', rot: 'Ler o bilhete', dur: 1.2, nota: ri(0, NOTAS.length - 1) }); };
+    const guardas = (x: number, y: number, arq: string, n: number) => { const g = gid++; for (let k = 0; k < n; k++) { const gx = x + ri(-2, 2), gy = y + ri(-2, 2); if (spawnLivre(gx, gy)) spawns.push({ id: sid++, arq, x: gx, y: gy, grupo: g }); } };
+    const marca = (tipo: string, nome: string, x: number, y: number, r = 8) => pois.push({ id: `${tipo}${pois.length}`, tipo, nome, x, y, r });
+    const MODELOS: Record<string, (x: number, y: number) => boolean> = {
+      acamp: (x, y) => { if (!pp('barraca', x, y, ori())) return false; pp('saco_dormir', x + 3, y, 0, { solido: false }); const f = pp('fogueira', x + 2, y + 3, 0, { solido: false, semLoot: true }); if (f) f.inters.push({ k: 'fogueira', rot: 'Usar a fogueira', dur: 0.4 }); const m = pp('mala', x + 3, y + 2); if (rng.chance(0.4)) nota(m); marca('acamp', 'Acampamento abandonado', x + 2, y + 2); return true; },
+      carros: (x, y) => { const o = ori(); if (!carro(x, y, o, rng.chance(0.4) ? ['combustivel'] : undefined)) return false; carro(x + (o ? 3 : 0), y + (o ? 0 : 3), ori()); pp('entulho', x + 4, y + 4, 0, { solido: false, semLoot: true }); pp('pneus', x - 1, y + 1, 0, { semLoot: true }); marca('carros', 'Carros acidentados', x + 2, y + 2, 7); return true; },
+      deposito: (x, y) => { if (!pp('caixote_militar', x + 1, y + 1, ori())) return false; pp('caixa', x + 3, y + 1); pp('barril', x + 3, y + 3, 0, { semLoot: true }); pp('barril', x + 1, y + 3, 0, { semLoot: true }); if (rng.chance(0.35)) guardas(x + 2, y + 2, 'irradiado', 2); marca('deposito', 'Depósito esquecido', x + 2, y + 2); return true; },
+      cemiterio: (x, y) => { let n = 0; for (let j = 0; j < 2; j++) for (let i = 0; i < 3; i++) if (pp('cruz', x + i * 2, y + j * 2, 0, { semLoot: true })) n++; if (!n) return false; nota(pp('mala', x + 1, y + 4)); if (rng.chance(0.4)) guardas(x + 2, y + 2, 'rastejador', 1); marca('cemiterio', 'Cemitério improvisado', x + 2, y + 2); return true; },
+      poco: (x, y) => { const p = pp('poco', x + 1, y + 1, 0, { semLoot: true }); if (!p) return false; p.inters.push({ k: 'fonte', rot: 'Água do poço', dur: 1.2 }); pp('barril', x + 3, y + 2, 0, { semLoot: true }); pp('banco', x + 1, y + 3, 0, { semLoot: true }); marca('poco', 'Poço de água', x + 1, y + 1); return true; },
+      sucata: (x, y) => { let n = 0; for (const [i, j] of [[1, 1], [3, 2], [1, 3]] as const) { const p = pp('sucata_pilha', x + i, y + j, 0, { semLoot: true }); if (p) { p.inters.push({ k: 'garimpar', rot: 'Garimpar sucata', dur: 2.2, ruido: 6 }); n++; } } if (!n) return false; pp('pneus', x + 3, y + 4, 0, { semLoot: true }); marca('sucata', 'Ferro-velho', x + 2, y + 2, 7); return true; },
+      ruinas: (x, y) => { let n = 0; for (const [nm, i, j] of [['estante', 0, 0], ['armario', 2, 0], ['lixeira', 4, 1], ['cadeira', 1, 3], ['mesa', 3, 3]] as const) if (pp(nm, x + i, y + j, ori(), { semLoot: nm === 'cadeira' || nm === 'mesa' })) n++; return n >= 2; },
+      corpo: (x, y) => { const m = pp('mala', x + 2, y + 2); if (!m) return false; nota(m); pp('saco_dormir', x + 1, y + 3, 0, { solido: false }); if (livre(x + 3, y + 1)) { flora.push({ id: fid++, rec: variante('ossos', ''), x: x + 3.5, y: y + 1.5, solido: false, cortavel: false }); ocupado[idx(x + 3, y + 1)] = 1; } return true; },
+      jardim: (x, y) => { let n = 0; for (let k = 0; k < 9; k++) { const fx = x + ri(0, 4), fy = y + ri(0, 4); if (!livre(fx, fy)) continue; const [f, v] = rng.pick([['arbusto', ''], ['arbusto', ''], ['flor', ''], ['cogumelo', 'brilho']] as const); flora.push({ id: fid++, rec: variante(f as TipoFlora, v), x: fx + 0.5, y: fy + 0.5, solido: false, cortavel: false }); ocupado[idx(fx, fy)] = 1; n++; } if (n < 4) return false; marca('jardim', 'Jardim selvagem', x + 2, y + 2, 7); return true; },
+    };
+    /** quando não cabe um POI inteiro (5×5), cabe pelo menos uma peça com algo para fazer */
+    const MINIS: ((x: number, y: number) => boolean)[] = [
+      (x, y) => { const m = pp('mala', x, y); nota(m); return !!m; },
+      (x, y) => { const p = pp('sucata_pilha', x, y, 0, { semLoot: true }); if (p) p.inters.push({ k: 'garimpar', rot: 'Garimpar sucata', dur: 2.2, ruido: 6 }); return !!p; },
+      (x, y) => !!pp('caixa', x, y),
+    ];
+    const PESO_POI: Record<string, [string, number][]> = {
+      ermo: [['acamp', 3], ['carros', 3], ['deposito', 2], ['cemiterio', 2], ['poco', 2], ['sucata', 3], ['ruinas', 2], ['corpo', 3], ['jardim', 1]],
+      floresta: [['acamp', 3], ['jardim', 4], ['poco', 2], ['corpo', 3], ['cemiterio', 1], ['sucata', 1], ['deposito', 1]],
+      cidade: [['ruinas', 3], ['carros', 3], ['deposito', 2], ['sucata', 3], ['corpo', 2], ['poco', 1], ['jardim', 1]],
+      industrial: [['deposito', 3], ['sucata', 4], ['carros', 2], ['corpo', 1], ['poco', 1]],
+      pantano: [['jardim', 4], ['corpo', 3], ['acamp', 1], ['cemiterio', 2], ['sucata', 1]],
+    }, tabela = PESO_POI[biomaId] ?? PESO_POI.ermo, LIM = 10, ignorar = new Uint8Array(W * H);
+    for (let rodada = 0; rodada < 64; rodada++) {
+      const d = distanciaAtracoes(atracoes(props, flora, pois), W, H); let melhor = -1, md = LIM;
+      for (let y = 3; y < H - 3; y++) for (let x = 3; x < W - 3; x++) { const i = idx(x, y); if (d[i] > md && !ignorar[i] && livre(x, y) && !perto(x, y, jogador.x, jogador.y, 9)) { md = d[i]; melhor = i; } }
+      if (melhor < 0) break;
+      const cx = melhor % W, cy = Math.floor(melhor / W); let ok = false;
+      for (let t = 0; t < 32 && !ok; t++) { const ax = cx - 2 + ri(-4, 4), ay = cy - 2 + ri(-4, 4); if (livreRect(ax, ay, 5, 5)) ok = MODELOS[rng.peso(tabela)](ax, ay); }
+      for (let t = 0; t < 24 && !ok; t++) { const ax = cx + ri(-3, 3), ay = cy + ri(-3, 3); if (livre(ax, ay)) ok = rng.pick(MINIS)(ax, ay); }
+      if (!ok) for (let j = -2; j <= 2; j++) for (let i2 = -2; i2 <= 2; i2++) if (dentro(cx + i2, cy + j)) ignorar[idx(cx + i2, cy + j)] = 1;
+    }
+  }
   // jipe do jogador
   const j = prop('carro', jipe.x, jipe.y, 0, { v: 4 + 5 * 3, d: 0.1, semLoot: true }); if (j) { j.inters.push({ k: 'jipe', rot: 'Usar o jipe (viajar)', dur: 0.3 }); }
   return { id, nome: nome ?? B.nome, bioma: biomaId, seed, tipos, rad, solido, opaco, estilo, props, flora, spawns, predios, pois, jogador, jipe, soltos: fazerSoltos() };

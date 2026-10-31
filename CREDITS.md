@@ -24,3 +24,7 @@ Next.js, React, Phaser 4.2.1, simplex-noise, alea, zustand, ZzFX (MIT; usamos o 
 ## Código (a ser incluído — ver HANDOFF.md §5)
 
 Phaser (MIT), Box2D v3 (MIT), walloc (MIT), Trystero (MIT), @noble/secp256k1 (MIT), ZzFX (MIT), simplex-noise (MIT), alea (MIT), PathFinding.js e heap.js (MIT). Ao vendorizar qualquer um, copiar o arquivo de licença junto.
+
+## Ícones próprios
+
+`public/icons/cinzas/` (bagas, cogumelo, erva, bilhete): desenhados para este projeto em pixel art, sem terceiros (domínio público / CC0).

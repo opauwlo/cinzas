@@ -4,7 +4,7 @@ import type { Peca } from './grade';
 export type ZEstado = {
   airdrop?: { dia: number; x: number; y: number; coletado: boolean };
   saqueados: number[]; abatidos: number[]; cortadas: number[]; desmontados: number[]; rasgados: number[];
-  hortas: Record<number, number>; coletados: number[]; fontes: Record<number, number>; npcMortos?: string[]; ultima: number; fogueiras: { x: number; y: number }[]; pois: string[]; esfolados: number[];
+  hortas: Record<number, number>; coletados: number[]; colhidas?: number[]; lidas?: number[]; fontes: Record<number, number>; npcMortos?: string[]; ultima: number; fogueiras: { x: number; y: number }[]; pois: string[]; esfolados: number[];
 };
 export type Run = {
   seed: string; zonaId: string; minutos: number;
@@ -17,7 +17,7 @@ export type Run = {
   traiu?: boolean; objVer?: number; saiuEm?: number; raidDia?: number; emboscada?: [string, number] | null; ultEv?: string;
 };
 export function normalizarRun(r: Run): Run { r.grade ??= []; r.xp ??= 0; r.nivel ??= 1; r.pontos ??= 0; r.perks ??= []; r.st ??= {}; r.contratos ??= []; r.nContratos ??= 0; r.mel ??= {}; r.dif ??= 1; r.emboscada ??= null; return r; }
-export const novoZEstado = (): ZEstado => ({ saqueados: [], abatidos: [], cortadas: [], desmontados: [], rasgados: [], hortas: {}, coletados: [], fontes: {}, ultima: 0, fogueiras: [], pois: [], esfolados: [] });
+export const novoZEstado = (): ZEstado => ({ saqueados: [], abatidos: [], cortadas: [], desmontados: [], rasgados: [], hortas: {}, coletados: [], colhidas: [], lidas: [], fontes: {}, ultima: 0, fogueiras: [], pois: [], esfolados: [] });
 const CHAVE = 'cinzas.save.v2';
 export function salvarRun(r: Run) { try { localStorage.setItem(CHAVE, JSON.stringify(r)); } catch { /* sem storage */ } }
 export function lerRun(): Run | null { try { const s = localStorage.getItem(CHAVE); return s ? normalizarRun(JSON.parse(s) as Run) : null; } catch { return null; } }

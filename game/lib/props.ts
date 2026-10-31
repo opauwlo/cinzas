@@ -115,6 +115,9 @@ export function propVox(r: RecProp): Vox {
     case 'horta': box(v, 2, 2, 0, 19, 19, 4, c(0x4a3624, 0.15)); for (let k = 0; k < 9; k++) { const x = 5 + (k % 3) * 6, y = 5 + ((k / 3) | 0) * 6, h = 2 + r.v * 3; v.linha(x, y, 4, x, y, 4 + h, 1, 0x5a7a3a); if (r.v > 1) v.ell(x, y, 4 + h, 2, 2, 1.6, (xx, yy, zz) => ruido(xx, yy, zz, 0.12, [0x8a6a2a, 0xa83a2a, 0x7a8a3a][k % 3])); } break;
     case 'lixo': for (let k = 0; k < 10; k++) { const x = 3 + hash3(k, s, 1) * 16, y = 3 + hash3(k, s, 2) * 16; v.ell(x, y, 2, 2.4 + hash3(k, s, 3) * 2, 2.4, 1.6, [0x6a6a5a, 0x4a4a3a, 0x8a8a7a, 0x5a4a3a][k % 4]); } break;
     case 'ponte_radio': box(v, 4, 4, 0, 15, 15, 16, mt(0x4a5238)); box(v, 6, 5, 16, 11, 13, 6, 0x2a2a2a); v.set(14, 6, 19, 0x5dff9a, true); v.linha(8, 8, 22, 8, 8, 40, 1, 0x7a7d80); break;
+    case 'poco': v.cil(11.5, 11.5, 0, 12, 8, 8, mt(0x6a6a64)); v.cil(11.5, 11.5, 11, 13, 6.2, 6.2, 0x1f3a4a); for (const x of [4, 18]) box(v, x, 11, 12, 1, 1, 20, c(0x4a3a2a)); box(v, 4, 10, 30, 15, 3, 2, c(0x5a3a1e)); box(v, 2, 7, 32, 19, 9, 2, c(0x6a4a2a)); box(v, 5, 8, 33, 13, 7, 1, c(0x7a5a3a)); box(v, 11, 11, 20, 1, 1, 10, 0x3a2a1a); box(v, 10, 10, 15, 3, 3, 4, c(0x6a4a2a)); break;
+    case 'sucata_pilha': for (let k = 0; k < 18; k++) { const x = 4 + hash3(k, s, 1) * 14, y = 4 + hash3(k, s, 2) * 14, z = hash3(k, s, 3) * 9, w = 3 + hash3(k, s, 4) * 6, d = 2 + hash3(k, s, 5) * 4, h = 1 + hash3(k, s, 6) * 4; box(v, x | 0, y | 0, z | 0, w | 0, d | 0, h | 0, mt([0x6a6a64, 0x4a4d50, 0x7a7870, 0x5a3a2a][k % 4])); } v.cil(11.5, 11.5, 0, 3, 7, 7, 0x2a2a2a); break;
+    case 'cruz': v.ell(11.5, 11.5, 2, 6, 9, 2, c(0x4a3a2a, 0.15)); box(v, 11, 8, 2, 2, 2, 24, c(0x6a4a2a)); box(v, 6, 8, 16, 11, 2, 2, c(0x6a4a2a)); if (r.v % 2) box(v, 13, 6, 5, 1, 1, 4, 0xb6a34a); break;
     default: box(v, 4, 4, 0, 15, 15, 20, c(0x7a6a5a));
   }
   return v;

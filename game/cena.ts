@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import * as ROT from 'rot-js';
-import { gerarZona, W, H, T, idx, dentro, type Zona, type Prop, type FloraObj } from './zona';
+import { gerarZona, W, H, T, idx, dentro, type Zona, type Prop, type FloraObj, type Interacao } from './zona';
 import { assarChao, CH } from './chao';
 import { ang, sstep, dirTela, proj } from './util';
 import { Fabrica, chaveRec, clipesDe, type Quadro } from './lib/fabrica';
@@ -49,7 +49,7 @@ export class Cena extends Phaser.Scene {
   chunks = new Map<string, { img: Phaser.GameObjects.Image; paredes: Rastreado[] }>();
   props: PropSpr[] = []; floras: FloraSpr[] = []; portas = new Map<number, { aberta: boolean; spr: Phaser.GameObjects.Image; horiz: boolean; t: number; rast: Rastreado }>();
   ents: Ent[] = []; cadaveres: Ent[] = []; interativos: Interativo[] = []; luzes: { x: number; y: number; r: number; cor: number; f: number; noite: boolean; glow?: Phaser.GameObjects.Image }[] = [];
-  jog!: Jog; jogBase!: RecHumano; recCache = new Map<string, RecHumano>();
+  recColhida!: RecEstatica; jog!: Jog; jogBase!: RecHumano; recCache = new Map<string, RecHumano>();
   lmA = new Float32Array(W * H).fill(0.9); seen = new Uint8Array(W * H); luzFrame = new Float32Array(W * H);
   fogC!: Phaser.Textures.CanvasTexture; fogD!: ImageData; fogImg!: Phaser.GameObjects.Image; climaC!: Phaser.Textures.CanvasTexture; climaD!: ImageData; climaImg!: Phaser.GameObjects.Image; grade!: Phaser.GameObjects.Rectangle;
   gfx!: Phaser.GameObjects.Graphics; marca!: Phaser.GameObjects.Graphics; gChao!: Phaser.GameObjects.Graphics; gAr!: Phaser.GameObjects.Graphics;
@@ -83,17 +83,17 @@ export class Cena extends Phaser.Scene {
     this.ze = this.s.zonas[loc.id] ??= novoZEstado(); this.ze.coletados ??= []; this.ze.fontes ??= {};
     for (const it of ITENS_SOLTOS) if (!this.textures.exists('solto_' + it)) this.textures.addCanvas('solto_' + it, texturaSolto(it));
     if (this.ze.ultima && this.s.minutos - this.ze.ultima > 3 * 1440) { const h = this.ze.hortas, f = this.ze.fogueiras; Object.assign(this.ze, novoZEstado(), { hortas: h, fogueiras: f }); }
-    for (const p of this.zona.props) { if (this.ze.saqueados.includes(p.id)) { p.aberto = true; p.loot = []; for (const i of p.inters) if (i.k === 'saque') i.feito = true; } if (this.ze.desmontados.includes(p.id)) for (const i of p.inters) if (i.k === 'desmontar') i.feito = true; if (this.ze.rasgados.includes(p.id)) for (const i of p.inters) if (i.k === 'rasgar') i.feito = true; }
-    for (const f of this.zona.flora) if (this.ze.cortadas.includes(f.id)) f.cortada = true;
+    for (const p of this.zona.props) { if (this.ze.saqueados.includes(p.id)) { p.aberto = true; p.loot = []; for (const i of p.inters) if (i.k === 'saque') i.feito = true; } if (this.ze.desmontados.includes(p.id)) for (const i of p.inters) if (i.k === 'desmontar') i.feito = true; if (this.ze.rasgados.includes(p.id)) for (const i of p.inters) if (i.k === 'rasgar') i.feito = true; if (this.ze.lidas?.includes(p.id)) for (const i of p.inters) if (i.k === 'nota') i.feito = true; }
+    for (const f of this.zona.flora) { if (this.ze.cortadas.includes(f.id)) f.cortada = true; else if (this.ze.colhidas?.includes(f.id)) f.colhida = true; }
     this.zona.spawns = this.zona.spawns.filter(sp => !this.ze.abatidos.includes(sp.id));
     const manter = [0.6, 1, 1][dif(this.s)]; if (manter < 1) this.zona.spawns = this.zona.spawns.filter(sp => new Rng(`${this.s.seed}|grp|${loc.id}|${sp.grupo}`).f() < manter); /* Calmo: 40% dos grupos nem existem */
     this.clima = new Clima(this.s.seed + '|' + loc.id + '|' + Math.floor(this.s.minutos / 1440), this.bioma, this.s.minutos);
     this.clima.aoRaio = atraso => { this.flashRaio = 1; this.cameras.main.flash(140, 235, 240, 255); trovao(atraso); };
-    this.part = new Particulas(); this.recToco = gerarFlora(new Rng('toco'), 'toco', '');
+    this.part = new Particulas(); this.recToco = gerarFlora(new Rng('toco'), 'toco', ''); this.recColhida = gerarFlora(new Rng('colhida'), 'capim', '');
     // jogador (receita base fixa por seed)
     this.jogBase = gerarHumano(new Rng(this.s.seed + '|jogador'), 'sobrevivente');
     // tarefas de pré-carga das texturas estáticas desta zona
-    const recs = new Map<string, RecEstatica>(), add = (r: RecEstatica) => recs.set(chaveRec(r), r); add(this.recToco);
+    const recs = new Map<string, RecEstatica>(), add = (r: RecEstatica) => recs.set(chaveRec(r), r); add(this.recToco); add(this.recColhida);
     for (const p of this.zona.props) add(p.rec); for (const f of this.zona.flora) add(f.rec);
     const est = new Set<number>(); for (let i = 0; i < W * H; i++) { const t = this.zona.tipos[i]; if (t === T.PAREDE || t === T.JANELA || t === T.RUINA) est.add(this.zona.estilo[i] % 4); }
     for (const e of est) for (const alto of ['a', 'b'] as const) { add({ tipo: 'estr', n: 'parede', estilo: e, alto, sem: 1 }); add({ tipo: 'estr', n: 'janela', estilo: e, alto, sem: 1 }); add({ tipo: 'estr', n: 'ruina', estilo: e, alto: 'a', sem: 1 }); }
@@ -115,7 +115,7 @@ export class Cena extends Phaser.Scene {
       if (p.aberto && p.loot && !p.loot.length) spr.setAlpha(0.8);
       if (p.luz) this.luzes.push({ x: p.x + p.w / 2, y: p.y + p.h / 2, r: p.luz.r, cor: p.luz.cor, f: p.luz.f, noite: p.luz.noite });
     }
-    for (const f of z.flora) { const rec = f.cortada ? this.recToco : f.rec, q = this.est(rec), [sx, sy] = proj(f.x, f.y), spr = this.img(sx, sy, q).setDepth((f.x + f.y) * 10); this.floras.push({ f, spr, fase: Math.random() * 6.28, q }); }
+    for (const f of z.flora) { const rec = f.cortada ? this.recToco : f.colhida ? this.recColhida : f.rec, q = this.est(rec), [sx, sy] = proj(f.x, f.y), spr = this.img(sx, sy, q).setDepth((f.x + f.y) * 10); this.floras.push({ f, spr, fase: Math.random() * 6.28, q }); }
     for (const so of z.soltos) if (!this.ze.coletados.includes(so.id)) { const [sx, sy] = proj(so.x, so.y); this.soltos.push({ s: so, spr: this.add.image(Math.round(sx), Math.round(sy), 'solto_' + so.item).setOrigin(0.5, 0.8).setDepth((so.x + so.y) * 10 - 2) }); }
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (z.tipos[idx(x, y)] === T.PORTA) {
       const horiz = z.tipos[idx(x - 1, y)] === T.PAREDE || z.tipos[idx(x + 1, y)] === T.PAREDE, q = this.est({ tipo: 'estr', n: 'porta', estilo: 0, alto: 'a', sem: 0, o: horiz ? 0 : 1 } as RecEstr), [sx, sy] = proj(x + 0.5, y + 0.5);
@@ -174,6 +174,13 @@ export class Cena extends Phaser.Scene {
   /** auxiliar de teste (playtests headless): cria uma criatura perto do jogador */
   dev(arq: string, dx: number, dy: number, grupo = -1, faccao?: number) { return criarEnt(this, arq, this.jog.x + dx, this.jog.y + dy, null, grupo, faccao); }
   devXp(n: number) { ganharXp(this, n); }
+  /** (teste) cria uma peça com as interações dadas ao lado do jogador, pelo mesmo caminho do jogo */
+  devProp(n: string, inters: Interacao[]) {
+    const J = this.jog; let px = Math.floor(J.x) + 2, py = Math.floor(J.y);
+    busca: for (const r of [2, 3, 4]) for (let a = 0; a < 6.28; a += 0.5) { const x = Math.floor(J.x + Math.cos(a) * r), y = Math.floor(J.y + Math.sin(a) * r); if (!this.solidoEm(x, y) && this.temLOS(J.x, J.y, x + 0.5, y + 0.5) && !this.props.some(q => q.p.x === x && q.p.y === y)) { px = x; py = y; break busca; } }
+    const rec = { tipo: 'prop', n, v: 0, d: 0.3, o: 0, sem: 1 } as Prop['rec'], q = this.est(rec), [sx, sy] = proj(px + 0.5, py + 0.5), spr = this.img(sx, sy, q).setDepth((px + py + 1) * 10);
+    const p: Prop = { id: 800000 + this.props.length, rec, x: px, y: py, w: 1, h: 1, solido: false, inters }; this.zona.props.push(p); this.props.push({ p, spr, rast: { spr, i: idx(px, py), lvl: -1 } }); montarInterativos(this); return p;
+  }
   /** (teste) pula a campanha para o passo `id` */
   devObjetivo(id: string) { const i = OBJETIVOS.findIndex(o => o.id === id); if (i >= 0) this.s.objIdx = i; }
   /** (teste) cria um NPC ao lado do jogador */
@@ -461,7 +468,7 @@ export class Cena extends Phaser.Scene {
     this.tFlora += dt; const cam = this.cameras.main, g = this.clima.rajada, t = this.tempo, vx0 = cam.scrollX - 40, vy0 = cam.scrollY - 60, vx1 = cam.scrollX + this.scale.width + 40, vy1 = cam.scrollY + this.scale.height + 80;
     let orc = 2;
     for (const fl of this.floras) {
-      if (fl.f.rec.balanco < 0.3 || fl.f.cortada) continue; const [sx, sy] = proj(fl.f.x, fl.f.y); if (sx < vx0 || sx > vx1 || sy < vy0 || sy > vy1) continue;
+      if (fl.f.rec.balanco < 0.3 || fl.f.cortada || fl.f.colhida) continue; const [sx, sy] = proj(fl.f.x, fl.f.y); if (sx < vx0 || sx > vx1 || sy < vy0 || sy > vy1) continue;
       const v = Math.sin(t * (1.3 + g * 1.8) + fl.fase) * (0.25 + g * 1.3) * fl.f.rec.balanco + g * 0.2, sw = v > 0.55 ? 1 : v < -0.55 ? -1 : 0; if (sw === fl.sw) continue;
       const rec = sw === 0 ? fl.f.rec : (sw === 1 ? (fl.r1 ??= { ...fl.f.rec, sw: 1 }) : (fl.r2 ??= { ...fl.f.rec, sw: -1 })); const k = chaveRec(rec);
       if (!this.estCache.has(k) && !this.fab.temEstatico(k)) { if (orc <= 0) continue; orc--; }

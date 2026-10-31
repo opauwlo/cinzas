@@ -3,17 +3,18 @@ import { ITENS, pesoDe } from './dados/itens';
 import type { ClimaId } from './dados/biomas';
 import type { Contrato } from './sistemas/contratos';
 import type { Peca } from './sistemas/grade';
+import type { Perfil } from './dados/sons';
 
 export type Tela = 'menu' | 'jogo' | 'morte' | 'vitoria' | 'creditos' | 'loja' | 'revelacao';
-export type Painel = null | 'inv' | 'craft' | 'bau' | 'mapa' | 'cozinha' | 'dormir' | 'pausa' | 'config' | 'diario' | 'mapaZona' | 'perk' | 'melhorias' | 'evento' | 'ajuda' | 'intro' | 'dialogo';
+export type Painel = null | 'inv' | 'craft' | 'bau' | 'mapa' | 'cozinha' | 'dormir' | 'pausa' | 'config' | 'diario' | 'mapaZona' | 'perk' | 'melhorias' | 'evento' | 'ajuda' | 'intro' | 'dialogo' | 'nota';
 export type DialogoUI = { npcId: number; nome: string; rotulo: string; fala: string; modo: 'fala' | 'troca'; fichas: number; compras: { item: string; q: number; preco: number }[]; vendas: { item: string; q: number; preco: number }[]; msg: string; vende: boolean };
 export type EventoUI = { titulo: string; txt: string; opcoes: { rot: string; ok: boolean; dica?: string }[]; resultado: string | null; cor?: string };
 export type Toast = { id: number; texto: string; cor: string };
 export type Resumo = { causa: string; dias: number; hora: string; abates: number; vasculhados: number; radMax: number; vitoria: boolean; distAbrigo: number; nivel?: number; contratos?: number; conquistas?: string[] };
-export type Configs = { mestre: number; sfx: number; amb: number; mus: number; vibra: boolean; ui: number; escala: number; v?: number; autoMira: boolean; gore: boolean; canhoto: boolean; fps: boolean; /** toque = uma mão (point & click) · manche = duas mãos (manche fixo + botão de ataque) */ controle: 'toque' | 'manche' };
+export type Configs = { mestre: number; sfx: number; amb: number; mus: number; vibra: boolean; ui: number; escala: number; v?: number; autoMira: boolean; gore: boolean; canhoto: boolean; fps: boolean; /** toque = uma mão (point & click) · manche = duas mãos (manche fixo + botão de ataque) */ controle: 'toque' | 'manche'; /** equalizador: perfil de som e ajuste de graves/agudos em dB */ perfil: Perfil; graves: number; agudos: number };
 export type ClimaHud = { tipo: ClimaId; chuva: number; vento: number; neblina: number; poeira: number; nuvem: number };
 
-export const CFG0: Configs = { mestre: 0.6, sfx: 0.7, amb: 0.5, mus: 0.3, vibra: true, ui: 1, escala: 1, v: 4, autoMira: true, gore: true, canhoto: false, fps: false, controle: 'toque' };
+export const CFG0: Configs = { mestre: 0.6, sfx: 0.7, amb: 0.5, mus: 0.3, vibra: true, ui: 1, escala: 1, v: 4, autoMira: true, gore: true, canhoto: false, fps: false, controle: 'toque', perfil: 'equilibrado', graves: 0, agudos: 0 };
 export function lerCfg(): Configs {
   try { const salvo = JSON.parse(localStorage.getItem('cinzas.cfg') ?? '{}'), c: Configs = { ...CFG0, ...salvo }; if ((salvo.v ?? 1) < 3) c.escala = CFG0.escala; if ((salvo.v ?? 1) < 4) { c.mestre = CFG0.mestre; c.sfx = CFG0.sfx; c.amb = CFG0.amb; c.mus = CFG0.mus; } c.v = 4; return c; } catch { return { ...CFG0 }; }
 }
@@ -28,7 +29,7 @@ export type Estado = {
   clima: ClimaHud; interior: boolean; tanque: number;
   toasts: Toast[]; acao: { rotulo: string; p: number } | null; alvo: string | null; furtivo: boolean;
   danoTs: number; resumo: Resumo | null; gemas: number; carga: number; descobertos: string[]; dica: string | null; cfg: Configs; temSave: boolean; fps: number;
-  dialogo: DialogoUI | null; grade: Peca[]; xp: number; nivel: number; pontos: number; perks: string[]; contratos: Contrato[]; mel: Record<string, number>; conquistas: string[]; evento: EventoUI | null; seta: { dx: number; dy: number; d: number } | null; dif: number;
+  dialogo: DialogoUI | null; nota: { titulo: string; texto: string; extra: string } | null; grade: Peca[]; xp: number; nivel: number; pontos: number; perks: string[]; contratos: Contrato[]; mel: Record<string, number>; conquistas: string[]; evento: EventoUI | null; seta: { dx: number; dy: number; d: number } | null; dif: number;
   set: (p: Partial<Estado>) => void;
   toast: (texto: string, cor?: string) => void;
 };
@@ -48,7 +49,7 @@ export const estadoInicial = (seed: string) => ({
   cpm: 18, objIdx: 0, objVal: 0, banner: null, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
   clima: { tipo: 'limpo', chuva: 0, vento: 0.1, neblina: 0, poeira: 0, nuvem: 0.1 } as ClimaHud, interior: false, tanque: 0,
   toasts: [] as Toast[], acao: null, alvo: null, furtivo: false, danoTs: 0, resumo: null, descobertos: ['base'] as string[], dica: null,
-  dialogo: null, grade: [] as Peca[], xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
+  dialogo: null, nota: null as { titulo: string; texto: string; extra: string } | null, grade: [] as Peca[], xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
 });
 
 export const useJogo = create<Estado>((set, get) => ({

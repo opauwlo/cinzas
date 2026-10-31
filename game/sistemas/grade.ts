@@ -13,7 +13,7 @@ const TAM: Record<string, [number, number]> = {
   agua: [1, 2], agua_suja: [1, 2], garrafa: [1, 2], alcool: [1, 2], combustivel: [2, 2], madeira: [2, 1], kit: [2, 1], mascara: [2, 2], lanterna: [1, 2], kit_fogueira: [2, 1], radio: [1, 2],
 };
 const PILHA: Record<string, number> = {
-  sucata: 12, tecido: 12, madeira: 6, enlatado: 4, pao: 4, carne_crua: 4, carne_cozida: 4, legume: 6, semente: 10, bandagem: 6, antirrad: 3, bateria: 4, eletronico: 6, alcool: 3, agua: 2, agua_suja: 2, garrafa: 4, kit: 2, ficha: 99,
+  sucata: 12, tecido: 12, madeira: 6, enlatado: 4, pao: 4, carne_crua: 4, carne_cozida: 4, legume: 6, baga: 6, cogumelo: 6, erva: 6, semente: 10, bandagem: 6, antirrad: 3, bateria: 4, eletronico: 6, alcool: 3, agua: 2, agua_suja: 2, garrafa: 4, kit: 2, ficha: 99,
 };
 export const linhasDe = (inv: Record<string, number>) => LINHAS_BASE + (inv.mochila ? 2 : 0);
 export const emGrade = (id: string) => !!ITENS[id] && !EQUIPADO.includes(id) && ITENS[id].tipo !== 'municao';

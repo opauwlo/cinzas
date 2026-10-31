@@ -61,7 +61,7 @@ export function Hud() {
   if (s.sangra) moodles.push({ k: 'sangra', icone: ic('lorc', 'bandage-roll'), n: 2 });
   if (s.stamina < 25) moodles.push({ k: 'stam', icone: ic('lorc', 'sprint'), n: 1 });
   if (s.furtivo) moodles.push({ k: 'furt', icone: ic('skoll', 'footsteps'), n: 1 });
-  const q = (id: string) => s.inv[id] ?? 0, comida = q('carne_cozida') + q('enlatado') + q('pao') + q('legume') + q('carne_crua'), agua = q('agua') + q('agua_suja'), cura = q('bandagem') + q('kit'), arma = s.arma ? ITENS[s.arma] : null, am = armaDe(s.arma);
+  const q = (id: string) => s.inv[id] ?? 0, comida = q('carne_cozida') + q('enlatado') + q('pao') + q('legume') + q('baga') + q('cogumelo') + q('carne_crua'), agua = q('agua') + q('agua_suja'), cura = q('bandagem') + q('kit') + q('erva'), arma = s.arma ? ITENS[s.arma] : null, am = armaDe(s.arma);
   const lv = livres(s.grade, linhasDe(s.inv)), ctPronto = s.contratos.find(pronto), ct = ctPronto ?? s.contratos[0];
   const hotRecente = useRecente(`${s.arma}|${agua}|${comida}|${cura}|${q('antirrad')}|${s.lanterna.ligada}`, 6000), trackerAberto = useRecente(`${s.objIdx}|${s.objVal}|${ct?.id ?? ''}|${ct ? progresso(ct) : 0}`), noiteH = h < 6 || h >= 20;
   const slots = [

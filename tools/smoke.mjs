@@ -325,6 +325,22 @@ try {
   ok('cumprir o objetivo mostra o banner e avança', await ate(() => { const t = window.__cinzas.store.getState(); return !!t.banner && /objetivo cumprido/i.test(t.banner.titulo); }, 6000));
   await foto('4a-banner');
 
+  // 7a4. mundo cheio: bilhete, ferro-velho e poço (peças criadas ao lado do jogador, pelo mesmo caminho do jogo)
+  await limpaPaineis();
+  const nota = await ev(() => { const k = window.__cinzas.cena(), p = k.devProp('mala', [{ k: 'nota', rot: 'Ler o bilhete', dur: 1.2, nota: 11 }]), it = k.interativos.find(i => i.rot === 'Ler o bilhete' && Math.abs(i.x - (p.x + 0.5)) < 0.6 && Math.abs(i.y - (p.y + 0.5)) < 0.6); if (!it) return null; k.devIrPara(it); k.alvoInter = it; const inv0 = window.__cinzas.store.getState().inv.erva ?? 0; it.exec(); return { inv0 }; });
+  ok('ler um bilhete abre a história e paga XP', !!nota && await ate(() => window.__cinzas.store.getState().painel === 'nota', 15000), JSON.stringify(nota));
+  const vistoNota = await ate(() => /Zé/.test(document.body.innerText) && /erva/i.test(document.body.innerText), 10000);
+  ok('o bilhete mostra o texto e o que estava junto', vistoNota, JSON.stringify(await ev(() => { const t = window.__cinzas.store.getState(); return { painel: t.painel, nota: !!t.nota, ov: document.querySelectorAll('.ov').length, len: document.body.innerText.length, txt: document.body.innerText.slice(0, 100) }; })));
+  await toque('^Guardar');
+  ok('guardar o bilhete fecha o painel e a erva vai para a mochila', await ate(i => window.__cinzas.store.getState().painel === null && (window.__cinzas.store.getState().inv.erva ?? 0) >= i + 2, 6000, nota?.inv0 ?? 0));
+  const garimpo = await ev(() => { const k = window.__cinzas.cena(), p = k.devProp('sucata_pilha', [{ k: 'garimpar', rot: 'Garimpar sucata', dur: 2.2, ruido: 6 }]), it = k.interativos.find(i => /Garimpar sucata/.test(i.rot) && Math.abs(i.x - (p.x + 0.5)) < 0.6 && Math.abs(i.y - (p.y + 0.5)) < 0.6); k.devIrPara(it); k.alvoInter = it; const s0 = window.__cinzas.store.getState().inv.sucata ?? 0; it.exec(); return { s0, id: p.id }; });
+  // espera o fim da ação (o uso é gasto no fim); uma sucata solta no chão poderia somar antes e enganar a espera pela mochila
+  const garimpou = await ate(id => window.__cinzas.cena().ze.fontes[id] === 2, 30000, garimpo.id);
+  ok('garimpar o ferro-velho rende sucata', garimpou && (await ev(() => window.__cinzas.store.getState().inv.sucata ?? 0)) > garimpo.s0, JSON.stringify(garimpo));
+  ok('o ferro-velho gasta um dos 3 usos', garimpou, JSON.stringify(await ev(id => ({ f: window.__cinzas.cena().ze.fontes[id], ids: Object.keys(window.__cinzas.cena().ze.fontes) }), garimpo.id)));
+  const poco = await ev(() => { const k = window.__cinzas.cena(), st = window.__cinzas.store; const p = k.devProp('poco', [{ k: 'fonte', rot: 'Água do poço', dur: 1.2 }]); const it = k.interativos.find(i => /poço|reservatório|Beber|Encher/i.test(i.rot) && Math.abs(i.x - (p.x + 0.5)) < 0.6 && Math.abs(i.y - (p.y + 0.5)) < 0.6); k.devIrPara(it); k.alvoInter = it; k.s.sede = 30; st.setState({ sede: 30 }); const a0 = st.getState().inv.agua ?? 0; it.exec(); return { a0 }; });
+  ok('o poço mata a sede ou enche a garrafa', await ate(a => { const k = window.__cinzas.cena(); return k.s.sede > 40 || (window.__cinzas.store.getState().inv.agua ?? 0) > a; }, 15000, poco.a0));
+
   // 7a2. diretor de população: de noite repõe inimigos variados, longe do jogador, e a tensão segura a reposição
   const spawn = await ev(() => {
     const k = window.__cinzas.cena(), J = k.jog; k.s.minutos = Math.floor(k.s.minutos / 1440) * 1440 + 1440 + 23 * 60; k.s.nivel = 5; const vistos = new Set(); let dmin = 99, grupos = 0;
@@ -395,6 +411,15 @@ try {
   await espera(600);
   ok('o mapa abre por nível: Posto Militar 14 (nível 8) não abre no nível 1', bloqueado.antes === bloqueado.depois && bloqueado.trava === false, JSON.stringify(bloqueado));
   await ev(() => window.__cinzas.cena().devXp(6000)); await ev(() => { window.__cinzas.cena().perkAvisado = 1e9; }); await espera(400); // sobe de nível para liberar os locais temáticos
+  // 7g2. colheita no mato: a Floresta Morta tem arbustos vivos, flores e cogumelos que rendem comida, ervas e fibra
+  await limpaPaineis();
+  await ev(() => { const k = window.__cinzas.cena(); k.s.hp = 100; window.__cinzas.ponte.cmd.viajar('floresta'); });
+  const veioF = await ate(() => { const t = window.__cinzas.store.getState(); return t.zonaId === 'floresta' && t.carga >= 1; }, 90000); await espera(1500);
+  const colheita = await ev(() => { const k = window.__cinzas.cena(), J = k.jog, conta = () => { const t = window.__cinzas.store.getState().inv; return (t.baga ?? 0) + (t.cogumelo ?? 0) + (t.erva ?? 0) + (t.tecido ?? 0); }; const c = k.interativos.filter(i => /Colher|Cortar juncos/.test(i.rot) && i.ok()).sort((a, b) => Math.hypot(a.x - J.x, a.y - J.y) - Math.hypot(b.x - J.x, b.y - J.y)); const it = c[0]; if (!it) return { n: 0 }; k.devIrPara(it); k.alvoInter = it; window.__antesMato = conta(); it.exec(); return { n: c.length, rot: it.rot, antes: window.__antesMato }; });
+  ok('a Floresta tem dezenas de plantas para colher', veioF && colheita.n >= 20, JSON.stringify(colheita));
+  ok('colher uma planta rende comida, erva ou fibra', await ate(() => { const t = window.__cinzas.store.getState().inv; return (t.baga ?? 0) + (t.cogumelo ?? 0) + (t.erva ?? 0) + (t.tecido ?? 0) > window.__antesMato; }, 20000));
+  ok('a planta colhida vira tufo e não rende de novo', await ev(() => { const k = window.__cinzas.cena(); return k.floras.some(f => f.f.colhida) && k.ze.colhidas.length >= 1; }));
+
   // 7h. locais temáticos carregam (hospital e posto militar)
   for (const [id, rx] of [['hospital', /hospital/i], ['militar', /militar/i], ['torre', /torre/i]]) {
     await limpaPaineis();

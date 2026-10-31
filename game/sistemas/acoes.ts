@@ -1,6 +1,7 @@
 // Interações do mundo, itens, fabricação, cozinha, sono, horta, viagem, morte e vitória. Tudo que o jogador "faz" além de andar e lutar.
 import type { Cena } from '../cena';
-import type { Prop } from '../zona';
+import type { Prop, Interacao } from '../zona';
+import { NOTAS } from '../dados/notas';
 import { T, W, idx } from '../zona';
 import { ITENS, RECEITAS, COZINHA, COR_RARIDADE, pesoDe, armaDe } from '../dados/itens';
 import { custoViagem, localPorId, bloqueioLocal } from '../dados/locais';
@@ -15,6 +16,7 @@ import { cabeNaMochila, sincGrade, adicionar, remover, linhasDe, emGrade } from 
 import { EVENTOS_VIAGEM, type Ajuda, type EventoViagem } from '../dados/eventos';
 import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado, dif } from './progresso';
 import { tocarToque } from './toque';
+import { colheitaDe, type Colheita } from '../dados/colheita';
 
 /** registro para módulos que dependem deste (evita import circular): NPCs ligam aqui seus interativos e comandos */
 export const ganchos: { npc: ((c: Cena, e: Ent) => Interativo) | null; cmd: { agir(c: Cena, a: 'trocar' | 'rumor' | 'sair'): void; comprar(c: Cena, item: string): void; vender(c: Cena, item: string): void } | null } = { npc: null, cmd: null };
@@ -65,14 +67,35 @@ export function montarInterativos(c: Cena) {
         case 'tanque': v = { x: cx, y: cy, r, rot: it.rot, dur: it.dur, alt, ok: () => true, exec: () => { const s = c.s, n = Math.min(Math.floor(s.tanque), st().inv.garrafa ?? 0); if (n <= 0) { toast(s.tanque < 1 ? 'O tanque está vazio. Espere chover.' : 'Precisa de garrafas vazias.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Enchendo garrafas', it.dur, () => { for (let i = 0; i < n; i++) { if (!tirar('garrafa')) break; dar(c, 'agua', 1, true); } s.tanque -= n; toast(`+ ${n} água limpa`, '#8fe36a'); sfx.beber(); }); } }; break;
         case 'fonte': v = { x: cx, y: cy, r, get rot() { const n = usosFonte(c, p); return n <= 0 ? 'Reservatório seco' : tem('garrafa') ? `Encher garrafa (${n} restantes)` : `Beber no reservatório (${n} restantes)`; }, dur: it.dur, alt, ok: () => usosFonte(c, p) > 0, exec: () => beberFonte(c, p, it.dur) }; break;
         case 'horta': v = { x: cx, y: cy, r, rot: it.rot, dur: it.dur, alt, ok: () => true, exec: () => cuidarHorta(c, p) }; break;
+        case 'garimpar': v = { x: cx, y: cy, r, get rot() { const n = usosGarimpo(c, p); return n > 0 ? `Garimpar sucata (${n} restantes)` : 'Já não resta nada útil'; }, dur: it.dur, ruido: it.ruido, alt, ok: () => usosGarimpo(c, p) > 0, exec: () => iniciarAcao(c, 'Garimpando sucata', it.dur, () => garimpar(c, p), it.ruido, 'metal') }; break;
+        case 'nota': v = { x: cx, y: cy, r, rot: it.rot, dur: it.dur, alt, ok: () => !it.feito, exec: () => iniciarAcao(c, 'Lendo', it.dur, () => lerNota(c, p, it)) }; break;
       }
       if (v) { v.pegada = [p.x, p.y, p.w, p.h]; c.interativos.push(v); }
     }
   }
   for (const e of c.ents) if (e.npc && e.vivo && ganchos.npc) c.interativos.push(ganchos.npc(c, e));
   for (const fl of c.floras) if (fl.f.cortavel) { const f = fl.f; c.interativos.push({ x: f.x, y: f.y, r: 1.5, get rot() { return (st().inv.machado || c.s.arma === 'machado') ? 'Cortar árvore (madeira ×3–5)' : 'Cortar árvore — precisa de machado'; }, dur: 3.2, ruido: 8, alt: 52, pegada: [Math.floor(f.x), Math.floor(f.y), 1, 1], ok: () => !f.cortada, exec: () => { const mach = st().inv.machado || c.s.arma === 'machado'; if (!mach) { toast('Precisa de um machado.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Cortando árvore', 3.2, () => { f.cortada = true; c.ze.cortadas.push(f.id); const i = idx(Math.floor(f.x), Math.floor(f.y)); f.solido = false; c.zona.solido[i] = 0; c.setQ(fl.spr, c.est(c.recToco)); dar(c, 'madeira', ri(3, 5)); sfx.achado(); c.cameras.main.shake(120, 0.004); }, 8, 'cortar'); } }); }
+  interativosColheita(c);
 }
 const acharPs = (c: Cena, p: Prop) => c.props.find(x => x.p === p);
+/** ferro-velho: 3 garimpadas por visita, cada uma rende sucata e, de vez em quando, peças */
+const usosGarimpo = (c: Cena, p: Prop) => c.ze.fontes[p.id] ?? 3;
+function garimpar(c: Cena, p: Prop) {
+  c.ze.fontes[p.id] = usosGarimpo(c, p) - 1; dar(c, 'sucata', ri(1, 3)); if (Math.random() < 0.3) dar(c, 'eletronico'); else if (Math.random() < 0.2) dar(c, 'bateria');
+  ganharXp(c, 3, false); registrar(c, 'garimpos'); sfx.achado();
+}
+/** bilhete: mostra a história, paga XP e, às vezes, tinha algo escondido junto */
+function lerNota(c: Cena, p: Prop, it: Interacao) {
+  const n = NOTAS[it.nota ?? 0] ?? NOTAS[0]; it.feito = true; (c.ze.lidas ??= []).push(p.id); let extra = '';
+  if (n.premio && ITENS[n.premio[0]]) extra = dar(c, n.premio[0], n.premio[1], true) ? `Achou junto: ${n.premio[1]}× ${ITENS[n.premio[0]].nome}` : 'Mochila cheia: o que estava junto ficou para trás.';
+  useJogo.setState({ painel: 'nota', nota: { titulo: n.titulo, texto: n.texto, extra } }); sfx.ui('abrir'); ganharXp(c, 8, false); registrar(c, 'notas');
+}
+/** colhe uma planta: rende o que a tabela manda, vira tufo de capim e volta depois de 3 dias */
+function colher(c: Cena, fl: Cena['floras'][number], col: Colheita) {
+  const f = fl.f; f.colhida = true; (c.ze.colhidas ??= []).push(f.id); c.setQ(fl.spr, c.est(c.recColhida));
+  for (const [id, ch, a, b] of col.rende) if (Math.random() < ch) dar(c, id, ri(a, b));
+  ganharXp(c, col.xp, false); registrar(c, 'colheitas'); sfx.achado();
+}
 function concluirSaque(c: Cena, p: Prop, it: { feito?: boolean }) {
   const resto: string[] = []; let raro = false;
   for (const id of p.loot ?? []) { const x = ITENS[id]; if (!x) continue; if (x.tipo !== 'municao' && !cabe(id)) { resto.push(id); continue; } dar(c, id, 1); if (x.raridade === 'raro') raro = true; }
@@ -84,6 +107,10 @@ function concluirSaque(c: Cena, p: Prop, it: { feito?: boolean }) {
 export function mostrarCadaver(c: Cena, e: Ent) {
   const animal = e.arq.modelo !== 'humano', rot = animal ? 'Esfolar ' + e.arq.nome.toLowerCase() : 'Revistar ' + e.arq.nome.toLowerCase();
   c.interativos.push({ x: e.x, y: e.y, r: 1.4, rot, dur: 1.8, alt: 8, ok: () => !e.cadaver, exec: () => { if (animal && !tem('faca') && !tem('facao') && !tem('machado')) { toast('Precisa de uma faca para esfolar.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, animal ? 'Esfolando' : 'Revistando', 1.8, () => { e.cadaver = true; let n = 0; for (const [id, ch, a, b] of e.arq.drops) if (Math.random() < ch) { dar(c, id, ri(a, b) * (pk(c.s, 'cacador') && id === 'carne_crua' ? 2 : 1)); n++; } if (!n) toast('Nada de útil.', '#8a8573'); else sfx.achado(); }); } });
+}
+/** todo mato rende algo (bagas, cogumelos, ervas, fibra): interativos das plantas colhíveis */
+export function interativosColheita(c: Cena) {
+  for (const fl of c.floras) { const col = colheitaDe(fl.f.rec); if (!col || fl.f.cortada || fl.f.colhida) continue; const f = fl.f; c.interativos.push({ x: f.x, y: f.y, r: 1.35, rot: col.rot, dur: col.dur, ruido: col.ruido, alt: 16, pegada: [Math.floor(f.x), Math.floor(f.y), 1, 1], ok: () => !f.colhida, exec: () => iniciarAcao(c, col.fazendo, col.dur, () => colher(c, fl, col), col.ruido, 'colher') }); }
 }
 export function aguaInter(c: Cena): Interativo | null {
   const J = c.jog; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = Math.floor(J.x) + dx, y = Math.floor(J.y) + dy; if (c.tipoEm(x, y) === T.AGUA_RASA && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) < 1.7) return { x: x + 0.5, y: y + 0.5, r: 1.8, get rot() { return tem('garrafa') ? 'Coletar água (turva)' : 'Coletar água — precisa de garrafa vazia'; }, dur: 1.5, alt: 4, ok: () => true, exec: () => { if (!tem('garrafa')) { toast('Precisa de uma garrafa vazia.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Coletando água', 1.5, () => { if (tirar('garrafa')) dar(c, 'agua_suja', 1); sfx.beber(); }, undefined, 'agua'); } }; }
@@ -133,8 +160,8 @@ export function usarItem(c: Cena, id: string) {
 function usarRapido(c: Cena, k: Rapido) {
   const tm = (id: string) => tem(id); let id: string | undefined; const s = c.s;
   if (k === 'agua') id = tm('agua') ? 'agua' : tm('agua_suja') ? 'agua_suja' : undefined;
-  if (k === 'comida') id = ['carne_cozida', 'enlatado', 'pao', 'legume', 'carne_crua'].find(tm);
-  if (k === 'curar') id = s.sangra ? ['bandagem', 'kit'].find(tm) : s.hp < s.maxHp ? ['bandagem', 'kit'].find(tm) : undefined;
+  if (k === 'comida') id = ['carne_cozida', 'enlatado', 'pao', 'legume', 'baga', 'cogumelo', 'carne_crua'].find(tm);
+  if (k === 'curar') id = s.sangra ? ['erva', 'bandagem', 'kit'].find(tm) : s.hp < s.maxHp ? ['erva', 'bandagem', 'kit'].find(tm) : undefined;
   if (k === 'antirrad') id = tm('antirrad') ? 'antirrad' : undefined;
   if (!id) { toast({ agua: 'Sem água', comida: 'Sem comida', curar: s.sangra || s.hp < s.maxHp ? 'Sem curativos' : 'Saúde cheia', antirrad: 'Sem antirrad' }[k], '#d9a02b'); sfx.ui('erro'); return; }
   usarItem(c, id);

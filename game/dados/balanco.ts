@@ -37,7 +37,7 @@ export function tamanhoRaid(dia: number, muro: number, dif = 1) { return Math.ma
 // ---------------------------------------------------------------- economia de troca (NPCs): valor em fichas
 export const VALOR: Record<string, number> = {
   agua: 4, agua_suja: 1, garrafa: 1, enlatado: 4, pao: 2, carne_crua: 2, carne_cozida: 5, legume: 3, semente: 2, bandagem: 3, kit: 10, antirrad: 8,
-  tecido: 1, madeira: 1, sucata: 1, alcool: 3, bateria: 4, eletronico: 6, combustivel: 14, municao: 4, cartucho: 5,
+  baga: 1, cogumelo: 1, erva: 2, tecido: 1, madeira: 1, sucata: 1, alcool: 3, bateria: 4, eletronico: 6, combustivel: 14, municao: 4, cartucho: 5,
   taco: 6, pe_de_cabra: 9, faca: 6, facao: 16, machado: 12, pistola: 30, escopeta: 40, rifle: 55, mascara: 25, lanterna: 10, colete: 14, kit_fogueira: 3, ficha: 1,
 };
 export const PRECO_COMPRA = 1.35, PRECO_VENDA = 0.55;

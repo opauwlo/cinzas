@@ -1,13 +1,19 @@
 // Testes de lógica e de BALANÇO (rodam em Node, sem navegador): `npm run teste`.
 // Cada meta de dificuldade do jogo está aqui como número; se um ajuste quebrar o equilíbrio, o teste falha dizendo qual.
 import assert from 'node:assert/strict';
+import './shim-audio'; // precisa vir ANTES do zzfx
+import { ZZFX } from 'zzfx';
+import { PRE, NIVEL, TETO_PICO_DB, DUCK, PERFIS, PERFIS_ORDEM, catDe, loudnessDb, picoDb, normalizar, type Cat } from '../../game/dados/sons';
 import { ARQS } from '../../game/dados/criaturas';
 import { ARMAS, ITENS, RECEITAS } from '../../game/dados/itens';
 import { BIOMAS } from '../../game/dados/biomas';
 import { LOCAIS, custoViagem, bloqueioLocal } from '../../game/dados/locais';
 import { estadoInicial, novoRun } from '../../game/store';
 import { Rng } from '../../game/lib/rng';
-import { gerarZona } from '../../game/zona';
+import { gerarZona, W, H, T, idx } from '../../game/zona';
+import { COLHEITA, colheitaDe } from '../../game/dados/colheita';
+import { NOTAS } from '../../game/dados/notas';
+import { atracoes, distanciaAtracoes, lacunas } from '../../game/sistemas/cobertura';
 import { DIF, FOME_POR_MIN, SEDE_POR_MIN, REGEN_VIDA, RAID_DIA_MIN, VIDA_POR_NIVEL, danoPorAcao, acoesParaMatar, dpsInimigo, perdaEmLuta, segundosAteZerar, tamanhoRaid, xpNivel, xpAcumulado, nivelPorXp } from '../../game/dados/balanco';
 import { planejarNpcs, falaDe, estoqueMascate, vendavel, TIPOS_NPC, type CtxFala } from '../../game/dados/npcs';
 import { OBJETIVOS } from '../../game/dados/objetivos';
@@ -106,7 +112,8 @@ teste('ponto de reposição: dentro do anel, só em terreno válido, 60% atrás 
 
 // ================================================================ mundo: população e economia (zonas geradas por seed)
 const SEEDS = Array.from({ length: 10 }, (_, i) => `balanco${i}`), ZONAS = LOCAIS.filter(l => l.id !== 'base' && l.id !== 'abrigo7');
-const zonas = (id: string) => { const l = LOCAIS.find(x => x.id === id)!; return SEEDS.map(s => gerarZona(l.id, l.bioma, s, l.nome, l.tema)); };
+const cacheZonas = new Map<string, ReturnType<typeof gerarZona>[]>(); // gerar zona é o custo dos testes: cada local sai uma vez só
+const zonas = (id: string) => { let z = cacheZonas.get(id); if (!z) { const l = LOCAIS.find(x => x.id === id)!; z = SEEDS.map(s => gerarZona(l.id, l.bioma, s, l.nome, l.tema)); cacheZonas.set(id, z); } return z; };
 const ameaca = (z: ReturnType<typeof gerarZona>) => z.spawns.reduce((s, sp) => s + (ARQS[sp.arq].hostil ? Math.sqrt(ARQS[sp.arq].hp * dpsInimigo(sp.arq)) : 0), 0);
 const media = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
 teste('a ameaça das zonas cresce com o perigo (≥ 5% por degrau)', () => {
@@ -164,6 +171,61 @@ teste('receitas por nível: básicas no começo, armas fortes só no fim, e o ma
   assert.ok(por('r_pistola') > por('r_faca') && por('r_escopeta') >= por('r_pistola') && por('r_facao') > por('r_machado'), 'armas melhores abrem depois');
   const iM = OBJETIVOS.findIndex(o => o.id === 'machado'), xpAntes = OBJETIVOS.slice(0, iM).reduce((s, o) => s + o.xp, 0); assert.ok(xpAcumulado(por('r_machado')) <= xpAntes, 'o passo do machado pede uma receita que o nível ainda não liberou');
   const iF = OBJETIVOS.findIndex(o => o.id === 'fabricar'); assert.ok(RECEITAS.filter(r => (r.nivelJog ?? 1) === 1 && (r.nivel ?? 0) === 0).length >= 3 && iF < iM, 'o passo de fabricar precisa de receitas de nível 1');
+});
+
+// ================================================================ mundo cheio: nenhum lugar vazio, mais recursos e interações
+const andavelDe = (z: ReturnType<typeof gerarZona>) => (x: number, y: number) => { const tp = z.tipos[idx(x, y)]; return !z.solido[idx(x, y)] && tp !== T.PAREDE && tp !== T.JANELA && tp !== T.AGUA_FUNDA && tp !== T.RUINA && x > 2 && y > 2 && x < W - 3 && y < H - 3; };
+teste('nenhum lugar do mapa fica longe de algo para fazer: pior lacuna ≤ 18 tiles e 95% das células a ≤ 10 tiles', () => {
+  for (const l of ZONAS) for (const z of zonas(l.id)) { const r = lacunas(distanciaAtracoes(atracoes(z.props, z.flora, z.pois), W, H), W, H, andavelDe(z)); assert.ok(r.max <= 18, `${l.id}: há um ponto a ${r.max.toFixed(1)} tiles de qualquer coisa para fazer`); assert.ok(r.p95 <= 10, `${l.id}: 95% das células ficam a ${r.p95.toFixed(1)} tiles (limite 10)`); }
+});
+teste('os pontos de interesse têm de tudo um pouco: água, bilhetes, ferro-velho, saque e plantas colhíveis; e a geração segue determinística', () => {
+  const tot: Record<string, number> = { fonte: 0, nota: 0, garimpar: 0, saque: 0, colher: 0, poi: 0 };
+  for (const l of ZONAS) for (const z of zonas(l.id)) { for (const p of z.props) for (const i of p.inters) if (i.k in tot) tot[i.k]++; tot.colher += z.flora.filter(f => !!colheitaDe(f.rec)).length; tot.poi += z.pois.length; }
+  for (const k of Object.keys(tot)) assert.ok(tot[k] > 0, `nenhum ${k} em todas as zonas`);
+  const a = zonas('ermo')[0], b = zonas('ermo')[0]; assert.deepEqual(a.pois, b.pois); assert.equal(a.props.length, b.props.length);
+});
+teste('as peças do cenário nunca se sobrepõem e quase tudo o que há para fazer é alcançável a pé a partir da chegada', () => {
+  let total = 0, alcancavel = 0;
+  for (const l of ZONAS) for (const z of zonas(l.id)) {
+    const dono = new Set<number>(); for (const p of z.props) for (let j = p.y; j < p.y + p.h; j++) for (let i = p.x; i < p.x + p.w; i++) { assert.ok(!dono.has(idx(i, j)), `${l.id}: duas peças no mesmo tile (${i}, ${j})`); dono.add(idx(i, j)); }
+    const vis = new Uint8Array(W * H), fila: number[] = [idx(z.jogador.x, z.jogador.y)]; vis[fila[0]] = 1;
+    for (let k = 0; k < fila.length; k++) { const i = fila[k], x = i % W, y = (i / W) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const n = idx(nx, ny); if (!vis[n] && !z.solido[n]) { vis[n] = 1; fila.push(n); } } }
+    for (const p of z.props) { if (!p.inters.some(i => i.k !== 'jipe') && !p.loot?.length) continue; total++; let ok = false; for (let j = p.y - 1; j <= p.y + p.h && !ok; j++) for (let i = p.x - 1; i <= p.x + p.w; i++) if (i >= 0 && j >= 0 && i < W && j < H && vis[idx(i, j)]) { ok = true; break; } if (ok) alcancavel++; }
+  }
+  assert.ok(alcancavel / total >= 0.9, `só ${(alcancavel / total * 100).toFixed(0)}% dos objetos interativos são alcançáveis (mín. 90%)`);
+});
+teste('colheita: toda linha rende um item que existe, com chances válidas; arbustos vivos, cogumelos, flores e juncos rendem; arbusto seco não', () => {
+  for (const [k, c] of Object.entries(COLHEITA)) { assert.ok(c.dur > 0.5 && c.dur < 4 && c.xp >= 0 && c.rot.length > 5, k); assert.ok(c.rende.length >= 1, k); for (const [id, ch, a, b] of c.rende) { assert.ok(ITENS[id], `${k} rende "${id}" que não existe`); assert.ok(ch > 0 && ch <= 1 && a >= 1 && b >= a && b <= 3, `${k}: ${id}`); } }
+  assert.ok(colheitaDe({ f: 'arbusto', v: '' }) && colheitaDe({ f: 'cogumelo', v: 'brilho' }) && colheitaDe({ f: 'flor', v: '' }) && colheitaDe({ f: 'junco', v: '' })); assert.equal(colheitaDe({ f: 'arbusto', v: 'seco' }), undefined);
+  assert.ok(ITENS.erva.estanca && ITENS.erva.hp! > 0 && ITENS.baga.fome! > 0 && ITENS.cogumelo.rad! > 0, 'itens novos coerentes');
+});
+teste('bilhetes: pelo menos 12, únicos, com texto legível e brindes que existem', () => {
+  assert.ok(NOTAS.length >= 12); assert.equal(new Set(NOTAS.map(n => n.titulo)).size, NOTAS.length, 'título repetido');
+  for (const n of NOTAS) { assert.ok(n.titulo.length >= 6 && n.texto.length >= 40 && n.texto.length <= 320, n.titulo); if (n.premio) assert.ok(ITENS[n.premio[0]] && n.premio[1] >= 1, `brinde de "${n.titulo}"`); }
+});
+
+// ================================================================ som: volume sentido parelho e perfis de equalização
+teste('sons equalizados: cada som atinge o nível da sua categoria, sem estourar o teto de pico, e a hierarquia tiro > impacto > voz > coleta > passo > ambiente faz sentido', () => {
+  const por: Partial<Record<Cat, number[]>> = {}; let dentro = 0, total = 0;
+  for (const nome of Object.keys(PRE)) {
+    const niv: number[] = [], alvo = NIVEL[catDe(nome)];
+    for (let v = 0; v < 3; v++) {
+      const s = ZZFX.buildSamples(...(PRE[nome] as number[])); normalizar(s, nome); const pico = picoDb(s), l = loudnessDb(s);
+      assert.ok(pico <= TETO_PICO_DB + 0.05, `${nome}: pico ${pico.toFixed(1)} dBFS passa do teto`); assert.ok(l > -45, `${nome}: quase inaudível (${l.toFixed(1)} dB)`);
+      assert.ok(l <= alvo + 0.5 && l >= alvo - 6, `${nome}: ${l.toFixed(1)} dB longe do alvo ${alvo} (categoria ${catDe(nome)})`); niv.push(l); total++; if (Math.abs(l - alvo) <= 1) dentro++;
+    }
+    assert.ok(Math.max(...niv) - Math.min(...niv) <= 1.5, `${nome}: as 3 variações diferem ${(Math.max(...niv) - Math.min(...niv)).toFixed(1)} dB`); (por[catDe(nome)] ??= []).push(...niv);
+  }
+  assert.ok(dentro / total >= 0.8, `só ${(dentro / total * 100).toFixed(0)}% dos sons chegam a 1 dB do alvo`);
+  const med = (c: Cat) => { const a = por[c] ?? []; return a.reduce((s, x) => s + x, 0) / a.length; };
+  const ordem: Cat[] = ['tiro', 'impacto', 'voz', 'coleta', 'ui', 'passo', 'pontual']; for (let i = 1; i < ordem.length; i++) assert.ok(med(ordem[i - 1]) > med(ordem[i]) + 1, `${ordem[i - 1]} (${med(ordem[i - 1]).toFixed(1)}) deveria soar mais alto que ${ordem[i]} (${med(ordem[i]).toFixed(1)})`);
+  assert.ok(med('tiro') - med('passo') >= 8, 'o tiro precisa se destacar do passo em ≥ 8 dB');
+});
+teste('perfis de equalização: valores seguros; celular corta graves, fone os realça, noturno comprime mais; ducking só para tiro, Colosso, pancada e alarme', () => {
+  for (const k of PERFIS_ORDEM) { const p = PERFIS[k]; assert.ok(p.nome.length > 3 && p.desc.length > 15, k); entre(p.hp, 20, 200, k + ' passa-alta'); entre(p.grave[0], 60, 300, k + ' graves Hz'); entre(p.grave[1], -6, 6, k + ' graves dB'); entre(p.medio[0], 800, 5000, k + ' médios Hz'); entre(p.medio[1], -4, 4, k + ' médios dB'); entre(p.medio[2], 0.4, 2, k + ' Q'); entre(p.agudo[0], 4000, 12000, k + ' agudos Hz'); entre(p.agudo[1], -6, 2, k + ' agudos dB'); assert.ok(p.comp[0] <= -12 && p.comp[1] >= 2 && p.comp[1] <= 8 && p.comp[2] >= 6 && p.comp[2] <= 30, k + ' compressor'); entre(p.trim, 0.6, 1.3, k + ' ganho'); }
+  assert.ok(PERFIS.celular.hp >= 100 && PERFIS.celular.grave[1] < 0 && PERFIS.fone.grave[1] > 0 && PERFIS.noturno.comp[1] >= Math.max(PERFIS.equilibrado.comp[1], PERFIS.celular.comp[1], PERFIS.fone.comp[1]), 'identidade dos perfis');
+  assert.deepEqual(Object.keys(DUCK).sort(), ['alerta', 'colosso', 'impacto', 'tiro']); for (const [c, [db, s]] of Object.entries(DUCK) as [string, [number, number]][]) { entre(db, 2, 9, 'duck ' + c); entre(s, 0.05, 0.6, 'espera ' + c); }
+  assert.ok(!('passo' in DUCK) && !('ui' in DUCK) && !('pontual' in DUCK));
 });
 void DIF;
 

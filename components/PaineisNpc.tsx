@@ -6,6 +6,17 @@ import { sfx } from '../game/audio';
 import Ico from './Ico';
 import { Cartao, p } from './Cartao';
 
+/** Bilhete encontrado: história curta, às vezes com algo que estava junto. */
+export function PainelNota() {
+  const n = useJogo(s => s.nota); if (!n) return null;
+  return (
+    <Cartao titulo={n.titulo} larg={480}>
+      <div className="fala card aco degrau"><p>{n.texto}</p>{n.extra && <div className="msg">{n.extra}</div>}</div>
+      <button className="btn grande aviso" {...p(() => { sfx.ui('clique'); useJogo.setState({ painel: null, nota: null }); })}>Guardar na memória</button>
+    </Cartao>
+  );
+}
+
 /** Conversa e troca com NPCs. Preços sempre à vista (sem pegadinha). */
 export function PainelNpc() {
   const d = useJogo(s => s.dialogo); if (!d) return null;
