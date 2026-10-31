@@ -19,7 +19,7 @@
 
 ## Código (npm, em uso)
 
-Next.js, React, Phaser 4.2.1, simplex-noise, alea, zustand, ZzFX (MIT; usamos o `buildSamples` com barramentos de áudio próprios); rot-js (BSD-3-Clause, FOV e A*). Fontes via @fontsource: Silkscreen, VT323 (OFL). Ícones convertidos em pixel art em tempo de execução (`components/Ico.tsx`). Todo o resto da arte (personagens, criaturas, flora, props, paredes) é gerado por código próprio: a biblioteca procedural em `game/lib/` (voxel → sprite isométrico em 8 direções). `app/icon.svg` é o ícone radioactive (Lorc, CC BY 3.0); os ícones do PWA em `public/pwa/` são gerados dele por `tools/icones.mjs`.
+Next.js, React, Phaser 4.2.1, simplex-noise, alea, zustand, ZzFX (MIT; usamos o `buildSamples` com barramentos de áudio próprios); rot-js (BSD-3-Clause, FOV e A*). Fontes via @fontsource: Silkscreen, VT323 e Pixelify Sans (OFL). Ícones convertidos em pixel art em tempo de execução (`components/Ico.tsx`). Todo o resto da arte (personagens, criaturas, flora, props, paredes) é gerado por código próprio: a biblioteca procedural em `game/lib/` (voxel → sprite isométrico em 8 direções). `app/icon.svg` é o ícone radioactive (Lorc, CC BY 3.0); os ícones do PWA em `public/pwa/` são gerados dele por `tools/icones.mjs`.
 
 ## Código (a ser incluído — ver HANDOFF.md §5)
 

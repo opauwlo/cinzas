@@ -306,7 +306,7 @@ Pedido do Uwlo: pixel art grande em tamanho normal, visão isométrica como Proj
 Base (abrigo com cama, baú, bancada, fogão, horta, tanque de chuva) → jipe → mapa → viagem (gasta combustível e horas) → saque/combate/gangues/colosso → volta. Salva sozinho (continuar no menu). Vitória: rádio de campanha → Abrigo 7.
 
 ### Testes e ferramentas
-- `npm run build` e depois `npm run smoke`: 77 verificações em Chrome headless (menu, manifesto PWA, introdução, base, movimento, estações, interação bloqueada por parede, fabricar, cozinhar, baú, sono, melhorias, XP e habilidades, conquistas, combate, climas, viagem, evento de viagem, contratos, invasão, lançamento de suprimentos, locais temáticos, salvar/continuar, morte, Modo Estudo). ~4 min em GL por software. Capturas: `node tools/smoke.mjs <pasta>`.
+- `npm run build` e depois `npm run smoke`: 88 verificações em Chrome headless (menu, manifesto PWA, introdução, base, movimento, estações, interação bloqueada por parede, fabricar, cozinhar, baú, sono, melhorias, XP e habilidades, conquistas, combate, climas, viagem, evento de viagem, contratos, invasão, lançamento de suprimentos, locais temáticos, salvar/continuar, morte, Modo Estudo). ~4 min em GL por software. Capturas: `node tools/smoke.mjs <pasta>`.
 - Para depurar no console: `window.__cinzas` (`cena()`, `store`, `ponte`) e `cena().dev('lobo', 3, 0)` cria criatura perto do jogador.
 - `tools/icones.mjs` gera `public/pwa/*`. `tools/empacotar.mjs`/`entrada.tsx` (artifact em arquivo único) são **legado: não usar mais**.
 
@@ -359,4 +359,14 @@ Base (abrigo com cama, baú, bancada, fogão, horta, tanque de chuva) → jipe �
 ### Pendências / ideias
 - Combinar itens arrastando um sobre o outro (estilo RE4), roda de atalhos configurável, mais tamanhos/pilhas e arma/ícone próprios na grade.
 - Ajustar `ZONA_*` do stick (limites 0,3/0,46/0,76/0,9 em `Controles.tsx`) depois de testar no celular.
+
+## 18. Objetivos, coleta de recursos, fonte e espaçamento (31/out/2026)
+
+**Pedido do Uwlo:** melhorar objetivos, coleta de recursos, fonte e espaçamento.
+
+- **Objetivos** (`game/dados/objetivos.ts`, `game/sistemas/objetivos.ts`): campanha em 3 atos (12 objetivos) com progresso numérico (x/y) no rastreador e no Diário, **estrela no mapa** no local do objetivo, XP + itens, **banner "Objetivo cumprido"** e aviso do próximo. O sinal do rádio vale em qualquer ponto da campanha; a **Torre de Rádio sempre guarda um rádio** (`TEMAS.radio.garante`). Saves antigos recontam em silêncio (`Run.objVer`).
+- **Coleta de recursos:** **itens soltos no chão** (`game/lib/soltos.ts`, `Zona.soltos`, `Cena.atualizarSoltos`): gravetos, sucata, trapos, latas, ervas e placas por bioma; é só passar por cima. Persistem em `ZEstado.coletados` (voltam em 3 dias). Cada coleta cronometrada tem **ritmo**: a cada batida há som e partículas do material (`ticarAcao`: cortar, metal, água, poeira). Os rótulos dizem o **rendimento e o que falta** ("Cortar árvore (madeira ×3–5)" / "precisa de machado"). O que entra na mochila aparece como **texto flutuante** perto do personagem (`Cena.flutuar`) e conta em `st.col_<item>` (alimenta objetivos).
+- **Fonte:** Pixelify Sans (OFL) para texto e rótulos; Silkscreen só no logo e títulos (16/32/56 px, múltiplos da grade de 8); VT323 só em números do HUD. Sem texto abaixo de 12 px; botões em caixa baixa.
+- **Espaçamento:** escala 4/8/12/16/24 (`--sp1..5`), alvos de toque de 40–54 px, HUD com mais respiro, relógio que nunca encosta nos botões do canto. Camada de overrides no fim de `app/globals.css`.
+- Pendências: parênteses da Pixelify Sans parecem chaves (peculiaridade do glifo); fontes de água limpa (poços/cisternas) e mais tipos de nó de coleta (minério, ervas medicinais).
 

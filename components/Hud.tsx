@@ -55,7 +55,7 @@ export function Hud() {
   if (s.furtivo) moodles.push({ k: 'furt', icone: ic('skoll', 'footsteps'), n: 1 });
   const q = (id: string) => s.inv[id] ?? 0, comida = q('carne_cozida') + q('enlatado') + q('pao') + q('legume') + q('carne_crua'), agua = q('agua') + q('agua_suja'), cura = q('bandagem') + q('kit'), arma = s.arma ? ITENS[s.arma] : null, am = armaDe(s.arma);
   const lv = livres(s.grade, linhasDe(s.inv)), ctPronto = s.contratos.find(pronto), ct = ctPronto ?? s.contratos[0];
-  const hotRecente = useRecente(`${s.arma}|${agua}|${comida}|${cura}|${q('antirrad')}|${s.lanterna.ligada}`, 6000), trackerAberto = useRecente(`${s.objIdx}|${ct?.id ?? ''}|${ct ? progresso(ct) : 0}`), noiteH = h < 6 || h >= 20;
+  const hotRecente = useRecente(`${s.arma}|${agua}|${comida}|${cura}|${q('antirrad')}|${s.lanterna.ligada}`, 6000), trackerAberto = useRecente(`${s.objIdx}|${s.objVal}|${ct?.id ?? ''}|${ct ? progresso(ct) : 0}`), noiteH = h < 6 || h >= 20;
   const slots = [
     { urg: false, k: 'arma', ico: arma ? arma.icone : ic('lorc', 'bowie-knife'), n: am.alvo === 'tiro' ? (s.balas[am.municao ?? 'municao'] ?? 0) : -1, fn: () => ponte.cmd?.trocarArma(), cor: arma ? '#cfc7ae' : '#565c64', on: false, t: 'Q' },
     { urg: noiteH && s.lanterna.tem && !s.lanterna.ligada, k: 'lanterna', ico: ic('delapouite', 'flashlight'), n: s.lanterna.tem ? Math.round(s.lanterna.bat) : -1, fn: () => ponte.cmd?.lanterna(), cor: s.lanterna.ligada ? '#8fe36a' : s.lanterna.tem ? '#cfc7ae' : '#565c64', on: s.lanterna.ligada, t: 'F' },
@@ -73,7 +73,7 @@ export function Hud() {
       </div>
       <div className="moodles" style={{ top: `calc(${(s.rad > 1 || s.cpm > 60 ? 104 : 90) * s.cfg.ui}px + var(--st))` }}>{moodles.map(m => <div key={m.k} className={`moodle n${m.n} ${m.rad ? 'rad' : ''}`}><Ico src={m.icone} n={18} cor={m.n === 2 ? '#ff8a70' : m.rad ? '#8fe36a' : '#d99a2b'} /></div>)}</div>
       <div className="relogio vidro degrau"><div className="h">{horaStr(s.minutos)}</div><div className="s"><span>DIA {dia}</span><IcoClima tipo={s.clima.tipo} noite={noite} /><span>{NOME_CLIMA[s.clima.tipo]}</span></div></div>
-      <div className={`obj vidro degrau ${trackerAberto ? '' : 'min'}`} onPointerDown={e => { e.stopPropagation(); useJogo.setState({ painel: 'diario' }); }}><b><em>OBJ</em> {obj.titulo}</b><div className="seg" style={{ ['--p' as string]: pct(s.objProg * 100) }}><i /></div>{ct && <b className={`ct ${ctPronto ? 'ok' : ''}`}>◆ {ctPronto ? 'Contrato pronto: receba no abrigo' : `${ct.titulo} ${progresso(ct)}/${ct.qtd}`}</b>}</div>
+      <div className={`obj vidro degrau ${trackerAberto ? '' : 'min'}`} onPointerDown={e => { e.stopPropagation(); useJogo.setState({ painel: 'diario' }); }}><b><em>OBJ</em> {obj.titulo}{obj.meta > 1 && <span className="cnt"> {Math.min(s.objVal, obj.meta)}/{obj.meta}</span>}</b><div className="seg" style={{ ['--p' as string]: pct(obj.meta > 1 ? (s.objVal / obj.meta) * 100 : s.objVal >= obj.meta ? 100 : 5) }}><i /></div>{ct && <b className={`ct ${ctPronto ? 'ok' : ''}`}>◆ {ctPronto ? 'Contrato pronto: receba no abrigo' : `${ct.titulo} ${progresso(ct)}/${ct.qtd}`}</b>}</div>
       <div className="topo-dir">
         {s.pontos > 0 && <button className="btn qbtn pisca" aria-label="Habilidades" {...press(() => useJogo.setState({ painel: 'perk' }))}><b style={{ font: "700 13px var(--f-ui)", color: 'var(--fosf)' }}>★{s.pontos}</b></button>}
         <button className="btn qbtn" aria-label="Mapa da zona" {...press(() => useJogo.setState({ painel: 'mapaZona' }))}><Ico src={ic('lorc', 'radar-sweep')} n={22} /></button>
@@ -81,6 +81,7 @@ export function Hud() {
         <button className="btn qbtn" aria-label="Pausa" {...press(() => useJogo.setState({ painel: 'pausa' }))}><svg width="14" height="14" viewBox="0 0 8 8" shapeRendering="crispEdges"><rect x="1" y="0" width="2" height="8" fill="#cfc7ae" /><rect x="5" y="0" width="2" height="8" fill="#cfc7ae" /></svg></button>
       </div>
       {s.seta && s.painel === null && <Seta dx={s.seta.dx} dy={s.seta.dy} d={s.seta.d} />}
+      {s.banner && <div key={s.banner.id} className="banner"><b>{s.banner.titulo.toUpperCase()}</b><strong>{s.banner.sub}</strong>{s.banner.extra && <small>{s.banner.extra}</small>}</div>}
       <div className="toasts">{s.toasts.map(t => <div key={t.id} className="toast" style={{ color: t.cor }}>{t.texto}</div>)}</div>
       {s.acao && <div className="acao"><div className="r">{s.acao.rotulo}</div><div className="seg" style={{ ['--p' as string]: pct(s.acao.p * 100) }}><i /></div></div>}
       {s.dica && <div className="dica">{s.dica}</div>}

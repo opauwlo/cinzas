@@ -22,7 +22,7 @@ export default function Jogo() {
   useEffect(() => { const c = lerCfg(); set({ cfg: c, temSave: temRun() }); aplicarVolumes({ mestre: c.mestre, sfx: c.sfx, amb: c.amb, mus: c.mus, vibra: c.vibra }); }, [set]);
   const iniciar = async (nova: boolean) => {
     void iniciarAudio();
-    try { await Promise.all(['700 16px Silkscreen', '400 18px VT323'].map(f => document.fonts.load(f))); } catch { /* segue */ }
+    try { await Promise.all(['700 16px Silkscreen', '400 18px VT323', '400 16px "Pixelify Sans"', '600 16px "Pixelify Sans"'].map(f => document.fonts.load(f))); } catch { /* segue */ }
     const meta = registrarDia(); let run = nova ? null : lerRun(); if (!run) run = novoRun(hoje(), meta.sequencia >= 3, lerMeta().dif ?? 1);
     runRef.current = run; aplicarRun(run); sincGrade(); set({ tela: 'jogo', painel: null, carga: 0 }); setCorrida(c => c + 1);
   };

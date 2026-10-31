@@ -23,15 +23,24 @@ const toast = (t: string, cor?: string) => st().toast(t, cor);
 export function cabe(id: string, qtd = 1) { return cabeNaMochila(id, qtd); }
 export function dar(c: Cena, id: string, qtd = 1, quieto = false): boolean {
   const it = ITENS[id]; if (!it) return false;
-  if (it.tipo === 'municao') { c.s.balas[it.municaoTipo!] = (c.s.balas[it.municaoTipo!] ?? 0) + it.balas! * qtd; if (!quieto) toast(`+ ${it.nome}`, COR_RARIDADE[it.raridade]); return true; }
+  if (it.tipo === 'municao') { c.s.balas[it.municaoTipo!] = (c.s.balas[it.municaoTipo!] ?? 0) + it.balas! * qtd; if (!quieto) c.flutuar(`+ ${it.nome}`, COR_RARIDADE[it.raridade]); return true; }
   if (!cabe(id, qtd)) { toast('Mochila cheia', '#c9561f'); return false; }
-  const inv = { ...st().inv }; inv[id] = (inv[id] ?? 0) + qtd; useJogo.setState({ inv, grade: emGrade(id) ? adicionar(st().grade, linhasDe(inv), id, qtd).g : st().grade }); if (id === 'lanterna') c.s.lanterna.tem = true; if (!quieto) toast(`+ ${it.nome}${qtd > 1 ? ' x' + qtd : ''}`, COR_RARIDADE[it.raridade]); return true;
+  const inv = { ...st().inv }; inv[id] = (inv[id] ?? 0) + qtd; useJogo.setState({ inv, grade: emGrade(id) ? adicionar(st().grade, linhasDe(inv), id, qtd).g : st().grade }); if (id === 'lanterna') c.s.lanterna.tem = true; if (!quieto) c.flutuar(`+${qtd > 1 ? qtd + ' ' : ''}${it.nome}`, COR_RARIDADE[it.raridade]); registrar(c, 'col_' + id, qtd); return true;
 }
 export function tirar(id: string, qtd = 1): boolean { const inv = { ...st().inv }; if ((inv[id] ?? 0) < qtd) return false; inv[id] -= qtd; if (inv[id] <= 0) delete inv[id]; useJogo.setState({ inv, grade: emGrade(id) ? remover(st().grade, id, qtd) : st().grade }); return true; }
 const tem = (id: string, q = 1) => (st().inv[id] ?? 0) >= q;
 const temFerr = () => FERR.some(f => tem(f));
 const ri = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
-export function iniciarAcao(c: Cena, rot: string, dur: number, fim: () => void, ruido?: number) { if (c.acao || c.morto) return; c.acao = { rotulo: rot, dur, t: 0, fim, ruido }; sfx.saque(); }
+export function iniciarAcao(c: Cena, rot: string, dur: number, fim: () => void, ruido?: number, tipo = 'vasculhar') { if (c.acao || c.morto) return; c.acao = { rotulo: rot, dur, t: 0, fim, ruido, tipo, tk: 0, x: c.alvoInter?.x ?? c.jog.x, y: c.alvoInter?.y ?? c.jog.y }; sfx.saque(); }
+/** ritmo da coleta: a cada batida, som + partículas do material (madeira, metal, água, poeira) */
+export function ticarAcao(c: Cena, dt: number) {
+  const a = c.acao; if (!a?.tipo) return; a.tk = (a.tk ?? 0) + dt; if (a.tk < (a.tipo === 'cortar' ? 0.45 : a.tipo === 'metal' ? 0.4 : 0.55)) return; a.tk = 0;
+  const [sx, sy] = proj(a.x ?? c.jog.x, a.y ?? c.jog.y, 14);
+  if (a.tipo === 'cortar') { sfx.golpe(); c.part.emitir(5, sx, sy, 10, { vz: 26, esp: 36, g: 190, vida: 0.5, cor: [0x8a6a3a, 0xa88a5a, 0x6a4e28] }); c.cameras.main.shake(60, 0.0025); }
+  else if (a.tipo === 'metal') { sfx.acerto(false); c.part.faisca(sx, sy, 10, 5); c.cameras.main.shake(50, 0.002); }
+  else if (a.tipo === 'agua') { sfx.beber(); c.part.emitir(3, sx, sy, 6, { vz: 16, esp: 14, g: 120, vida: 0.4, cor: [0x6fa6d6, 0x9ac0c8] }); }
+  else { sfx.saque(); c.part.poeira(sx, sy, 3); }
+}
 const painel = (p: 'bau' | 'craft' | 'cozinha' | 'dormir' | 'mapa') => { sfx.ui('abrir'); useJogo.setState({ painel: p }); };
 
 // ---------------------------------------------------------------- interativos do mundo
@@ -43,7 +52,7 @@ export function montarInterativos(c: Cena) {
       let v: Interativo | null = null;
       switch (it.k) {
         case 'saque': v = { x: cx, y: cy, r, rot: it.rot, dur: it.dur, ruido: it.ruido, alt, ok: () => !it.feito && (p.loot?.length ?? 0) > 0, exec: () => iniciarAcao(c, it.rot.replace('Vasculhar', 'Vasculhando'), it.dur * (pk(c.s, 'catador') ? 0.7 : 1), () => concluirSaque(c, p, it), it.ruido) }; break;
-        case 'desmontar': v = { x: cx, y: cy, r, rot: it.rot, dur: it.dur, ruido: it.ruido, alt, ok: () => !it.feito && !(it.rot.includes('porta-malas')), exec: () => { if (!temFerr()) { toast('Precisa de uma ferramenta: pé de cabra, machado…', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Desmontando carro', it.dur, () => { it.feito = true; c.ze.desmontados.push(p.id); const n = ri(3, 5); dar(c, 'sucata', n); if (Math.random() < 0.4) dar(c, 'bateria'); if (Math.random() < 0.25) dar(c, 'combustivel'); acharPs(c, p)?.spr.setTint(0x555555); sfx.achado(); }, it.ruido); } }; break;
+        case 'desmontar': v = { x: cx, y: cy, r, get rot() { return temFerr() ? 'Desmontar carro (sucata ×3–5)' : 'Desmontar carro — precisa de ferramenta'; }, dur: it.dur, ruido: it.ruido, alt, ok: () => !it.feito && !(it.rot.includes('porta-malas')), exec: () => { if (!temFerr()) { toast('Precisa de uma ferramenta: pé de cabra, machado…', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Desmontando carro', it.dur, () => { it.feito = true; c.ze.desmontados.push(p.id); const n = ri(3, 5); dar(c, 'sucata', n); if (Math.random() < 0.4) dar(c, 'bateria'); if (Math.random() < 0.25) dar(c, 'combustivel'); acharPs(c, p)?.spr.setTint(0x555555); sfx.achado(); }, it.ruido, 'metal'); } }; break;
         case 'rasgar': v = { x: cx, y: cy, r, rot: it.rot, dur: it.dur, alt, ok: () => !it.feito, exec: () => iniciarAcao(c, 'Rasgando', it.dur, () => { it.feito = true; c.ze.rasgados.push(p.id); dar(c, 'tecido', ri(2, 3)); sfx.achado(); }, 3) }; break;
         case 'bau': v = { x: cx, y: cy, r, rot: it.rot, dur: 0, alt, ok: () => true, exec: () => painel('bau') }; break;
         case 'bancada': v = { x: cx, y: cy, r, rot: it.rot, dur: 0, alt, ok: () => true, exec: () => painel('craft') }; break;
@@ -56,7 +65,7 @@ export function montarInterativos(c: Cena) {
       if (v) { v.pegada = [p.x, p.y, p.w, p.h]; c.interativos.push(v); }
     }
   }
-  for (const fl of c.floras) if (fl.f.cortavel) { const f = fl.f; c.interativos.push({ x: f.x, y: f.y, r: 1.5, rot: 'Cortar árvore', dur: 3.2, ruido: 8, alt: 52, pegada: [Math.floor(f.x), Math.floor(f.y), 1, 1], ok: () => !f.cortada, exec: () => { const mach = st().inv.machado || c.s.arma === 'machado'; if (!mach) { toast('Precisa de um machado.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Cortando árvore', 3.2, () => { f.cortada = true; c.ze.cortadas.push(f.id); const i = idx(Math.floor(f.x), Math.floor(f.y)); f.solido = false; c.zona.solido[i] = 0; c.setQ(fl.spr, c.est(c.recToco)); dar(c, 'madeira', ri(3, 5)); sfx.achado(); c.cameras.main.shake(120, 0.004); }, 8); } }); }
+  for (const fl of c.floras) if (fl.f.cortavel) { const f = fl.f; c.interativos.push({ x: f.x, y: f.y, r: 1.5, get rot() { return (st().inv.machado || c.s.arma === 'machado') ? 'Cortar árvore (madeira ×3–5)' : 'Cortar árvore — precisa de machado'; }, dur: 3.2, ruido: 8, alt: 52, pegada: [Math.floor(f.x), Math.floor(f.y), 1, 1], ok: () => !f.cortada, exec: () => { const mach = st().inv.machado || c.s.arma === 'machado'; if (!mach) { toast('Precisa de um machado.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Cortando árvore', 3.2, () => { f.cortada = true; c.ze.cortadas.push(f.id); const i = idx(Math.floor(f.x), Math.floor(f.y)); f.solido = false; c.zona.solido[i] = 0; c.setQ(fl.spr, c.est(c.recToco)); dar(c, 'madeira', ri(3, 5)); sfx.achado(); c.cameras.main.shake(120, 0.004); }, 8, 'cortar'); } }); }
 }
 const acharPs = (c: Cena, p: Prop) => c.props.find(x => x.p === p);
 function concluirSaque(c: Cena, p: Prop, it: { feito?: boolean }) {
@@ -72,7 +81,7 @@ export function mostrarCadaver(c: Cena, e: Ent) {
   c.interativos.push({ x: e.x, y: e.y, r: 1.4, rot, dur: 1.8, alt: 8, ok: () => !e.cadaver, exec: () => { if (animal && !tem('faca') && !tem('facao') && !tem('machado')) { toast('Precisa de uma faca para esfolar.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, animal ? 'Esfolando' : 'Revistando', 1.8, () => { e.cadaver = true; let n = 0; for (const [id, ch, a, b] of e.arq.drops) if (Math.random() < ch) { dar(c, id, ri(a, b) * (pk(c.s, 'cacador') && id === 'carne_crua' ? 2 : 1)); n++; } if (!n) toast('Nada de útil.', '#8a8573'); else sfx.achado(); }); } });
 }
 export function aguaInter(c: Cena): Interativo | null {
-  const J = c.jog; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = Math.floor(J.x) + dx, y = Math.floor(J.y) + dy; if (c.tipoEm(x, y) === T.AGUA_RASA && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) < 1.7) return { x: x + 0.5, y: y + 0.5, r: 1.8, rot: 'Coletar água', dur: 1.5, alt: 4, ok: () => true, exec: () => { if (!tem('garrafa')) { toast('Precisa de uma garrafa vazia.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Coletando água', 1.5, () => { if (tirar('garrafa')) dar(c, 'agua_suja', 1); sfx.beber(); }); } }; }
+  const J = c.jog; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = Math.floor(J.x) + dx, y = Math.floor(J.y) + dy; if (c.tipoEm(x, y) === T.AGUA_RASA && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) < 1.7) return { x: x + 0.5, y: y + 0.5, r: 1.8, get rot() { return tem('garrafa') ? 'Coletar água (turva)' : 'Coletar água — precisa de garrafa vazia'; }, dur: 1.5, alt: 4, ok: () => true, exec: () => { if (!tem('garrafa')) { toast('Precisa de uma garrafa vazia.', '#d9a02b'); sfx.ui('erro'); return; } iniciarAcao(c, 'Coletando água', 1.5, () => { if (tirar('garrafa')) dar(c, 'agua_suja', 1); sfx.beber(); }, undefined, 'agua'); } }; }
   return null;
 }
 
@@ -187,7 +196,7 @@ export function instalarComandos(c: Cena) {
     pausar: p => { try { if (!c.sys?.isActive() && !c.sys?.isPaused()) return; if (p) c.scene.pause(); else c.scene.resume(); } catch { /* cena já destruída */ } },
     tocarMundo: (x, y) => {
       const cam = c.cameras.main, wx = cam.scrollX + x / c.esc, wy = cam.scrollY + y / c.esc;
-      for (const it of c.interativos) { if (!it.ok()) continue; const d = Math.hypot(it.x - c.jog.x, it.y - c.jog.y); if (d > it.r || !c.alcancavel(it)) continue; const [sx, sy] = proj(it.x, it.y, (it.alt ?? 30) * 0.5); if (Math.hypot(sx - wx, sy - wy) < 44 / c.esc) { it.exec(); return true; } }
+      for (const it of c.interativos) { if (!it.ok()) continue; const d = Math.hypot(it.x - c.jog.x, it.y - c.jog.y); if (d > it.r || !c.alcancavel(it)) continue; const [sx, sy] = proj(it.x, it.y, (it.alt ?? 30) * 0.5); if (Math.hypot(sx - wx, sy - wy) < 44 / c.esc) { c.alvoInter = it; it.exec(); return true; } }
       return false;
     },
     craft: id => {

@@ -167,3 +167,54 @@ img { -webkit-user-drag: none; }
 .cc-topo { display: grid; grid-template-columns: 38px 1fr; gap: 8px; align-items: center; } .cc-topo .im { width: 36px; height: 36px; display: grid; place-items: center; background: #050506; box-shadow: inset 0 0 0 2px var(--rc); } .cc-topo b { font: 700 11px var(--f-ui); color: var(--rc); display: block; line-height: 1.2; } .cc-topo small { display: block; font: 16px var(--f-hud); color: var(--osso2); }
 .pips { display: flex; gap: 4px; flex-wrap: wrap; } .pip { display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px; background: #050506; font: 16px var(--f-hud); color: var(--osso2); } .pip.ok { color: var(--fosf); } .pip.falta { color: var(--sangue2); }
 @media (max-width: 340px) { .cartoes-craft { grid-template-columns: 1fr; } }
+
+/* ================= TIPOGRAFIA E ESPAÇAMENTO (revisão de legibilidade e respiro) =================
+   Silkscreen só em logo e títulos (tamanhos que respeitam a grade de 8 px); Pixelify Sans para texto e rótulos (legível a 14–18 px);
+   VT323 só para números do HUD. Escala de espaço 4/8/12/16/24 e alvos de toque de 40–54 px. */
+:root { --f-txt: 'Pixelify Sans', 'VT323', monospace; --sp1: 4px; --sp2: 8px; --sp3: 12px; --sp4: 16px; --sp5: 24px; }
+body { font-family: var(--f-txt); font-size: 16px; line-height: 1.35; }
+.mini { font: 400 16px/1.42 var(--f-txt); } .mini b { font-weight: 700; }
+.sub { font: 400 15px var(--f-txt); letter-spacing: .22em; margin: var(--sp2) 0 var(--sp4); }
+.lista { font: 400 16px/1.45 var(--f-txt); } .manip p, .quase p { font-family: var(--f-txt); font-size: 16px; line-height: 1.4; }
+.linha-item small { font: 400 14px/1.35 var(--f-txt); margin-top: 2px; } .detalhe .dh small, .cc-topo small, .eq small { font: 400 14px/1.35 var(--f-txt); }
+.chip, .pip { font: 400 14px/1.5 var(--f-txt); padding: 0 var(--sp2); } .pip { padding: 1px 6px; }
+.peca .q { font: 600 15px var(--f-txt); }
+.btn { font: 600 15px var(--f-txt); letter-spacing: .03em; text-transform: none; height: 46px; padding: 0 var(--sp4); gap: var(--sp2); }
+.btn.grande { height: 54px; font-size: 18px; } .btn.peq { height: 40px; font-size: 14px; padding: 0 var(--sp3); }
+.aba { height: 40px; font-size: 14px; padding: 0 var(--sp3); }
+.cartao > h2 { font: 700 16px var(--f-ui); letter-spacing: .08em; } .card h3 { font: 700 13px var(--f-txt); letter-spacing: .12em; margin: 0 0 var(--sp2); }
+.linha-item b { font: 600 15px/1.25 var(--f-txt); letter-spacing: .01em; } .craft-card b, .cc-topo b { font: 600 14px/1.25 var(--f-txt); letter-spacing: 0; }
+.stat span { font: 600 12px var(--f-txt); letter-spacing: .1em; } .stat b { font-size: 36px; }
+.slider, .troca { font: 600 14px var(--f-txt); letter-spacing: .02em; text-transform: none; } .slider { grid-template-columns: 112px 1fr 40px; } .slider output { font: 20px var(--f-hud); }
+.eq b { font: 600 13px var(--f-txt); letter-spacing: 0; } .link { font: 600 14px var(--f-txt); }
+.titulo { font-size: 56px; } .titulo.m { font-size: 32px; }
+/* respiro */
+.cartao { gap: var(--sp3); padding: var(--sp3) var(--sp4); } .cartao .corpo { gap: var(--sp3); } .card { padding: var(--sp3) var(--sp4); } .col { gap: var(--sp3); }
+.linha-item { gap: var(--sp3); padding: var(--sp2) var(--sp3); } .grade { gap: var(--sp2); } .stat { padding: var(--sp3); } .chips { gap: var(--sp1) var(--sp2); margin-top: var(--sp1); } .abas { gap: var(--sp2); }
+.cartoes-craft { gap: var(--sp3); } .craft-card { padding: var(--sp3); gap: var(--sp2); } .equipado { gap: var(--sp2); } .eq { padding: var(--sp2); } .detalhe .bt2 { gap: var(--sp2); margin-top: var(--sp3); } .duas { gap: var(--sp3); } .duas .linha-item b { font-size: 13px; }
+/* HUD */
+.vitais { padding: 7px 9px; gap: 5px; width: calc(124px * var(--u)); } .vrow { gap: 6px; } .vrow b { font: calc(20px * var(--u)) var(--f-hud); }
+.relogio { padding: 4px 14px 5px; gap: 3px; left: calc(142px * var(--u) + var(--sl)); } .relogio .h { font-size: calc(28px * var(--u)); } .relogio .s { font: 600 calc(11px * var(--u)) var(--f-txt); letter-spacing: .08em; }
+.obj { padding: 5px 10px 6px; gap: 5px; left: calc(142px * var(--u) + var(--sl)); top: calc(56px * var(--u) + var(--st)); } .obj b { font: 600 calc(15px * var(--u))/1.25 var(--f-txt); } .obj b em { font-weight: 700; letter-spacing: .08em; margin-right: 4px; } .obj b.ct { font-size: calc(14px * var(--u)); }
+.moodles { gap: 6px; } .toasts { gap: 6px; } .toast { font: 600 calc(15px * var(--u))/1.3 var(--f-txt); padding: 5px 12px 6px 9px; }
+.dica { font: 400 calc(15px * var(--u))/1.4 var(--f-txt); padding: 8px 12px; } .inter .rot { font: 600 calc(15px * var(--u)) var(--f-txt); padding: 4px 10px 5px; }
+.acao .r { font: 600 calc(13px * var(--u)) var(--f-txt); letter-spacing: .04em; text-transform: none; } .xpl { font: 600 calc(10px * var(--u)) var(--f-txt); }
+.hotbar { gap: calc(6px * var(--u)); padding: 6px; } .slot { width: calc(46px * var(--u)); height: calc(46px * var(--u)); } .slot .k { font-size: calc(12px * var(--u)); }
+.seta b { font: 600 15px var(--f-txt); } .carga-d { font: 400 16px/1.4 var(--f-txt); } .carga-s { font: 400 16px var(--f-txt); }
+/* banner de objetivo cumprido */
+.banner { position: absolute; left: 50%; top: calc(30% + var(--st)); transform: translateX(-50%); z-index: 12; text-align: center; pointer-events: none; animation: banner 3s steps(14) forwards; padding: var(--sp3) var(--sp5); background: rgba(5,5,6,.82); box-shadow: inset 0 0 0 2px #050506, inset 0 0 0 4px var(--fosf); }
+.banner b { display: block; font: 700 16px var(--f-ui); letter-spacing: .16em; color: var(--fosf); } .banner strong { display: block; font: 600 calc(24px * var(--u))/1.2 var(--f-txt); color: var(--osso); margin: var(--sp1) 0; } .banner small { display: block; font: 400 calc(16px * var(--u)) var(--f-txt); color: var(--ambar); }
+@keyframes banner { 0% { opacity: 0; transform: translateX(-50%) scale(.8); } 10% { opacity: 1; transform: translateX(-50%) scale(1.04); } 14% { transform: translateX(-50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+.ato { font: 700 13px var(--f-txt); letter-spacing: .14em; color: var(--aviso2); margin-top: var(--sp2); }
+@media (prefers-reduced-motion: reduce) { .banner { animation: none; } }
+
+.obj b .cnt { color: var(--ambar); font-weight: 700; }
+.obj-linha { display: grid; grid-template-columns: 22px 1fr; gap: var(--sp2); padding: var(--sp2) 0; border-top: 1px solid #0d0e10; } .obj-linha .mk { font: 700 15px var(--f-txt); color: var(--a4); }
+.obj-linha b { font: 600 15px/1.3 var(--f-txt); color: var(--osso2); } .obj-linha.ok .mk, .obj-linha.ok b { color: var(--fosf); } .obj-linha.atual { background: rgba(240,154,80,.07); padding-left: var(--sp2); margin-left: calc(var(--sp2) * -1); } .obj-linha.atual b { color: var(--osso); } .obj-linha.atual .mk { color: var(--aviso2); }
+.estrela { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font: 700 20px var(--f-txt); color: var(--ambar); text-shadow: 0 2px 0 #000; animation: pisca 1s steps(2, jump-none) infinite; pointer-events: none; }
+
+/* ajuste fino: relógio nunca encosta nos botões do canto; legendas da maleta cabem */
+.relogio { min-width: 0; padding: 4px 10px 5px; max-width: calc(100vw - (142px * var(--u)) - 142px); } .relogio .h { font-size: calc(26px * var(--u)); }
+.relogio .s { gap: 5px; min-width: 0; } .relogio .s span:last-child { max-width: calc(78px * var(--u)); overflow: hidden; text-overflow: ellipsis; }
+.eq small { font-size: 13px; }
+.relogio .s { font-size: calc(10px * var(--u)); letter-spacing: .02em; } .relogio .s span:last-child { max-width: calc(92px * var(--u)); }

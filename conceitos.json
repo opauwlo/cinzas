@@ -129,6 +129,21 @@
       "id": 26,
       "nome": "Mochila em grade com encaixe, giro e baú de excesso",
       "nota": "O espaço (células) substitui o peso: peças de tamanhos diferentes, arrastar, girar, organizar; o que não cabe vai ao baú e nunca some."
+    },
+    {
+      "id": 27,
+      "nome": "Campanha em 3 atos com progresso numérico, local marcado e recompensa",
+      "nota": "Cada objetivo ensina uma parte do jogo, mostra x/y no rastreador, aponta o local com estrela no mapa e paga XP/itens com banner de conclusão."
+    },
+    {
+      "id": 28,
+      "nome": "Itens soltos no chão coletados ao passar por cima",
+      "nota": "Gravetos, sucata, trapos, latas e ervas gerados por bioma e seed; persistem como coletados e voltam em 3 dias."
+    },
+    {
+      "id": 29,
+      "nome": "Ritmo e rendimento visíveis na coleta",
+      "nota": "Rótulos dizem o que a fonte rende e o que falta (ex.: 'Cortar árvore (madeira ×3–5)' / 'precisa de machado'); cada batida tem som e partículas do material."
     }
   ],
   "adaptados": [
@@ -203,6 +218,10 @@
     {
       "nome": "Maleta em grade e cartões de fabricação",
       "origem": "referência de design: inventário do Resident Evil 4; implementação e arte próprias"
+    },
+    {
+      "nome": "Fonte de texto Pixelify Sans",
+      "origem": "@fontsource/pixelify-sans (OFL-1.1)"
     }
   ]
 }

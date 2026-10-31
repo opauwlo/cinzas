@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useJogo, OBJETIVOS, lerMeta, gravarMeta } from '../game/store';
+import { useJogo, OBJETIVOS, ATOS, lerMeta, gravarMeta } from '../game/store';
 import { ITENS } from '../game/dados/itens';
 import { localPorId } from '../game/dados/locais';
 import { PERKS, CONQUISTAS, MELHORIAS, PASSOS_INTRO, perkPorId } from '../game/dados/meta';
@@ -23,7 +23,9 @@ export function Diario() {
     <Cartao titulo="Diário">
       <div className="abas">{abas.map(([k, n]) => <button key={k} className={`btn aba ${aba === k ? 'on' : ''}`} {...p(() => { setAba(k); sfx.ui('clique'); })}>{n}</button>)}</div>
       {aba === 'obj' && <>
-        <div className="card aco"><h3>Objetivos</h3>{OBJETIVOS.map((o, i) => <div key={o.titulo} className="mini" style={{ color: i < s.objIdx ? 'var(--fosf)' : i === s.objIdx ? 'var(--osso)' : 'var(--a4)' }}>{i < s.objIdx ? '[x]' : i === s.objIdx ? '[>]' : '[ ]'} {o.titulo}{i === s.objIdx ? ` — ${o.dica}` : ''}</div>)}</div>
+        <div className="card aco"><h3>Campanha</h3>{([1, 2, 3] as const).map(ato => <div key={ato}><div className="ato">{ATOS[ato]}</div>{OBJETIVOS.map((o, i) => { if (o.ato !== ato) return null; const feito = i < s.objIdx, atual = i === s.objIdx; return (
+          <div key={o.id} className={`obj-linha ${feito ? 'ok' : atual ? 'atual' : ''}`}><span className="mk">{feito ? '✔' : atual ? '▶' : '○'}</span><div><b>{o.titulo}{atual && o.meta > 1 ? ` · ${Math.min(s.objVal, o.meta)}/${o.meta}` : ''}</b>
+            {atual && <><div className="mini">{o.dica}</div>{o.meta > 1 && <div className="seg" style={{ ['--p' as string]: pct((s.objVal / o.meta) * 100) }}><i /></div>}<div className="chips">{o.local && <span className="chip ok">★ {localPorId(o.local).nome}</span>}<span className="chip">+{o.xp} XP</span></div></>}</div></div>); })}</div>)}</div>
         <div className="grade"><div className="stat"><b>{dia}</b><span>dia</span></div><div className="stat"><b>{s.abates}</b><span>abates</span></div><div className="stat"><b>{s.vasculhados}</b><span>saques</span></div><div className="stat"><b>{s.combustivel}</b><span>combustível</span></div></div>
         <div className="card aco mini">Locais conhecidos: <b>{s.descobertos.map(d => localPorId(d).nome).join(', ')}</b> · Dificuldade: <b>{DIF_NOMES[s.dif]}</b></div>
       </>}

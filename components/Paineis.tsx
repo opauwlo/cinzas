@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useJogo, horaStr, gravarCfg, type Configs } from '../game/store';
+import { useJogo, horaStr, gravarCfg, OBJETIVOS, type Configs } from '../game/store';
 import { ITENS, RECEITAS, COZINHA, COR_RARIDADE, armaDe } from '../game/dados/itens';
 import { LOCAIS, localPorId, custoViagem } from '../game/dados/locais';
 import { BIOMAS } from '../game/dados/biomas';
@@ -67,7 +67,7 @@ function Mapa() {
     g.putImageData(img, 0, 0); g.fillStyle = '#6a604c';
     const base = LOCAIS[0]; for (const l of LOCAIS.slice(1)) { const n = Math.ceil(Math.hypot(l.x - base.x, l.y - base.y)); for (let i = 0; i < n; i += 2) g.fillRect(Math.round(base.x + (l.x - base.x) * i / n), Math.round(base.y + (l.y - base.y) * i / n), 1, 1); }
   }, []);
-  const dest = localPorId(sel), custo = custoViagem(s.zonaId, sel, s.perks.includes('mecanico')), travado = !!dest.requer && !(s.inv[dest.requer] ?? 0), sem = s.combustivel < custo.combustivel, aqui = sel === s.zonaId;
+  const alvoObj = OBJETIVOS[Math.min(s.objIdx, OBJETIVOS.length - 1)].local, dest = localPorId(sel), custo = custoViagem(s.zonaId, sel, s.perks.includes('mecanico')), travado = !!dest.requer && !(s.inv[dest.requer] ?? 0), sem = s.combustivel < custo.combustivel, aqui = sel === s.zonaId;
   return (
     <Cartao titulo="Mapa" larg={560} rodape={
       <div className="card aco degrau" style={{ display: 'grid', gap: 6 }}>
@@ -80,7 +80,7 @@ function Mapa() {
         <canvas ref={ref} width={100} height={100} className="mapamundi" />
         {LOCAIS.filter(l => l.id !== 'abrigo7' || s.sabeAbrigo || (s.inv.radio ?? 0) > 0).map(l => (
           <button key={l.id} className="btn" aria-label={l.nome} {...p(() => { setSel(l.id); sfx.ui('clique'); })} style={{ position: 'absolute', left: `${l.x}%`, top: `${l.y}%`, transform: 'translate(-50%,-50%)', width: 34, height: 34, padding: 0, boxShadow: l.id === sel ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #f09a50' : l.id === s.zonaId ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #8fe36a' : undefined }}>
-            <span style={{ width: 14, height: 14, background: COR_BIOMA[l.bioma], boxShadow: '0 0 0 2px #050506' }} />
+            {l.id === alvoObj && <span className="estrela">★</span>}<span style={{ width: 14, height: 14, background: COR_BIOMA[l.bioma], boxShadow: '0 0 0 2px #050506' }} />
             <span style={{ position: 'absolute', top: 36, left: '50%', transform: 'translateX(-50%)', font: '17px var(--f-hud)', color: l.id === s.zonaId ? '#8fe36a' : '#cfc7ae', whiteSpace: 'nowrap', textShadow: '0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000' }}>{l.id === s.zonaId ? '▸ ' : ''}{l.nome}</span>
           </button>))}
       </div>

@@ -41,6 +41,7 @@ try {
   ok('menu tem o botão de começar', await ev(() => [...document.querySelectorAll('button')].some(b => /sobreviver|nova run/i.test(b.textContent))));
   const pwa = await pg.evaluate(async u => { const r = await fetch(u + 'manifest.webmanifest').catch(() => null); return r && r.ok ? (await r.json()).name : null; }, url);
   ok('manifesto PWA publicado', !!pwa, String(pwa));
+  ok('as fontes de texto carregaram (Pixelify Sans + Silkscreen)', await ev(async () => { await document.fonts.ready; return document.fonts.check('600 16px "Pixelify Sans"') && document.fonts.check('700 16px Silkscreen') && getComputedStyle(document.body).fontFamily.includes('Pixelify'); }));
   await foto('1-menu');
   ok('"Como jogar" abre e fecha', await toque('Como jogar') && await ate(() => /como jogar/i.test(document.body.innerText), 4000) && await toque('^Fechar') && await ate(() => /sobreviver|nova run/i.test(document.body.innerText), 4000));
   ok('"Config." abre e fecha', await toque('^Config') && await ate(() => /configura/i.test(document.body.innerText), 4000) && await toque('^Fechar') && await ate(() => /sobreviver|nova run/i.test(document.body.innerText), 4000));
@@ -85,6 +86,17 @@ try {
     ok(`estação "${painel}" abre o painel`, abriu, achou ? '' : 'interativo não encontrado');
     await ev(() => window.__cinzas.store.setState({ painel: null }));
   }
+
+  // 4a0. objetivos em atos, rótulos de coleta com rendimento e ferramenta
+  const obj0 = await ev(() => { const t = window.__cinzas.store.getState(); return { idx: t.objIdx, hud: document.querySelector('.obj')?.textContent ?? '' }; });
+  ok('o rastreador mostra o objetivo atual', obj0.idx === 0 && /OBJ/i.test(obj0.hud) && /Ermo/i.test(obj0.hud), JSON.stringify(obj0));
+  await ev(() => window.__cinzas.store.setState({ painel: 'diario' })); await espera(400); await foto('2e-diario');
+  ok('o Diário mostra a campanha em atos', /Ato I/i.test(await ev(() => document.body.innerText)) && /Ato III/i.test(await ev(() => document.body.innerText)));
+  await ev(() => window.__cinzas.store.setState({ painel: null }));
+  const rotulos = await ev(() => { const k = window.__cinzas.cena(), arv = k.interativos.find(i => /Cortar árvore/i.test(i.rot)), agua = null; const sem = arv ? arv.rot : null; const st = window.__cinzas.store, i = st.getState().inv; st.setState({ inv: { ...i, machado: 1 } }); return { sem, com: arv ? arv.rot : null }; });
+  ok('o rótulo da árvore diz o que falta (machado)', rotulos.sem && /machado/i.test(rotulos.sem) && /precisa/i.test(rotulos.sem), JSON.stringify(rotulos));
+  ok('com machado o rótulo mostra o rendimento', rotulos.com && /madeira/i.test(rotulos.com) && !/precisa/i.test(rotulos.com), JSON.stringify(rotulos));
+  await ev(() => { const st = window.__cinzas.store, t = st.getState(), i = { ...t.inv }; delete i.machado; st.setState({ inv: i }); });
 
   // 4a. interação não atravessa parede: o baú está dentro da casa
   const paredes = await ev(() => {
@@ -191,6 +203,15 @@ try {
   ok('o Ermo tem criaturas, flora e objetos', z.ents > 0 && z.flora > 20 && z.props > 5, JSON.stringify(z));
 
   await limpaPaineis(); // um nível ganho na viagem abre a escolha de habilidade num momento calmo: resolve antes do saque
+  // 7a. objetivo "Viaje até o Ermo" cumprido ao chegar; itens soltos no chão são coletados ao passar por cima
+  ok('o objetivo da viagem é cumprido ao chegar', await ate(() => window.__cinzas.store.getState().objIdx >= 1, 8000), JSON.stringify(await ev(() => window.__cinzas.store.getState().objIdx)));
+  const solto = await ev(() => { const k = window.__cinzas.cena(); if (!k.soltos.length) return null; const o = k.soltos[0], st = window.__cinzas.store.getState(), n0 = k.soltos.length, q0 = st.inv[o.s.item] ?? 0; k.jog.x = o.s.x; k.jog.y = o.s.y; return { id: o.s.id, item: o.s.item, n0, q0 }; });
+  ok('o Ermo tem itens soltos no chão', !!solto && (await ev(() => window.__cinzas.cena().soltos.length)) > 5, JSON.stringify(solto));
+  ok('passar por cima de um item solto o coleta', solto && await ate(o => { const k = window.__cinzas.cena(), t = window.__cinzas.store.getState(); return k.soltos.length < o.n0 && (t.inv[o.item] ?? 0) > o.q0 && k.ze.coletados.includes(o.id); }, 6000, solto));
+  await ev(() => { const k = window.__cinzas.cena(); k.s.vasculhados = Math.max(k.s.vasculhados, 5); });
+  ok('cumprir o objetivo mostra o banner e avança', await ate(() => { const t = window.__cinzas.store.getState(); return !!t.banner && /objetivo cumprido/i.test(t.banner.titulo); }, 6000));
+  await foto('4a-banner');
+
   // 7b. saque de um contêiner no Ermo
   const vas0 = await ev(() => window.__cinzas.store.getState().vasculhados);
   const alvoSaque = await ev(() => {
@@ -244,13 +265,14 @@ try {
   ok('abrir os suprimentos conclui e vira conquista', abriu && await ate(() => window.__cinzas.store.getState().conquistas.includes('chuvaouro'), 12000));
 
   // 7h. locais temáticos carregam (hospital e posto militar)
-  for (const [id, rx] of [['hospital', /hospital/i], ['militar', /militar/i]]) {
+  for (const [id, rx] of [['hospital', /hospital/i], ['militar', /militar/i], ['torre', /torre/i]]) {
     await limpaPaineis();
     await ev(id => { const k = window.__cinzas.cena(); k.s.hp = 100; window.__cinzas.ponte.cmd.viajar(id); }, id);
     const veio = await ate(i => { const t = window.__cinzas.store.getState(); return t.zonaId === i && t.carga >= 1; }, 60000, id); await espera(1500);
     const info = await ev(() => { const k = window.__cinzas.cena(); return { props: k.props.length, ents: k.ents.length, nome: k.zona.nome }; });
     ok(`o local temático "${id}" carrega com conteúdo`, veio && info.props > 5 && rx.test(info.nome), JSON.stringify(info));
     if (id === 'hospital') await foto('4e-hospital');
+    if (id === 'torre') ok('a Torre de Rádio guarda o rádio de campanha', await ev(() => window.__cinzas.cena().zona.props.some(p => p.loot?.includes('radio'))));
   }
 
   // 8. salvar, recarregar a página e continuar
@@ -258,7 +280,7 @@ try {
   await pg.goto(url, { waitUntil: 'networkidle0' });
   ok('menu oferece "Continuar" após recarregar', await ev(() => [...document.querySelectorAll('button')].some(b => /^continuar/i.test(b.textContent.trim()))));
   await toque('^continuar'); ok('continua o jogo salvo', await jogoPronto());
-  s = await estado(); ok('retoma na zona salva', s.zonaId === 'militar', JSON.stringify(s));
+  s = await estado(); ok('retoma na zona salva', s.zonaId === 'torre', JSON.stringify(s));
   s = await ev(() => { const t = window.__cinzas.store.getState(); return { nivel: t.nivel, perks: t.perks.length, tanque: t.mel.tanque }; });
   ok('nível, habilidades e melhorias sobrevivem ao salvar', s.nivel >= 5 && s.perks >= 4 && s.tanque === 1, JSON.stringify(s));
 

@@ -23,7 +23,7 @@ export type Estado = {
   hp: number; maxHp: number; fome: number; sede: number; stamina: number; rad: number; sangra: boolean;
   inv: Record<string, number>; bau: Record<string, number>; arma: string | null; balas: Record<string, number>; mascara: boolean; combustivel: number;
   lanterna: { tem: boolean; ligada: boolean; bat: number };
-  cpm: number; objIdx: number; objProg: number; vasculhados: number; abates: number; radMax: number; sabeAbrigo: boolean;
+  cpm: number; objIdx: number; objVal: number; banner: { id: number; titulo: string; sub: string; extra: string } | null; vasculhados: number; abates: number; radMax: number; sabeAbrigo: boolean;
   clima: ClimaHud; interior: boolean; tanque: number;
   toasts: Toast[]; acao: { rotulo: string; p: number } | null; alvo: string | null; furtivo: boolean;
   danoTs: number; resumo: Resumo | null; gemas: number; carga: number; descobertos: string[]; dica: string | null; cfg: Configs; temSave: boolean; fps: number;
@@ -32,14 +32,7 @@ export type Estado = {
   toast: (texto: string, cor?: string) => void;
 };
 
-export const OBJETIVOS = [
-  { titulo: 'Viaje no jipe até o Ermo', dica: 'Use o jipe no portão do abrigo e escolha um destino no mapa.' },
-  { titulo: 'Vasculhe 5 contêineres', dica: 'Geladeiras, armários e porta-malas guardam o essencial.' },
-  { titulo: 'Fabrique algo na bancada', dica: 'Volte ao abrigo com madeira, sucata e tecido.' },
-  { titulo: 'Sobreviva a uma noite', dica: 'À noite a visão encurta e eles ficam mais ativos.' },
-  { titulo: 'Ache o rádio de campanha', dica: 'Um rádio de campanha deve estar na Cidade Velha.' },
-  { titulo: 'Viaje até o Abrigo 7', dica: 'O rádio capta o sinal. Escolha o Abrigo 7 no mapa.' },
-];
+export { OBJETIVOS, ATOS } from './dados/objetivos';
 
 export const horaStr = (min: number) => { const m = Math.floor(min) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
 export const PESO_BASE = 14;
@@ -51,7 +44,7 @@ export const estadoInicial = (seed: string) => ({
   seed, zonaId: 'base', zonaNome: 'Abrigo', biomaId: 'base', minutos: 8 * 60, hp: 100, maxHp: 100, fome: 78, sede: 70, stamina: 100, rad: 0, sangra: false,
   inv: { agua: 1, bandagem: 2, pe_de_cabra: 1, enlatado: 1 } as Record<string, number>, bau: { tecido: 3, madeira: 4, sucata: 4, enlatado: 2, alcool: 1, garrafa: 2, semente: 2 } as Record<string, number>,
   arma: 'pe_de_cabra' as string | null, balas: { municao: 0, cartucho: 0 } as Record<string, number>, mascara: false, combustivel: 6, lanterna: { tem: false, ligada: false, bat: 100 },
-  cpm: 18, objIdx: 0, objProg: 0, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
+  cpm: 18, objIdx: 0, objVal: 0, banner: null, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
   clima: { tipo: 'limpo', chuva: 0, vento: 0.1, neblina: 0, poeira: 0, nuvem: 0.1 } as ClimaHud, interior: false, tanque: 0,
   toasts: [] as Toast[], acao: null, alvo: null, furtivo: false, danoTs: 0, resumo: null, descobertos: ['base'] as string[], dica: null,
   grade: [] as Peca[], xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
@@ -91,7 +84,7 @@ export function novoRun(seed: string, bonus = false, dif = 1): Run {
 /** copia a run para o store da UI (o que a HUD e os painéis leem) */
 export function aplicarRun(r: Run) {
   useJogo.setState({ seed: r.seed, zonaId: r.zonaId, minutos: r.minutos, hp: r.hp, maxHp: r.maxHp, fome: r.fome, sede: r.sede, stamina: r.stamina, rad: r.rad, sangra: r.sangra, inv: { ...r.inv }, bau: { ...r.bau }, arma: r.arma, balas: { ...r.balas }, mascara: r.mascara, combustivel: r.combustivel, lanterna: { ...r.lanterna },
-    objIdx: r.objIdx, objProg: 0, vasculhados: r.vasculhados, abates: r.abates, radMax: r.radMax, sabeAbrigo: r.sabeAbrigo, descobertos: [...r.descobertos], tanque: r.tanque, toasts: [], acao: null, alvo: null, painel: null, dica: null, resumo: null,
+    objIdx: r.objIdx, objVal: 0, banner: null, vasculhados: r.vasculhados, abates: r.abates, radMax: r.radMax, sabeAbrigo: r.sabeAbrigo, descobertos: [...r.descobertos], tanque: r.tanque, toasts: [], acao: null, alvo: null, painel: null, dica: null, resumo: null,
     grade: [...(r.grade ?? [])], xp: r.xp ?? 0, nivel: r.nivel ?? 1, pontos: r.pontos ?? 0, perks: [...(r.perks ?? [])], contratos: [...(r.contratos ?? [])], mel: { ...(r.mel ?? {}) }, conquistas: lerMeta().conquistas, evento: null, seta: null, dif: r.dif ?? 1 });
 }
 export { ITENS };

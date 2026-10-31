@@ -22,11 +22,13 @@ export type FloraObj = { id: number; rec: RecFlora; x: number; y: number; solido
 export type Spawn = { id: number; arq: string; x: number; y: number; faccao?: number; grupo: number };
 export type Poi = { id: string; tipo: string; nome: string; x: number; y: number; r: number };
 export type Predio = { x: number; y: number; w: number; h: number; tipo: string };
+export type Solto = { id: number; x: number; y: number; item: string; q: number };
 export type Zona = {
   id: string; nome: string; bioma: string; seed: string;
   tipos: Uint8Array; rad: Float32Array; solido: Uint8Array; opaco: Uint8Array; estilo: Uint8Array;
   props: Prop[]; flora: FloraObj[]; spawns: Spawn[]; predios: Predio[]; pois: Poi[];
   jogador: { x: number; y: number }; jipe: { x: number; y: number };
+  soltos: Solto[];
 };
 
 const CONT: Record<string, Container> = { geladeira: 'geladeira', armario: 'armario', caixa: 'caixa', ferramentas: 'ferramentas', caixote_militar: 'caixote_militar', prateleira: 'prateleira', estante: 'estante', guarda_roupa: 'guarda_roupa', mala: 'mala', bomba: 'bomba', lixeira: 'lixeira', balcao: 'balcao', bau: 'bau_gangue', bancada: 'bancada_velha' };
@@ -47,6 +49,12 @@ const MOBILIA: Record<string, string[]> = {
   posto: ['balcao', 'geladeira', 'prateleira', 'caixa', 'lixeira'],
 };
 
+/** o que aparece solto no chão por bioma (peso) e quantos por zona: passar por cima coleta */
+const SOLTOS: Record<string, [string, number][]> = {
+  base: [['madeira', 5], ['sucata', 3], ['tecido', 2]], ermo: [['sucata', 5], ['tecido', 3], ['madeira', 3], ['enlatado', 1]], cidade: [['sucata', 5], ['tecido', 4], ['enlatado', 2], ['eletronico', 1]],
+  floresta: [['madeira', 7], ['legume', 3], ['tecido', 1]], industrial: [['sucata', 7], ['eletronico', 2], ['tecido', 1]], pantano: [['legume', 4], ['madeira', 3], ['tecido', 2]],
+};
+const N_SOLTOS: Record<string, number> = { base: 16, ermo: 34, cidade: 32, floresta: 46, industrial: 32, pantano: 30 };
 export function gerarZona(id: string, biomaId: string, seed: string, nome?: string, tema?: string): Zona {
   const B = biomaDe(biomaId, tema), TEMA = tema ? TEMAS[tema] : undefined, rng = new Rng(`${seed}|${id}`), ruido = createNoise2D(Alea(`${seed}|${id}|n`)), ruido2 = createNoise2D(Alea(`${seed}|${id}|m`));
   const tipos = new Uint8Array(W * H), rad = new Float32Array(W * H), solido = new Uint8Array(W * H), opaco = new Uint8Array(W * H), estilo = new Uint8Array(W * H), ocupado = new Uint8Array(W * H), interior = new Uint8Array(W * H);
@@ -55,6 +63,7 @@ export function gerarZona(id: string, biomaId: string, seed: string, nome?: stri
   const jogador = { x: 48, y: 84 }, jipe = { x: 43, y: 83 };
   const ri = (a: number, b: number) => rng.int(a, b);
   const perto = (x: number, y: number, ax: number, ay: number, r: number) => Math.hypot(x - ax, y - ay) < r;
+  const fazerSoltos = (): Solto[] => { const r2 = new Rng(`${seed}|${id}|soltos`), tab = SOLTOS[biomaId] ?? SOLTOS.ermo, n = N_SOLTOS[biomaId] ?? 30, out: Solto[] = []; for (let k = 0, t = 0; k < n && t < n * 40; t++) { const x = r2.int(3, W - 4), y = r2.int(3, H - 4); if (!livre(x, y) || out.some(o => Math.abs(o.x - x - 0.5) < 2 && Math.abs(o.y - y - 0.5) < 2)) continue; out.push({ id: 500000 + k, x: x + 0.5, y: y + 0.5, item: r2.peso(tab), q: 1 }); k++; } return out; };
 
   // ---- terreno
   const estradas = biomaId === 'cidade' ? { xs: [22, 70], ys: [30, 62] } : biomaId === 'ermo' ? { xs: [] as number[], ys: [56] } : biomaId === 'industrial' ? { xs: [40], ys: [48] } : { xs: [] as number[], ys: [] as number[] };
@@ -205,9 +214,10 @@ export function gerarZona(id: string, biomaId: string, seed: string, nome?: stri
   const nFauna = Math.round(12 * B.densFauna); for (let g = 0; g < nFauna; g++) { const x = ri(3, W - 4), y = ri(3, H - 4); if (spawnLivre(x, y)) grupo(rng.peso(B.fauna), x, y); }
   if (rng.chance(B.colosso)) { for (let t = 0; t < 30; t++) { const x = ri(8, W - 8), y = ri(8, H - 20); if (spawnLivre(x, y) && !perto(x, y, jogador.x, jogador.y, 34)) { spawns.push({ id: sid++, arq: 'colosso', x, y, grupo: gid++ }); pois.push({ id: 'colosso', tipo: 'colosso', nome: 'Covil do Colosso', x, y, r: 14 }); break; } } }
 
+  if (TEMA?.garante) { const alvo = props.find(p => p.loot && p.loot.length && p.rec.n !== 'carro'); if (alvo) alvo.loot!.push(TEMA.garante); }
   // jipe do jogador
   const j = prop('carro', jipe.x, jipe.y, 0, { v: 4 + 5 * 3, d: 0.1, semLoot: true }); if (j) { j.inters.push({ k: 'jipe', rot: 'Usar o jipe (viajar)', dur: 0.3 }); }
-  return { id, nome: nome ?? B.nome, bioma: biomaId, seed, tipos, rad, solido, opaco, estilo, props, flora, spawns, predios, pois, jogador, jipe };
+  return { id, nome: nome ?? B.nome, bioma: biomaId, seed, tipos, rad, solido, opaco, estilo, props, flora, spawns, predios, pois, jogador, jipe, soltos: fazerSoltos() };
 
   // =============================================================== ABRIGO (base do jogador)
   function gerarBase(): Zona {
@@ -233,7 +243,7 @@ export function gerarZona(id: string, biomaId: string, seed: string, nome?: stri
     // flora dentro e fora
     const poolB: RecFlora[] = ['seco', ''].map((v, i) => gerarFlora(new Rng(`${seed}|base|${v}|${i}`), 'arbusto', v)), capins = [0, 1, 2, 3].map(i => gerarFlora(new Rng(`${seed}|base|c|${i}`), 'capim', '')), arvores = ['morta', 'doente', 'pinheiro'].map((v, i) => gerarFlora(new Rng(`${seed}|base|a|${i}`), 'arvore', v)), pedras = [0, 1, 2].map(i => gerarFlora(new Rng(`${seed}|base|p|${i}`), 'pedra', ''));
     for (let k = 0; k < 900; k++) { const x = ri(1, W - 2), y = ri(1, H - 2), dentroBase = x > cx0 && x < cx1 && y > cy0 && y < cy1; if (!livre(x, y) || (dentroBase && rng.chance(0.85))) continue; if (perto(x, y, jogador.x, jogador.y, 5)) continue; const r = rng.f(), rec = dentroBase ? (r < 0.8 ? rng.pick(capins) : rng.pick(poolB)) : (r < 0.25 ? rng.pick(arvores) : r < 0.5 ? rng.pick(poolB) : r < 0.9 ? rng.pick(capins) : rng.pick(pedras)); const sol = rec.f === 'arvore'; flora.push({ id: fid++, rec, x: x + 0.5 + rng.range(-0.3, 0.3), y: y + 0.5 + rng.range(-0.3, 0.3), solido: sol, cortavel: sol && !dentroBase }); ocupado[idx(x, y)] = 1; if (sol) solido[idx(x, y)] = 1; if (flora.length > 260) break; }
-    return { id, nome: nome ?? 'Abrigo', bioma: 'base', seed, tipos, rad, solido, opaco, estilo, props, flora, spawns, predios, pois, jogador: { x: 48, y: 85 }, jipe: { x: 43, y: 83 } };
+    return { id, nome: nome ?? 'Abrigo', bioma: 'base', seed, tipos, rad, solido, opaco, estilo, props, flora, spawns, predios, pois, jogador: { x: 48, y: 85 }, jipe: { x: 43, y: 83 }, soltos: fazerSoltos() };
   }
 }
 void ARQS;

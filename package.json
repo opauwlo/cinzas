@@ -11,6 +11,7 @@
     "icones": "node tools/icones.mjs"
   },
   "dependencies": {
+    "@fontsource/pixelify-sans": "^5.3.0",
     "@fontsource/silkscreen": "^5.3.0",
     "@fontsource/vt323": "^5.3.0",
     "alea": "^1.0.1",

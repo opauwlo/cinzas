@@ -9,20 +9,23 @@ import type { RecEstr } from './lib/props';
 import { Rng } from './lib/rng';
 import { gerarHumano, type RecHumano } from './lib/humano';
 import { gerarFlora } from './lib/flora';
-import { armaDe } from './dados/itens';
+import { armaDe, ITENS, COR_RARIDADE } from './dados/itens';
 import { BIOMAS, type Bioma } from './dados/biomas';
 import { biomaDe } from './dados/meta';
 import { localPorId } from './dados/locais';
 import { ARQS, type Arq } from './dados/criaturas';
 import { useJogo, horaStr, OBJETIVOS } from './store';
 import { sincGrade } from './sistemas/grade';
+import { avancarObjetivos, objetivoAtual } from './sistemas/objetivos';
 import { ponte } from './ponte';
 import { sfx, ambiente, setGeiger, setBatimento, aplicarVolumes, trovao } from './audio';
 import { Clima, luzDia, gradeCor, sombraSol } from './sistemas/clima';
 import { Particulas } from './sistemas/particulas';
 import { novoZEstado, salvarRun, type Run, type ZEstado } from './sistemas/salvar';
 import { atualizarEnt, criarEnt, atacarJogador, iniciarMorte, type Ent } from './sistemas/ia';
-import { montarInterativos, instalarComandos, aguaInter, tickHortas, type Interativo, executarMorte } from './sistemas/acoes';
+import { montarInterativos, instalarComandos, aguaInter, tickHortas, ticarAcao, dar, cabe, type Interativo, executarMorte } from './sistemas/acoes';
+import { texturaSolto, ITENS_SOLTOS } from './lib/soltos';
+import type { Solto } from './zona';
 import { iniciarZona, atualizarDiretor, desenharBeacon, setaAirdrop, type Airdrop, type Raid } from './sistemas/diretor';
 import { DIF, dif, pk, melNivel, ganharXp, registrar, tickProgresso } from './sistemas/progresso';
 
@@ -46,11 +49,12 @@ export class Cena extends Phaser.Scene {
   lmA = new Float32Array(W * H).fill(0.9); seen = new Uint8Array(W * H); luzFrame = new Float32Array(W * H);
   fogC!: Phaser.Textures.CanvasTexture; fogD!: ImageData; fogImg!: Phaser.GameObjects.Image; climaC!: Phaser.Textures.CanvasTexture; climaD!: ImageData; climaImg!: Phaser.GameObjects.Image; grade!: Phaser.GameObjects.Rectangle;
   gfx!: Phaser.GameObjects.Graphics; marca!: Phaser.GameObjects.Graphics; gChao!: Phaser.GameObjects.Graphics; gAr!: Phaser.GameObjects.Graphics;
-  teclas!: Record<string, Phaser.Input.Keyboard.Key>; acao: { rotulo: string; dur: number; t: number; fim: () => void; ruido?: number } | null = null;
+  teclas!: Record<string, Phaser.Input.Keyboard.Key>; acao: { rotulo: string; dur: number; t: number; fim: () => void; ruido?: number; tipo?: string; tk?: number; x?: number; y?: number } | null = null;
   tracers: { x0: number; y0: number; x1: number; y1: number; t: number; cor: number }[] = []; aneis: { x: number; y: number; r: number; t: number }[] = [];
   pronto = false; morto = false; vitoria = false; ambient = 1; hitstop = 0; cdAtaque = 0; tSync = 0; tAlvo = 0; tRuido = 0; tSpawn = 0; tPortas = 0; tCut = 0; tAmb = 0; tSave = 0; tSeg = 0; tFlora = 0; tDicas = 0; flashRaio = 0;
   camX = 0; camY = 0; pathBudget = 3; desktop = false; mouse = { x: 0, y: 0, ativo: false, baixo: false }; radSuave = 0; interior = false; alvoInter: Interativo | null = null; tapVisto = 0; esc = 2; fogW = 0; fogH = 0;
   evPend: import('./sistemas/acoes').EvPend | null = null;
+  soltos: { s: Solto; spr: Phaser.GameObjects.Image }[] = []; avisoCheia = -99; flN = 0; flT = 0;
   fz = 2; cz = 1; fogLw = 0; fogLh = 0; climaLw = 0; climaLh = 0;
   airdrop: Airdrop | null = null; raid: Raid | null = null; perkAvisado = 0; novasConquistas: string[] = [];
   tarefas: (() => void)[] = []; totalTarefas = 1; estCache = new Map<string, Quadro>(); recToco!: RecEstatica; pausadoPor = false; noiteAnterior = false; tempo = 0; trava = false; intro = 0;
@@ -61,7 +65,7 @@ export class Cena extends Phaser.Scene {
     this._dados = { run: d.run, zonaId: d.zonaId, esc: d.esc ?? 2 }; this.s = d.run; this.s.zonaId = d.zonaId;
     this.chunks = new Map(); this.props = []; this.floras = []; this.portas = new Map(); this.ents = []; this.cadaveres = []; this.interativos = []; this.luzes = []; this.tracers = []; this.aneis = []; this.estCache = new Map(); this.recCache = new Map();
     this.lmA.fill(0.9); this.seen.fill(0); this.luzFrame.fill(0); this.pronto = false; this.morto = false; this.vitoria = false; this.acao = null; this.alvoInter = null; this.tempo = 0; this.trava = false; this.intro = 0;
-    this.fogW = 0; this.fogH = 0; // a mesma instância da cena é reaproveitada na viagem: força recriar as camadas (as antigas foram destruídas)
+    this.soltos = []; this.fogW = 0; this.fogH = 0; // a mesma instância da cena é reaproveitada na viagem: força recriar as camadas (as antigas foram destruídas)
   }
   private aoRedimensionar = () => this.criarCamadas();
 
@@ -71,7 +75,8 @@ export class Cena extends Phaser.Scene {
     if (!FAB) FAB = new Fabrica(reg, rem); else FAB.vincular(reg, rem); this.fab = FAB;
     this.esc = this._dados.esc; this.cameras.main.setRoundPixels(true);
     const loc = localPorId(this.s.zonaId); this.bioma = biomaDe(loc.bioma, loc.tema); this.zona = gerarZona(loc.id, loc.bioma, this.s.seed, loc.nome, loc.tema);
-    this.ze = this.s.zonas[loc.id] ??= novoZEstado();
+    this.ze = this.s.zonas[loc.id] ??= novoZEstado(); this.ze.coletados ??= [];
+    for (const it of ITENS_SOLTOS) if (!this.textures.exists('solto_' + it)) this.textures.addCanvas('solto_' + it, texturaSolto(it));
     if (this.ze.ultima && this.s.minutos - this.ze.ultima > 3 * 1440) { const h = this.ze.hortas, f = this.ze.fogueiras; Object.assign(this.ze, novoZEstado(), { hortas: h, fogueiras: f }); }
     for (const p of this.zona.props) { if (this.ze.saqueados.includes(p.id)) { p.aberto = true; p.loot = []; for (const i of p.inters) if (i.k === 'saque') i.feito = true; } if (this.ze.desmontados.includes(p.id)) for (const i of p.inters) if (i.k === 'desmontar') i.feito = true; if (this.ze.rasgados.includes(p.id)) for (const i of p.inters) if (i.k === 'rasgar') i.feito = true; }
     for (const f of this.zona.flora) if (this.ze.cortadas.includes(f.id)) f.cortada = true;
@@ -105,6 +110,7 @@ export class Cena extends Phaser.Scene {
       if (p.luz) this.luzes.push({ x: p.x + p.w / 2, y: p.y + p.h / 2, r: p.luz.r, cor: p.luz.cor, f: p.luz.f, noite: p.luz.noite });
     }
     for (const f of z.flora) { const rec = f.cortada ? this.recToco : f.rec, q = this.est(rec), [sx, sy] = proj(f.x, f.y), spr = this.img(sx, sy, q).setDepth((f.x + f.y) * 10); this.floras.push({ f, spr, fase: Math.random() * 6.28, q }); }
+    for (const so of z.soltos) if (!this.ze.coletados.includes(so.id)) { const [sx, sy] = proj(so.x, so.y); this.soltos.push({ s: so, spr: this.add.image(Math.round(sx), Math.round(sy), 'solto_' + so.item).setOrigin(0.5, 0.8).setDepth((so.x + so.y) * 10 - 2) }); }
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (z.tipos[idx(x, y)] === T.PORTA) {
       const horiz = z.tipos[idx(x - 1, y)] === T.PAREDE || z.tipos[idx(x + 1, y)] === T.PAREDE, q = this.est({ tipo: 'estr', n: 'porta', estilo: 0, alto: 'a', sem: 0, o: horiz ? 0 : 1 } as RecEstr), [sx, sy] = proj(x + 0.5, y + 0.5);
       const spr = this.img(sx, sy, q).setDepth((x + y + 1) * 10 - 1); this.portas.set(idx(x, y), { aberta: false, spr, horiz, t: 0, rast: { spr, i: idx(x, y), lvl: -1 } });
@@ -145,6 +151,20 @@ export class Cena extends Phaser.Scene {
     if (loc.id !== 'base') useJogo.getState().toast('Chegada: ' + loc.nome, '#8fe36a'); this.verPois(); iniciarZona(this);
   }
   fov!: InstanceType<typeof ROT.FOV.PreciseShadowcasting>; clarao!: Phaser.GameObjects.Image;
+  /** coleta de itens soltos: é só passar por cima (se couber na mochila) */
+  atualizarSoltos() {
+    const J = this.jog, t = this.tempo;
+    for (let i = this.soltos.length - 1; i >= 0; i--) {
+      const o = this.soltos[i], dx = o.s.x - J.x, dy = o.s.y - J.y; o.spr.setAlpha(0.8 + 0.2 * Math.sin(t * 4 + o.s.id));
+      if (dx * dx + dy * dy > 0.75) continue;
+      if (!cabe(o.s.item, o.s.q)) { if (t - this.avisoCheia > 5) { this.avisoCheia = t; useJogo.getState().toast('Sem espaço na mochila', '#c9561f'); } continue; }
+      if (!dar(this, o.s.item, o.s.q, true)) continue;
+      this.ze.coletados.push(o.s.id); this.flutuar('+' + ITENS[o.s.item].nome, COR_RARIDADE[ITENS[o.s.item].raridade]); sfx.pegar();
+      const [sx, sy] = proj(o.s.x, o.s.y, 6); this.part.poeira(sx, sy, 4); o.spr.destroy(); this.soltos.splice(i, 1);
+    }
+  }
+  /** texto que sobe perto do jogador; vários seguidos se empilham */
+  flutuar(t: string, cor = '#e8d9a8') { if (!this.jog) return; const agora = performance.now(); this.flN = agora - this.flT < 700 ? this.flN + 1 : 0; this.flT = agora; this.texto(this.jog.x, this.jog.y - 0.5 - this.flN * 0.45, t, cor); }
   /** auxiliar de teste (playtests headless): cria uma criatura perto do jogador */
   dev(arq: string, dx: number, dy: number, grupo = -1, faccao?: number) { return criarEnt(this, arq, this.jog.x + dx, this.jog.y + dy, null, grupo, faccao); }
   devXp(n: number) { ganharXp(this, n); }
@@ -273,7 +293,7 @@ export class Cena extends Phaser.Scene {
     const s = this.s; this.pathBudget = 3;
     if (!this.morto) {
       s.minutos += dt * MIN_POR_SEG; const h = this.hora(); this.ambient = luzDia(h) * (1 - this.clima.nuvem * 0.05);
-      this.jogador(dt); this.necessidades(dt);
+      this.jogador(dt); this.necessidades(dt); this.atualizarSoltos();
     }
     const noite = 1 - this.ambient; this.tSpawn += dt;
     if (!this.morto && this.tSpawn > 45) { this.tSpawn = 0; this.spawnDinamico(); }
@@ -284,7 +304,7 @@ export class Cena extends Phaser.Scene {
     this.tPortas += dt; if (this.tPortas > 0.5) { this.tPortas = 0; for (const [i, d] of this.portas) if (d.aberta) { d.t += 0.5; const x = i % W, y = Math.floor(i / W); if (d.t > 4 && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) > 6 && !this.ents.some(e => e.vivo && Math.hypot(e.x - x - 0.5, e.y - y - 0.5) < 1.2)) this.fecharPorta(i); } }
     this.tSync += dt; if (this.tSync > 0.1) { this.tSync = 0; this.sincronizar(); }
     this.tSave += dt; if (this.tSave > 30 && !this.morto) { this.tSave = 0; this.salvar(); }
-    this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); atualizarDiretor(this, 1); sincGrade(); }
+    this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); avancarObjetivos(this); atualizarDiretor(this, 1); sincGrade(); }
   }
   separar() {
     const at = this.ents.filter(e => e.vivo && e.arq.hostil && Math.abs(e.x - this.jog.x) < 20 && Math.abs(e.y - this.jog.y) < 20);
@@ -321,7 +341,7 @@ export class Cena extends Phaser.Scene {
     this.cdAtaque -= dt; if (atacando) atacarJogador(this);
     if (this.flash > 0) { this.flash -= dt; if (this.flash <= 0) this.clarao.setVisible(false); } this.flashRaio = Math.max(0, this.flashRaio - dt * 2);
     this.tAlvo += dt; if (this.tAlvo > 0.12) { this.tAlvo = 0; this.alvoInter = this.alvoProx(); useJogo.setState({ alvo: this.alvoInter ? this.alvoInter.rot : null }); }
-    if (this.acao) { this.acao.t += dt; if (this.acao.ruido && Math.random() < dt * 0.8) this.ruido(J.x, J.y, this.acao.ruido); if (this.acao.t >= this.acao.dur) { const f = this.acao.fim; this.acao = null; f(); } }
+    if (this.acao) { this.acao.t += dt; ticarAcao(this, dt); if (this.acao.ruido && Math.random() < dt * 0.8) this.ruido(J.x, J.y, this.acao.ruido); if (this.acao.t >= this.acao.dur) { const f = this.acao.fim; this.acao = null; f(); } }
     useJogo.setState(q => (q.acao?.p === (this.acao ? this.acao.t / this.acao.dur : undefined) ? q : { acao: this.acao ? { rotulo: this.acao.rotulo, p: this.acao.t / this.acao.dur } : null }));
   }
   /** direção para o inimigo mais próximo (visível) na frente do jogador; null se não há */
@@ -357,13 +377,6 @@ export class Cena extends Phaser.Scene {
     const alvoCpm = 18 + this.radSuave * 900 + (cl.acida && !this.interior ? cl.chuva * 120 : 0); st.cpm = st.cpm; this.cpm += (alvoCpm - this.cpm) * Math.min(1, dt * 3); setGeiger(this.cpm); setBatimento(s.hp < 30 && !this.morto);
     if (cl.chuva > 0.2 && this.zona.id === 'base') { const tn = melNivel(s, 'tanque'); s.tanque = Math.min([5, 8, 12][tn], s.tanque + dmin * 0.01 * cl.chuva * [1, 1.5, 2][tn]); }
     const h = this.hora(), noite = h < 6 || h >= 20.5; if (this.noiteAnterior && !noite && h >= 6) { s.noites++; useJogo.getState().toast('Você sobreviveu à noite', '#8fe36a'); registrar(this, 'noites'); ganharXp(this, 30); } this.noiteAnterior = noite;
-    for (let n = 0; n < 6; n++) {
-      if (s.objIdx === 0 && s.viajou) { s.objIdx = 1; st.toast('Objetivo cumprido', '#8fe36a'); }
-      if (s.objIdx === 1 && s.vasculhados >= 5) { s.objIdx = 2; st.toast('Objetivo cumprido', '#8fe36a'); }
-      if (s.objIdx === 2 && s.craftou) { s.objIdx = 3; st.toast('Objetivo cumprido', '#8fe36a'); }
-      if (s.objIdx === 3 && s.noites >= 1) { s.objIdx = 4; st.toast('Objetivo cumprido', '#8fe36a'); }
-      if (s.objIdx === 4 && (st.inv.radio || this.s.inv.radio)) { s.objIdx = 5; s.sabeAbrigo = true; if (!s.descobertos.includes('abrigo7')) s.descobertos.push('abrigo7'); st.toast('Sinal do Abrigo 7 captado', '#8fe36a'); registrar(this, 'radio'); ganharXp(this, 60); }
-    }
   }
   cpm = 18;
   dicas() {
@@ -446,8 +459,8 @@ export class Cena extends Phaser.Scene {
   }
   sincronizar() {
     const s = this.s, J = this.jog, st = useJogo.getState(), cl = this.clima; let prog = 0, h = this.hora();
-    if (s.objIdx === 0) prog = 0.06; else if (s.objIdx === 1) prog = s.vasculhados / 5; else if (s.objIdx === 2) prog = 0.08; else if (s.objIdx === 3) prog = h >= 20 ? (h - 20) / 10 : h < 6 ? (h + 4) / 10 : 0.04; else if (s.objIdx === 4) prog = 0.1; else prog = 0.3;
-    useJogo.setState({ minutos: s.minutos, hp: s.hp, maxHp: s.maxHp, fome: s.fome, sede: s.sede, stamina: s.stamina, rad: s.rad, sangra: s.sangra, balas: { ...s.balas }, arma: s.arma, mascara: s.mascara, combustivel: s.combustivel, lanterna: { ...s.lanterna, tem: !!st.inv.lanterna }, cpm: Math.round(this.cpm), objIdx: s.objIdx, objProg: prog, vasculhados: s.vasculhados, abates: s.abates, radMax: s.radMax, sabeAbrigo: s.sabeAbrigo, furtivo: ponte.entrada.furtivo, interior: this.interior, tanque: s.tanque, descobertos: [...s.descobertos], clima: { tipo: cl.tipo, chuva: cl.chuva, vento: cl.vento, neblina: cl.neblina, poeira: cl.poeira, nuvem: cl.nuvem }, seta: setaAirdrop(this), fps: Math.round(this.game.loop.actualFps) });
+    
+    useJogo.setState({ minutos: s.minutos, hp: s.hp, maxHp: s.maxHp, fome: s.fome, sede: s.sede, stamina: s.stamina, rad: s.rad, sangra: s.sangra, balas: { ...s.balas }, arma: s.arma, mascara: s.mascara, combustivel: s.combustivel, lanterna: { ...s.lanterna, tem: !!st.inv.lanterna }, cpm: Math.round(this.cpm), objIdx: s.objIdx, objVal: objetivoAtual(s.objIdx).valor(s, st.inv), vasculhados: s.vasculhados, abates: s.abates, radMax: s.radMax, sabeAbrigo: s.sabeAbrigo, furtivo: ponte.entrada.furtivo, interior: this.interior, tanque: s.tanque, descobertos: [...s.descobertos], clima: { tipo: cl.tipo, chuva: cl.chuva, vento: cl.vento, neblina: cl.neblina, poeira: cl.poeira, nuvem: cl.nuvem }, seta: setaAirdrop(this), fps: Math.round(this.game.loop.actualFps) });
     h = 0; void J; void horaStr; void OBJETIVOS;
   }
   morrer(causa: string) { executarMorte(this, causa); }

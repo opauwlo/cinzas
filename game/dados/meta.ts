@@ -72,12 +72,12 @@ export const MELHORIAS: Melhoria[] = [
 ];
 
 // ---------------------------------------------------------------- temas de zona: mesma geração, identidade e saque próprios
-export type Tema = { bioma: Partial<Bioma>; extra: string[]; chance: number };
+export type Tema = { bioma: Partial<Bioma>; extra: string[]; chance: number; /** item que sempre aparece em algum contêiner do local */ garante?: string };
 export const TEMAS: Record<string, Tema> = {
   hospital: { bioma: { predios: 12, tiposPredio: [['hospital', 8], ['casa', 1], ['mercado', 1]], inimigos: [['irradiado', 8], ['rastejador', 3], ['corredor', 2]], densInimigos: 1.5, gangues: 0, colosso: 0.1 }, extra: ['kit', 'bandagem', 'antirrad', 'alcool'], chance: 0.5 },
   militar: { bioma: { predios: 9, tiposPredio: [['galpao', 6], ['oficina', 2]], inimigos: [['miliciano', 5], ['irradiado', 4], ['corredor', 1]], densInimigos: 1.3, gangues: 3, colosso: 0.2 }, extra: ['municao', 'cartucho', 'municao', 'mascara', 'rifle'], chance: 0.5 },
   posto: { bioma: { predios: 5, tiposPredio: [['posto', 6], ['oficina', 2]], carros: 28, gangues: 2 }, extra: ['combustivel', 'combustivel', 'alcool', 'bateria'], chance: 0.55 },
-  radio: { bioma: { predios: 6, tiposPredio: [['galpao', 3], ['oficina', 3]], densInimigos: 1.1, gangues: 1 }, extra: ['eletronico', 'eletronico', 'bateria', 'lanterna'], chance: 0.55 },
+  radio: { bioma: { predios: 6, tiposPredio: [['galpao', 3], ['oficina', 3]], densInimigos: 1.1, gangues: 1 }, extra: ['eletronico', 'eletronico', 'bateria', 'lanterna'], chance: 0.55, garante: 'radio' },
 };
 /** bioma efetivo de um local (bioma-base + tema) */
 export const biomaDe = (biomaId: string, tema?: string): Bioma => ({ ...BIOMAS[biomaId], ...(tema ? TEMAS[tema]?.bioma : undefined) });

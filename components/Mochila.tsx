@@ -52,7 +52,7 @@ export function Mochila() {
         {arr && <div className={`fantasma ${arr.ok ? 'ok' : 'no'}`} style={{ left: arr.x * passo, top: arr.y * passo, width: tamDe(grade[arr.i].id, grade[arr.i].r)[0] * cel + (tamDe(grade[arr.i].id, grade[arr.i].r)[0] - 1) * GAP, height: tamDe(grade[arr.i].id, grade[arr.i].r)[1] * cel + (tamDe(grade[arr.i].id, grade[arr.i].r)[1] - 1) * GAP }} />}
       </div>
       <div className="equipado">
-        {[['arma', s.arma ? ITENS[s.arma].icone : ic('lorc', 'bowie-knife'), s.arma ? ITENS[s.arma].nome : 'Punhos', armaDe(s.arma).alvo === 'tiro' ? `${s.balas[armaDe(s.arma).municao ?? 'municao'] ?? 0} balas` : 'corpo a corpo'],
+        {[['arma', s.arma ? ITENS[s.arma].icone : ic('lorc', 'bowie-knife'), s.arma ? ITENS[s.arma].nome : 'Punhos', armaDe(s.arma).alvo === 'tiro' ? `${s.balas[armaDe(s.arma).municao ?? 'municao'] ?? 0} balas` : 'arma branca'],
           ['mochila', ITENS.mochila.icone, s.inv.mochila ? 'Mochila grande' : 'Mochila', s.inv.mochila ? '+2 linhas' : 'comum'],
           ['colete', ITENS.colete.icone, s.inv.colete ? 'Colete' : 'Sem colete', s.inv.colete ? '−25% dano' : '—']].map(([k, ico, n, d]) => <div key={k} className={`eq ${k === 'arma' || (k === 'mochila' && s.inv.mochila) || (k === 'colete' && s.inv.colete) ? 'on' : ''}`}><Ico src={ico} n={22} cor="#cfc7ae" /><div><b>{n}</b><small>{d}</small></div></div>)}
       </div>
