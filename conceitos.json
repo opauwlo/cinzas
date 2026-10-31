@@ -204,6 +204,16 @@
       "id": 41,
       "nome": "Colheita de mato com rebrote",
       "nota": "Toda planta rende algo (baga, erva, cogumelo, fibra), vira tufo e volta depois de 3 dias; tabela testada."
+    },
+    {
+      "id": 42,
+      "nome": "Decalques carimbados no chão por tipo de terreno e bioma",
+      "nota": "Manchas, ossos, pedras, flores, folhas e remendos entram depois do chão assado, com tabelas por terreno e multiplicadores por bioma; ao redor dos objetos o chão conta o que houve ali."
+    },
+    {
+      "id": 43,
+      "nome": "Vida no ar por bioma, hora e clima",
+      "nota": "Cinza caindo, vagalumes, esporos e brasas saem de uma tabela pura (a chuva lava a cinza e espanta os vagalumes), com teto de partículas por segundo."
     }
   ],
   "adaptados": [

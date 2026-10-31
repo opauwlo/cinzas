@@ -2,6 +2,7 @@
 // então o terreno emenda sem costura e a radiação mancha o chão sem quadrados.
 import { W, H, T, idx, dentro, type Zona } from './zona';
 import { mix, hash3 } from './lib/cor';
+import { decalques } from './decalques';
 
 export const TW = 32, TH = 16;
 export const iso = (x: number, y: number) => [(x - y) * (TW / 2), (x + y) * (TH / 2)] as const;
@@ -98,7 +99,6 @@ function corChao(m: Zona, t: number, gx: number, gy: number, x: number, y: numbe
       if (grao > 0.993) c = 0x8a8068; else if (grao < 0.006) c = 0x14110e;
       const tf = vn(gx * 3.1, gy * 3.1, 17); if (tf > 0.74 && grao > 0.7) c = mix(c, 0x6d6c36, 0.7);
       const f = h2(x, y, 33);
-      if (f < 0.03) { const dx = gx - (x + 0.5), dy = gy - (y + 0.5); if (Math.abs(dx - dy) < 0.05 && Math.abs(dx + dy) < 0.5) c = 0xc9c0a2; }
       if (f > 0.97 && Math.hypot(gx - x - 0.5, gy - y - 0.5) < 0.22) c = mix(c, 0x0c0a08, 0.7);
       return c;
     }
@@ -137,5 +137,6 @@ export function assarChao(m: Zona, cx: number, cy: number): { canvas: HTMLCanvas
       const o = ((ly + py) * w + (lx + px)) * 4; d[o] = (col >> 16) & 255; d[o + 1] = (col >> 8) & 255; d[o + 2] = col & 255; d[o + 3] = 255;
     }
   }
+  decalques(m, cx, cy, { d, w, h, ox, oy, TW, TH, CH }); // detalhes carimbados sobre o chão (manchas, ossos, pedras, folhas, remendos…)
   g.putImageData(img, 0, 0); return { canvas: c, ox, oy };
 }

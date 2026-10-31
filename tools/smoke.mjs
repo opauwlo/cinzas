@@ -312,6 +312,7 @@ try {
   ok('viaja para o Ermo', await ate(() => { const s = window.__cinzas.store.getState(); return s.zonaId === 'ermo' && s.carga >= 1; }, 60000), JSON.stringify(await estado()));
   s = await estado(); ok('a viagem gastou combustível', s.combustivel < comb0, `${comb0} → ${s.combustivel}`);
   await espera(2500); await foto('4-ermo');
+  ok('o ar tem vida: cinza, poeira e fumaça soltas no Ermo', await ate(() => { const k = window.__cinzas.cena(); return k.part.ps.filter(p => p.a !== undefined).length >= 6; }, 25000), await ev(() => { const k = window.__cinzas.cena(); return JSON.stringify({ n: k.part.ps.filter(p => p.a !== undefined).length, interior: k.interior, hora: k.hora() }); }));
   const z = await ev(() => { const k = window.__cinzas.cena(); return { ents: k.ents.length, flora: k.floras.length, props: k.props.length }; });
   ok('o Ermo tem criaturas, flora e objetos', z.ents > 0 && z.flora > 20 && z.props > 5, JSON.stringify(z));
 

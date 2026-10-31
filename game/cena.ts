@@ -22,6 +22,7 @@ import { ponte } from './ponte';
 import { sfx, ambiente, setGeiger, setBatimento, aplicarVolumes, trovao } from './audio';
 import { Clima, luzDia, gradeCor, sombraSol } from './sistemas/clima';
 import { Particulas } from './sistemas/particulas';
+import { taxasVida } from './sistemas/vida';
 import { novoZEstado, salvarRun, type Run, type ZEstado } from './sistemas/salvar';
 import { atualizarEnt, criarEnt, atacarJogador, iniciarMorte, type Ent } from './sistemas/ia';
 import { montarInterativos, instalarComandos, aguaInter, tickHortas, ticarAcao, dar, cabe, type Interativo, executarMorte } from './sistemas/acoes';
@@ -321,7 +322,7 @@ export class Cena extends Phaser.Scene {
     const J = this.jog; this.clima.atualizar(dt, s.minutos, this.interior);
     for (const e of this.ents) { if (Math.abs(e.x - J.x) < 36 && Math.abs(e.y - J.y) < 36) atualizarEnt(this, e, dt, noite); }
     this.ents = this.ents.filter(e => !e.remover); this.separar();
-    this.atualizarLuz(dt); this.desenharEntidades(dt, noite); this.camera(dt); this.fluxoChunks(); this.pintarFog(); this.cortes(dt, noite); this.efeitos(dt); this.vento(dt); desenharBeacon(this, dt);
+    this.atualizarLuz(dt); this.desenharEntidades(dt, noite); this.camera(dt); this.fluxoChunks(); this.pintarFog(); this.cortes(dt, noite); this.efeitos(dt); this.vento(dt); this.vidaNoAr(dt); desenharBeacon(this, dt);
     this.tPortas += dt; if (this.tPortas > 0.5) { this.tPortas = 0; for (const [i, d] of this.portas) if (d.aberta) { d.t += 0.5; const x = i % W, y = Math.floor(i / W); if (d.t > 4 && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) > 6 && !this.ents.some(e => e.vivo && Math.hypot(e.x - x - 0.5, e.y - y - 0.5) < 1.2)) this.fecharPorta(i); } }
     this.tSync += dt; if (this.tSync > 0.1) { this.tSync = 0; this.sincronizar(); }
     this.tSave += dt; if (this.tSave > 30 && !this.morto) { this.tSave = 0; this.salvar(); }
@@ -462,6 +463,29 @@ export class Cena extends Phaser.Scene {
     for (const c of this.chunks.values()) for (const w of c.paredes) this.tingir(w, noite);
     for (const p of this.props) this.tingir(p.rast, noite); for (const d of this.portas.values()) this.tingir(d.rast, noite);
     for (const fl of this.floras) { const i = idx(Math.min(W - 1, Math.max(0, Math.floor(fl.f.x))), Math.min(H - 1, Math.max(0, Math.floor(fl.f.y)))), l = Math.round(this.lmA[i] * 12); if (l !== (fl as unknown as { l?: number }).l) { (fl as unknown as { l?: number }).l = l; fl.spr.setTint(this.tom(l / 12, noite)); } }
+  }
+  /** vida no ar: cinza caindo, poeira em suspensão, vagalumes, esporos e brasas (taxas em sistemas/vida.ts) e a fumaça das fogueiras; só ao ar livre e na área da câmera */
+  acVida = { cinza: 0, poeira: 0, vagalume: 0, esporo: 0, brasa: 0, fumaca: 0 };
+  vidaNoAr(dt: number) {
+    if (this.interior || dt <= 0) return;
+    const cam = this.cameras.main, W = this.scale.width, H = this.scale.height, cl = this.clima, R = Math.random, ac = this.acVida, p = this.part, x0 = cam.scrollX, y0 = cam.scrollY, ven = 4 + cl.rajada * 40;
+    const tx = taxasVida({ bioma: this.zona.bioma, dia: luzDia(this.hora()), chuva: cl.chuva, vento: cl.rajada, neblina: cl.neblina });
+    for (const k of ['cinza', 'poeira', 'vagalume', 'esporo', 'brasa'] as const) {
+      ac[k] += tx[k] * dt; for (let n = 0; ac[k] >= 1 && n < 3; n++, ac[k] -= 1) {
+        const x = x0 + R() * W, y = y0 + R() * H;
+        if (k === 'cinza') { const z = 40 + R() * 30, vz = -(8 + R() * 6); p.solta(x, y, z, { vx: ven * 0.5 + R() * 8, vy: 1, vz, vida: (z / -vz) * 0.95, cor: [0x8a8a86, 0xa0a09a, 0x6a6a66], a: 0.6, fi: 0.5 }); }
+        else if (k === 'poeira') p.solta(x, y, 6 + R() * 22, { vx: ven * 0.4 + R() * 5, vy: (R() - 0.5) * 3, vz: (R() - 0.5) * 2, vida: 4 + R() * 3, cor: [0xc8bca0, 0xb0a488], a: 0.35, fi: 1 });
+        else if (k === 'vagalume') p.solta(x, y, 8 + R() * 28, { vx: (R() - 0.5) * 12, vy: (R() - 0.5) * 6, vz: (R() - 0.5) * 6, vida: 5 + R() * 4, cor: [0xd8f060, 0xb8e84a], tam: 2, a: 0.9, pis: 3 + R() * 3, fi: 1 });
+        else if (k === 'esporo') p.solta(x, y, 4 + R() * 10, { vx: (R() - 0.5) * 4 + ven * 0.2, vy: 0, vz: 5 + R() * 5, vida: 3 + R() * 2, cor: [0x9ae060, 0x7acf50], a: 0.6, pis: 2, fi: 0.8 });
+        else p.solta(x, y, 2, { vx: ven * 0.5 + (R() - 0.5) * 10, vy: 0, vz: 16 + R() * 14, g: 6, vida: 1.8 + R() * 0.8, cor: [0xff9a30, 0xffc060, 0xff6a20] });
+      }
+    }
+    // fumaça e fagulhas das fogueiras que estão na tela
+    for (const l of this.luzes) {
+      if (l.cor !== 0xff9a40) continue; const [sx, sy] = proj(l.x, l.y); if (sx < x0 - 30 || sx > x0 + W + 30 || sy < y0 - 40 || sy > y0 + H + 60) continue;
+      ac.fumaca += 6 * dt; for (let n = 0; ac.fumaca >= 1 && n < 4; n++, ac.fumaca -= 1) p.solta(sx + (R() - 0.5) * 3, sy, 10, { vx: ven * 0.6 + (R() - 0.5) * 4, vz: 12 + R() * 8, g: -3, vida: 1.6 + R() * 0.8, cor: [0x6a6a66, 0x86867e], tam: 2, a: 0.45, fi: 0.15 });
+      if (R() < dt * 1.2) p.faisca(sx, sy, 8, 2);
+    }
   }
   /** vento balança a flora (skew) e solta folhas/cinza */
   vento(dt: number) {

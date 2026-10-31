@@ -10,7 +10,7 @@ import { BIOMAS } from '../../game/dados/biomas';
 import { LOCAIS, custoViagem, bloqueioLocal } from '../../game/dados/locais';
 import { estadoInicial, novoRun } from '../../game/store';
 import { Rng } from '../../game/lib/rng';
-import { gerarZona, W, H, T, idx } from '../../game/zona';
+import { gerarZona, W, H, T, idx, dentro } from '../../game/zona';
 import { COLHEITA, colheitaDe } from '../../game/dados/colheita';
 import { NOTAS } from '../../game/dados/notas';
 import { atracoes, distanciaAtracoes, lacunas } from '../../game/sistemas/cobertura';
@@ -19,6 +19,9 @@ import { planejarNpcs, falaDe, estoqueMascate, vendavel, TIPOS_NPC, type CtxFala
 import { OBJETIVOS } from '../../game/dados/objetivos';
 import { criarCenaViagem, marco, ceuEm, texto, larguraTexto, type ClimaViagem } from '../../game/lib/viagem';
 import { novaRota, passoRota, P_PARADA, distTotal, type FaseRota } from '../../game/sistemas/rota';
+import { decalques } from '../../game/decalques';
+import { taxasVida, TETO_VIDA } from '../../game/sistemas/vida';
+import { TW, TH, CH } from '../../game/chao';
 import { VALOR, precoCompra, precoVenda } from '../../game/dados/balanco';
 import { GANGUE, TENSAO_LIMITE, alvoHostis, escolherArq, intervaloSpawn, noiteFator, pesosArq, podeSpawnar, pontoSpawn, tamanhoGrupo, tensaoAbate, tensaoDano, tensaoDecai, type CtxSpawn } from '../../game/sistemas/spawn';
 
@@ -347,6 +350,66 @@ teste('viagem: a física da rota chega ao fim em todo passo de tempo, para diant
   const p0 = e.p, d0 = e.dist; for (let n = 0; n < 900; n++) assert.equal(passoRota(e, 1 / 30, r, 'evento'), null); assert.equal(e.p, p0); assert.equal(e.dist, d0); assert.equal(e.vel, 0);
   // depois de chegar, o jipe para sozinho
   const f = novaRota(); let fa: FaseRota = 'indo'; for (let n = 0; n < 4000 && !f.fim; n++) if (passoRota(f, 1 / 30, { dur: 5, evento: false }, fa) === 'fim') fa = 'chegando'; for (let n = 0; n < 120; n++) passoRota(f, 1 / 30, { dur: 5, evento: false }, 'chegando'); assert.equal(f.vel, 0, 'o jipe deve parar na chegada');
+});
+
+// ================================================================ decalques do chão (detalhes carimbados sobre o terreno)
+/** monta o buffer de um chunk como o chão faz (losangos opacos) para rodar os decalques em Node */
+function bufferChunk(m: ReturnType<typeof gerarZona>, cx: number, cy: number) {
+  const w = (CH * 2 - 1) * (TW / 2) + TW, h = (CH * 2 - 1) * (TH / 2) + TH, ox = ((cx - cy) * CH - (CH - 1)) * (TW / 2) - TW / 2, oy = (cx + cy) * CH * (TH / 2), d = new Uint8ClampedArray(w * h * 4); let pixels = 0;
+  for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {
+    const x = cx * CH + i, y = cy * CH + j; if (!dentro(x, y)) continue; const lx = (x - y) * (TW / 2) - ox - TW / 2, ly = (x + y) * (TH / 2) - oy;
+    for (let py = 0; py < TH; py++) for (let px = 0; px < TW; px++) { if (Math.abs(px + 0.5 - TW / 2) / (TW / 2) + Math.abs(py + 0.5 - TH / 2) / (TH / 2) > 1.02) continue; const o = ((ly + py) * w + (lx + px)) * 4; d[o] = 120; d[o + 1] = 110; d[o + 2] = 90; d[o + 3] = 255; pixels++; }
+  }
+  return { buf: { d, w, h, ox, oy, TW, TH, CH }, pixels };
+}
+const soma = (d: Uint8ClampedArray) => { let h = 0; for (let i = 0; i < d.length; i += 7) h = Math.imul(h ^ d[i], 16777619); return h; };
+teste('decalques do chão: determinísticos, só tocam pixels de chão, cobrem 0,3–4% do terreno e dão variedade em todo local', () => {
+  for (const l of [...ZONAS, LOCAIS[0]]) {
+    const m = LOCAIS[0] === l ? gerarZona('base', 'base', 'balanco0', l.nome) : zonas(l.id)[0]; let n = 0, px = 0, pixels = 0; const tipos = new Set<string>();
+    for (let cy = 0; cy < H / CH; cy++) for (let cx = 0; cx < W / CH; cx++) {
+      const a = bufferChunk(m, cx, cy), antes = a.buf.d.slice(), r = decalques(m, cx, cy, a.buf), b = bufferChunk(m, cx, cy); decalques(m, cx, cy, b.buf);
+      assert.equal(soma(a.buf.d), soma(b.buf.d), `${l.id}: decalques não determinísticos no chunk ${cx},${cy}`); n += r.n; px += r.px; pixels += a.pixels; for (const t of Object.keys(r.porTipo)) tipos.add(t);
+      for (let o = 0; o < antes.length; o += 4) { if (antes[o + 3] === 0) { if (a.buf.d[o] | a.buf.d[o + 1] | a.buf.d[o + 2] | a.buf.d[o + 3]) assert.fail(`${l.id}: decalque pintou fora do chão (chunk ${cx},${cy})`); } else assert.equal(a.buf.d[o + 3], 255, `${l.id}: alfa do chão mudou`); }
+    }
+    entre((px / pixels) * 100, 0.3, 4, `${l.id}: % do chão com decalque`); assert.ok(n >= 150, `${l.id}: poucos decalques (${n})`); assert.ok(tipos.size >= 5, `${l.id}: pouca variedade (${[...tipos].join(', ')})`);
+  }
+});
+teste('decalques do chão: nunca em parede, porta, madeira nem água funda; marcas ao redor dos objetos (cinza da fogueira) aparecem', () => {
+  const PROIBIDO = new Set<number>([T.PAREDE, T.JANELA, T.PORTA, T.MADEIRA, T.AGUA_FUNDA]);
+  for (const id of ['cidade', 'hospital', 'floresta', 'industrial']) {
+    const m = zonas(id)[0];
+    for (let cy = 0; cy < H / CH; cy++) for (let cx = 0; cx < W / CH; cx++) {
+      const { buf } = bufferChunk(m, cx, cy), antes = buf.d.slice(); decalques(m, cx, cy, buf);
+      for (let Y = 0; Y < buf.h; Y++) for (let X = 0; X < buf.w; X++) {
+        const o = (Y * buf.w + X) * 4; if (buf.d[o] === antes[o] && buf.d[o + 1] === antes[o + 1] && buf.d[o + 2] === antes[o + 2]) continue;
+        const a = (X + 0.5 + buf.ox) / (TW / 2), b = (Y + 0.5 + buf.oy - TH / 2) / (TH / 2), x = Math.round((a + b) / 2), y = Math.round((b - a) / 2);
+        assert.ok(dentro(x, y), `${id}: decalque fora do mapa (${x},${y})`); assert.ok(!PROIBIDO.has(m.tipos[idx(x, y)]), `${id}: decalque em tile proibido ${x},${y} (tipo ${m.tipos[idx(x, y)]})`);
+      }
+    }
+  }
+  // uma fogueira de mentira num trecho de terra: o chão em volta ganha cinza
+  const m = zonas('ermo')[0]; let achou = false;
+  for (let ty = 32; ty < 47 && !achou; ty++) for (let tx = 32; tx < 47 && !achou; tx++) {
+    if (![[0, 0], [1, 0], [0, 1]].every(([dx, dy]) => m.tipos[idx(tx + dx, ty + dy)] === T.TERRA && m.rad[idx(tx + dx, ty + dy)] < 0.5)) continue; achou = true;
+    const sem = decalques({ ...m, props: [] }, 2, 2, bufferChunk(m, 2, 2).buf), com = decalques({ ...m, props: [{ id: 1, rec: { tipo: 'prop', n: 'fogueira', v: 0, d: 0, o: 0, sem: 3 } as never, x: tx, y: ty, w: 1, h: 1, solido: false, inters: [] }] }, 2, 2, bufferChunk(m, 2, 2).buf);
+    assert.ok((com.porTipo.queimado ?? 0) >= (sem.porTipo.queimado ?? 0) + 2 && com.n >= sem.n + 2, `a fogueira deveria marcar o chão (sem ${sem.n}, com ${com.n})`);
+  }
+  assert.ok(achou, 'não achei um trecho de terra para a fogueira de teste');
+});
+
+// ================================================================ vida no ar (cinza, poeira, vagalumes, esporos, brasas)
+teste('vida no ar: taxas finitas, sem passar do teto, vagalumes só à noite e sem chuva, cinza cai menos na chuva, cada bioma com sua cara', () => {
+  const soma = (t: ReturnType<typeof taxasVida>) => t.cinza + t.poeira + t.vagalume + t.esporo + t.brasa;
+  for (const bioma of ['ermo', 'cidade', 'industrial', 'floresta', 'pantano', 'base', 'desconhecido']) for (const dia of [0, 0.3, 0.7, 1]) for (const chuva of [0, 0.5, 1]) for (const vento of [0, 0.5, 1.4]) for (const neblina of [0, 1]) {
+    const t = taxasVida({ bioma, dia, chuva, vento, neblina }), rot = `${bioma} dia ${dia} chuva ${chuva} vento ${vento} neblina ${neblina}`;
+    for (const [k, v] of Object.entries(t)) assert.ok(Number.isFinite(v) && v >= 0, `${rot}: ${k} = ${v}`); assert.ok(soma(t) <= TETO_VIDA + 1e-9, `${rot}: soma ${soma(t).toFixed(1)} passa do teto`);
+  }
+  const seco = (bioma: string, dia: number) => taxasVida({ bioma, dia, chuva: 0, vento: 0 });
+  assert.equal(seco('pantano', 1).vagalume, 0, 'vagalume de dia'); assert.ok(seco('pantano', 0).vagalume >= 2, 'o Pântano precisa de vagalumes à noite'); assert.ok(seco('floresta', 0).vagalume >= 1.5); assert.equal(seco('ermo', 0).vagalume, 0, 'o Ermo não tem vagalumes');
+  assert.equal(taxasVida({ bioma: 'pantano', dia: 0, chuva: 1, vento: 0 }).vagalume < seco('pantano', 0).vagalume * 0.3, true, 'chuva espanta os vagalumes');
+  assert.ok(seco('ermo', 1).cinza >= 4 && seco('industrial', 1).cinza >= seco('ermo', 1).cinza, 'cinza cai no Ermo e mais ainda na Refinaria'); assert.ok(taxasVida({ bioma: 'ermo', dia: 1, chuva: 1, vento: 0 }).cinza <= seco('ermo', 1).cinza * 0.3, 'a chuva lava a cinza');
+  assert.ok(seco('industrial', 0).brasa > seco('industrial', 1).brasa && seco('industrial', 1).brasa >= 2, 'brasas na Refinaria, mais à noite'); assert.equal(seco('ermo', 1).brasa, 0);
+  assert.equal(seco('ermo', 0).poeira, 0, 'sem poeira em suspensão à noite'); assert.ok(seco('ermo', 1).poeira >= 3); assert.ok(seco('pantano', 1).esporo >= 1.5 && seco('floresta', 1).esporo >= 0.8, 'esporos de dia no Pântano e na Floresta');
 });
 
 // ================================================================ execução
