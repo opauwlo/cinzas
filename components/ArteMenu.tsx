@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useRef } from 'react';
-import { renderVox } from '../game/voxel';
-import { humano, dirYaw } from '../game/modelos';
+import { renderVox } from '../game/lib/vox';
+import { montarHumano, poseHumano, gerarHumano, centroHumano } from '../game/lib/humano';
+import { Rng } from '../game/lib/rng';
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 const hex = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
@@ -35,7 +36,7 @@ export default function ArteMenu() {
     for (let x = 0; x < W; x += 12) put(x, 66, 0x8a7a2c), put(x + 1, 66, 0x8a7a2c), put(x + 2, 66, 0x8a7a2c);
     for (const tx of [14, 118]) { for (let y = 40; y < 62; y++) put(tx, y, 0x050406); for (let k = 0; k < 14; k++) { put(tx - k, 44 - (k >> 1), 0x050406); put(tx + k, 46 - (k >> 1), 0x050406); } }
     g.putImageData(img, 0, 0);
-    const s = renderVox(humano(1, 'melee', 'sobrevivente'), { yaw: dirYaw(2), R: 17, mcx: 9, mcy: 9 }); g.drawImage(s.canvas, 70 - s.ox, 63 - s.oy);
+    const rec = { ...gerarHumano(new Rng('menu'), 'sobrevivente'), arma: 'pe_de_cabra' }, [mcx, mcy, R] = centroHumano(rec), sp = renderVox(montarHumano(rec, poseHumano('parado', 0, rec)), { yaw: Math.PI / 2, R, mcx, mcy }); g.drawImage(sp.canvas, 70 - sp.ox, 63 - sp.oy);
   }, []);
   return <canvas ref={ref} width={140} height={70} className="arte-menu" />;
 }

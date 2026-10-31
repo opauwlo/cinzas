@@ -1,61 +1,71 @@
 import { create } from 'zustand';
-import { ITENS } from './itens';
+import { ITENS, pesoDe } from './dados/itens';
+import type { ClimaId } from './dados/biomas';
 
 export type Tela = 'menu' | 'jogo' | 'morte' | 'vitoria' | 'creditos' | 'loja' | 'revelacao';
+export type Painel = null | 'inv' | 'craft' | 'bau' | 'mapa' | 'cozinha' | 'dormir' | 'pausa' | 'config' | 'diario' | 'mapaZona';
 export type Toast = { id: number; texto: string; cor: string };
 export type Resumo = { causa: string; dias: number; hora: string; abates: number; vasculhados: number; radMax: number; vitoria: boolean; distAbrigo: number };
+export type Configs = { mestre: number; sfx: number; amb: number; mus: number; vibra: boolean; ui: number; escala: 2 | 3; autoMira: boolean; gore: boolean; canhoto: boolean; fps: boolean };
+export type ClimaHud = { tipo: ClimaId; chuva: number; vento: number; neblina: number; poeira: number; nuvem: number };
+
+export const CFG0: Configs = { mestre: 0.8, sfx: 0.9, amb: 0.8, mus: 0.5, vibra: true, ui: 1, escala: 2, autoMira: true, gore: true, canhoto: false, fps: false };
+export function lerCfg(): Configs { try { return { ...CFG0, ...JSON.parse(localStorage.getItem('cinzas.cfg') ?? '{}') }; } catch { return { ...CFG0 }; } }
+export function gravarCfg(c: Configs) { try { localStorage.setItem('cinzas.cfg', JSON.stringify(c)); } catch { /* sem storage */ } }
 
 export type Estado = {
-  tela: Tela;
-  seed: string;
-  minutos: number;
+  tela: Tela; painel: Painel; seed: string; zonaId: string; zonaNome: string; biomaId: string; minutos: number;
   hp: number; maxHp: number; fome: number; sede: number; stamina: number; rad: number; sangra: boolean;
-  inv: Record<string, number>; arma: string | null; municao: number; mascara: boolean;
+  inv: Record<string, number>; bau: Record<string, number>; arma: string | null; balas: Record<string, number>; mascara: boolean; combustivel: number;
   lanterna: { tem: boolean; ligada: boolean; bat: number };
-  cpm: number; objIdx: number; objProg: number; abrigoDist: number; abrigoDir: number; sabeAbrigo: boolean;
-  vasculhados: number; abates: number; radMax: number;
+  cpm: number; objIdx: number; objProg: number; vasculhados: number; abates: number; radMax: number; sabeAbrigo: boolean;
+  clima: ClimaHud; interior: boolean; tanque: number;
   toasts: Toast[]; acao: { rotulo: string; p: number } | null; alvo: string | null; furtivo: boolean;
-  invAberto: boolean; danoTs: number; resumo: Resumo | null; gemas: number; carga: number;
+  danoTs: number; resumo: Resumo | null; gemas: number; carga: number; descobertos: string[]; dica: string | null; cfg: Configs; temSave: boolean; fps: number;
   set: (p: Partial<Estado>) => void;
   toast: (texto: string, cor?: string) => void;
 };
 
 export const OBJETIVOS = [
+  { titulo: 'Viaje no jipe até o Ermo', dica: 'Use o jipe no portão do abrigo e escolha um destino no mapa.' },
   { titulo: 'Vasculhe 5 contêineres', dica: 'Geladeiras, armários e porta-malas guardam o essencial.' },
-  { titulo: 'Sobreviva até o anoitecer', dica: 'À noite a visão encurta e eles ficam mais ativos.' },
-  { titulo: 'Ache o rádio de campanha', dica: 'Um prédio a leste guarda um rádio de campanha.' },
-  { titulo: 'Chegue ao ABRIGO 7', dica: 'O rádio capta o sinal. Siga a seta.' },
+  { titulo: 'Fabrique algo na bancada', dica: 'Volte ao abrigo com madeira, sucata e tecido.' },
+  { titulo: 'Sobreviva a uma noite', dica: 'À noite a visão encurta e eles ficam mais ativos.' },
+  { titulo: 'Ache o rádio de campanha', dica: 'Um rádio de campanha deve estar na Cidade Velha.' },
+  { titulo: 'Viaje até o Abrigo 7', dica: 'O rádio capta o sinal. Escolha o Abrigo 7 no mapa.' },
 ];
 
 export const horaStr = (min: number) => { const m = Math.floor(min) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
-export const pesoInv = (inv: Record<string, number>) => Object.entries(inv).reduce((s, [id, q]) => s + (ITENS[id]?.peso ?? 0) * q, 0);
-export const PESO_MAX = 14;
+export const PESO_BASE = 14;
+export const pesoMax = (inv: Record<string, number>) => PESO_BASE + (inv.mochila ? 10 : 0);
+export const pesoInv = (inv: Record<string, number>) => pesoDe(inv);
 
 let tid = 1;
 export const estadoInicial = (seed: string) => ({
-  seed, minutos: 8 * 60, hp: 100, maxHp: 100, fome: 78, sede: 70, stamina: 100, rad: 0, sangra: false,
-  inv: { agua: 1, bandagem: 1 } as Record<string, number>, arma: 'pe_de_cabra' as string | null, municao: 0, mascara: false,
-  lanterna: { tem: false, ligada: false, bat: 100 }, cpm: 18, objIdx: 0, objProg: 0, abrigoDist: 0, abrigoDir: 0, sabeAbrigo: false,
-  vasculhados: 0, abates: 0, radMax: 0, toasts: [] as Toast[], acao: null, alvo: null, furtivo: false, invAberto: false, danoTs: 0, resumo: null,
+  seed, zonaId: 'base', zonaNome: 'Abrigo', biomaId: 'base', minutos: 8 * 60, hp: 100, maxHp: 100, fome: 78, sede: 70, stamina: 100, rad: 0, sangra: false,
+  inv: { agua: 1, bandagem: 2, pe_de_cabra: 1, enlatado: 1 } as Record<string, number>, bau: { tecido: 3, madeira: 4, sucata: 4, enlatado: 2, alcool: 1, garrafa: 2, semente: 2 } as Record<string, number>,
+  arma: 'pe_de_cabra' as string | null, balas: { municao: 0, cartucho: 0 } as Record<string, number>, mascara: false, combustivel: 6, lanterna: { tem: false, ligada: false, bat: 100 },
+  cpm: 18, objIdx: 0, objProg: 0, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
+  clima: { tipo: 'limpo', chuva: 0, vento: 0.1, neblina: 0, poeira: 0, nuvem: 0.1 } as ClimaHud, interior: false, tanque: 0,
+  toasts: [] as Toast[], acao: null, alvo: null, furtivo: false, danoTs: 0, resumo: null, descobertos: ['base'] as string[], dica: null,
 });
 
 export const useJogo = create<Estado>((set, get) => ({
-  tela: 'menu', ...estadoInicial(''), gemas: 20, carga: 0,
+  tela: 'menu', painel: null, ...estadoInicial(''), gemas: 20, carga: 0, cfg: { ...CFG0 }, temSave: false, fps: 0,
   set: p => set(p),
-  toast: (texto, cor = '#e8e4d8') => {
+  toast: (texto, cor = '#d8d3c0') => {
     const t = { id: tid++, texto, cor };
     set({ toasts: [...get().toasts.slice(-3), t] });
     setTimeout(() => set({ toasts: get().toasts.filter(x => x.id !== t.id) }), 2600);
   },
 }));
 
-// ---- meta-progresso local (aversão à perda legítima: o que fica depois da morte)
-export type Meta = { runs: number; melhorTempo: number; abatesTotais: number; sequencia: number; ultimoDia: string; vitorias: number };
-const META0: Meta = { runs: 0, melhorTempo: 0, abatesTotais: 0, sequencia: 0, ultimoDia: '', vitorias: 0 };
+// ---- meta-progresso local (o que fica depois da morte)
+export type Meta = { runs: number; melhorTempo: number; abatesTotais: number; sequencia: number; ultimoDia: string; vitorias: number; dicas: string[] };
+const META0: Meta = { runs: 0, melhorTempo: 0, abatesTotais: 0, sequencia: 0, ultimoDia: '', vitorias: 0, dicas: [] };
 export const hoje = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 export function lerMeta(): Meta { try { return { ...META0, ...JSON.parse(localStorage.getItem('cinzas.meta') ?? '{}') }; } catch { return { ...META0 }; } }
 export function gravarMeta(m: Meta) { try { localStorage.setItem('cinzas.meta', JSON.stringify(m)); } catch { /* sem storage */ } }
-/** atualiza a sequência de dias jogados; devolve a meta já atualizada */
 export function registrarDia(): Meta {
   const m = lerMeta(); const h = hoje();
   if (m.ultimoDia !== h) {
@@ -64,3 +74,15 @@ export function registrarDia(): Meta {
   }
   return m;
 }
+import type { Run } from './sistemas/salvar';
+export function novoRun(seed: string, bonus = false): Run {
+  const e = estadoInicial(seed), inv = { ...e.inv }; if (bonus) inv.kit = 1;
+  return { seed, zonaId: 'base', minutos: e.minutos, hp: 100, maxHp: 100, fome: e.fome, sede: e.sede, stamina: 100, rad: 0, sangra: false, radMax: 0, inv, bau: { ...e.bau }, arma: 'pe_de_cabra', balas: { municao: 0, cartucho: 0 }, mascara: false, combustivel: 6, lanterna: { tem: false, ligada: false, bat: 100 },
+    vasculhados: 0, abates: 0, objIdx: 0, sabeAbrigo: false, descobertos: ['base'], tanque: 0, zonas: {}, viajou: false, craftou: false, noites: 0, dicas: [], tempoDeJogo: 0 };
+}
+/** copia a run para o store da UI (o que a HUD e os painéis leem) */
+export function aplicarRun(r: Run) {
+  useJogo.setState({ seed: r.seed, zonaId: r.zonaId, minutos: r.minutos, hp: r.hp, maxHp: r.maxHp, fome: r.fome, sede: r.sede, stamina: r.stamina, rad: r.rad, sangra: r.sangra, inv: { ...r.inv }, bau: { ...r.bau }, arma: r.arma, balas: { ...r.balas }, mascara: r.mascara, combustivel: r.combustivel, lanterna: { ...r.lanterna },
+    objIdx: r.objIdx, objProg: 0, vasculhados: r.vasculhados, abates: r.abates, radMax: r.radMax, sabeAbrigo: r.sabeAbrigo, descobertos: [...r.descobertos], tanque: r.tanque, toasts: [], acao: null, alvo: null, painel: null, dica: null, resumo: null });
+}
+export { ITENS };

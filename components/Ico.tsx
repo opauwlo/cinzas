@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+
 // Ícones game-icons.net (CC BY 3.0) convertidos para pixel art 1-bit com contorno, para combinar com o resto da arte.
 const cache = new Map<string, string>(); const pend = new Map<string, Promise<string>>();
 function gerar(src: string, cor: string, n: number): Promise<string> {
@@ -18,7 +20,7 @@ function gerar(src: string, cor: string, n: number): Promise<string> {
         else if (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1)) { o.data[i] = 8; o.data[i + 1] = 8; o.data[i + 2] = 9; o.data[i + 3] = 255; }
       }
       sg.putImageData(o, 0, 0); const u = sm.toDataURL(); cache.set(k, u); res(u);
-    }; im.onerror = () => res(''); im.src = emb ?? src;
+    }; im.onerror = () => res(''); im.src = emb ?? ((process.env.NEXT_PUBLIC_BASE_PATH ?? '') + src);
   });
   pend.set(k, p); return p;
 }
@@ -27,4 +29,4 @@ export default function Ico({ src, cor = '#cfc7ae', n = 22, esc = 1, style }: { 
   useEffect(() => { let vivo = true; gerar(src, cor, n).then(x => { if (vivo) setU(x); }); return () => { vivo = false; }; }, [src, cor, n]);
   return <img src={u || undefined} alt="" width={n * esc} height={n * esc} style={{ imageRendering: 'pixelated', display: 'block', opacity: u ? 1 : 0, ...style }} draggable={false} />;
 }
-export const ic = (a: string, n: string) => `/icons/${a}/${n}.svg`;
+export const ic = (a: string, n: string) => `${BASE}/icons/${a}/${n}.svg`;

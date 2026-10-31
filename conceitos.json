@@ -39,6 +39,51 @@
       "id": 8,
       "nome": "Modo Estudo com Revelação (mostrado x verdade)",
       "nota": "Reproduz técnicas sombrias de propósito, sem cobrança real, e registra cada uma para a reportagem."
+    },
+    {
+      "id": 9,
+      "nome": "Biblioteca raiz de componentes procedurais (receita → peça → sprite)",
+      "nota": "Humanos, quadrúpedes, insetos, aves, flora, props e paredes saem de receitas pequenas (dados) montadas por peças intercambiáveis com variação por seed. Nenhum sprite desenhado à mão (game/lib)."
+    },
+    {
+      "id": 10,
+      "nome": "Membros faltando como dado de gameplay",
+      "nota": "A receita lista `falta: [bracoE, pernaD, mandibula…]`: o montador omite o membro, desenha o toco e a IA muda (perna a menos = mais lento; duas = rasteja)."
+    },
+    {
+      "id": 11,
+      "nome": "Fábrica de sprites preguiçosa com orçamento por quadro",
+      "nota": "Sprites 8 direções × clipes são gerados sob demanda numa fila com orçamento de ms e poda, então a variedade é praticamente ilimitada sem pré-renderizar."
+    },
+    {
+      "id": 12,
+      "nome": "Vento nas plantas por quadros cisalhados gerados sob demanda",
+      "nota": "Phaser 4 não tem skew em Image; a flora recebe versões cisalhadas do voxel (±1) geradas aos poucos e trocadas pela rajada."
+    },
+    {
+      "id": 13,
+      "nome": "Camada de clima em pixels ligada à jogabilidade",
+      "nota": "Chuva, respingos, neblina pontilhada, poeira e raios desenhados em pixels; clima muda visibilidade, ruído, luz e sons ambientes."
+    },
+    {
+      "id": 14,
+      "nome": "Visão adaptativa pelo dia",
+      "nota": "Círculo de visão cresce com a luz do dia e encolhe à noite, quando o cone da lanterna passa a mandar; paredes bloqueiam (shadowcasting)."
+    },
+    {
+      "id": 15,
+      "nome": "Gerador único de zonas por bioma com estado persistente em diff",
+      "nota": "Uma função gera base, ermo, cidade, floresta, indústria e pântano a partir de configs; só as mudanças do jogador são salvas e o mundo reaparece em 3 dias."
+    },
+    {
+      "id": 16,
+      "nome": "Loop base ↔ viagem de jipe com combustível e horas",
+      "nota": "Viajar custa combustível e horas do relógio; zonas têm perigo, saque e clima próprios; o abrigo é o ponto de retorno (vibe Last Day on Earth)."
+    },
+    {
+      "id": 17,
+      "nome": "Controles de toque com mira automática e toque-no-objeto",
+      "nota": "Joystick duplo próprio: tocar ataca com auto-mira, arrastar mira, tocar num objeto interage."
     }
   ],
   "adaptados": [
@@ -67,10 +112,6 @@
       "origem": "game-icons.net (CC BY 3.0)"
     },
     {
-      "nome": "Joystick virtual",
-      "origem": "nipplejs (MIT)"
-    },
-    {
       "nome": "Render e câmera",
       "origem": "Phaser 4.2.1 (MIT)"
     },
@@ -85,6 +126,26 @@
     {
       "nome": "Ruído e RNG com seed",
       "origem": "simplex-noise, alea (MIT)"
+    },
+    {
+      "nome": "Joystick virtual (próprio)",
+      "origem": "padrão dos jogos mobile; código próprio (nipplejs removido)"
+    },
+    {
+      "nome": "Base + viagens + fabricação",
+      "origem": "referência de gameplay: Last Day on Earth; implementação própria"
+    },
+    {
+      "nome": "Buffers de áudio procedural",
+      "origem": "ZzFX buildSamples (MIT) com barramentos mestre/sfx/ambiente/música próprios"
+    },
+    {
+      "nome": "PWA instalável e funcionamento offline",
+      "origem": "padrões web (manifest + service worker)"
+    },
+    {
+      "nome": "Publicação",
+      "origem": "GitHub Pages via actions oficiais (upload-pages-artifact, deploy-pages)"
     }
   ]
 }
