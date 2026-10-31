@@ -16,7 +16,7 @@ export type Spawn = { tipo: 'irr' | 'cao' | 'rato'; x: number; y: number };
 export type Predio = { x: number; y: number; w: number; h: number; tipo: 'casa' | 'loja' | 'oficina' | 'mercado' };
 
 export type Mundo = {
-  tipos: Uint8Array; rad: Float32Array; solido: Uint8Array; opaco: Uint8Array;
+  tipos: Uint8Array; rad: Float32Array; solido: Uint8Array; opaco: Uint8Array; estilo: Uint8Array;
   props: Prop[]; spawns: Spawn[]; predios: Predio[];
   jogador: { x: number; y: number }; abrigo: { x: number; y: number }; radio: { x: number; y: number };
 };
@@ -41,6 +41,7 @@ export function gerarMundo(seed: string): Mundo {
   const spawns: Spawn[] = [];
   const ocupado = new Uint8Array(W * H); // props e portas (não colocar nada em cima)
   const interior = new Uint8Array(W * H);
+  const estilo = new Uint8Array(W * H);
   let pid = 1;
   const ri = (a: number, b: number) => a + Math.floor(rng() * (b - a + 1));
 
@@ -88,7 +89,7 @@ export function gerarMundo(seed: string): Mundo {
     for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) {
       const borda = x === p.x || y === p.y || x === p.x + p.w - 1 || y === p.y + p.h - 1;
       const i = idx(x, y);
-      if (borda) { tipos[i] = T.PAREDE; solido[i] = 1; opaco[i] = 1; }
+      if (borda) { tipos[i] = T.PAREDE; solido[i] = 1; opaco[i] = 1; estilo[i] = p.tipo === 'casa' ? 0 : p.tipo === 'oficina' ? 2 : 1; }
       else { tipos[i] = piso; interior[i] = 1; }
     }
     // divisória
@@ -98,7 +99,7 @@ export function gerarMundo(seed: string): Mundo {
       for (let y = p.y + 1; y < p.y + p.h - 1; y++) {
         const i = idx(dx, y);
         if (y === gap || y === gap + 1) { ocupado[i] = 1; continue; }
-        tipos[i] = T.PAREDE; solido[i] = 1; opaco[i] = 1; interior[i] = 0;
+        tipos[i] = T.PAREDE; solido[i] = 1; opaco[i] = 1; interior[i] = 0; estilo[i] = p.tipo === 'casa' ? 0 : p.tipo === 'oficina' ? 2 : 1;
       }
     }
     // porta principal (lado voltado ao centro do mundo) + janelas + brechas
@@ -174,10 +175,10 @@ export function gerarMundo(seed: string): Mundo {
   for (let k = 0; k < 34; k++) {
     const horiz = rng() < 0.5;
     const via = horiz ? ESTRADAS_Y[ri(0, 1)] : ESTRADAS_X[ri(0, 1)];
-    const off = ri(0, 2);
+    const off = ri(0, 1);
     const along = ri(3, W - 6);
     const x = horiz ? along : via + off, y = horiz ? via + off : along;
-    const w = horiz ? 2 : 1, h = horiz ? 1 : 2;
+    const w = horiz ? 3 : 2, h = horiz ? 2 : 3;
     let ok = true;
     for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (!dentro(xx, yy) || ocupado[idx(xx, yy)] || ![T.ESTRADA, T.LINHA_H, T.LINHA_V].includes(tipos[idx(xx, yy)] as 1 | 9 | 10)) ok = false;
     if (!ok) continue;
@@ -214,5 +215,5 @@ export function gerarMundo(seed: string): Mundo {
   for (let g = 0; g < 8; g++) { const cx = ri(3, W - 4), cy = ri(3, H - 4); if (longe(cx, cy)) grupo('rato', ri(3, 5), cx, cy); }
 
   const rp = props.find(p => p.especial);
-  return { tipos, rad, solido, opaco, props, spawns, predios, jogador, abrigo, radio: rp ? { x: rp.x, y: rp.y } : { x: 60, y: 48 } };
+  return { tipos, rad, solido, opaco, estilo, props, spawns, predios, jogador, abrigo, radio: rp ? { x: rp.x, y: rp.y } : { x: 60, y: 48 } };
 }

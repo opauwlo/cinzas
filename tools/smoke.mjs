@@ -35,10 +35,11 @@ try {
   let pg = await abrir();
   await foto(pg, '1-menu');
   ok(await pg.$eval('h1', e => e.textContent) === 'CINZAS', 'menu mostra CINZAS');
-  ok(await pg.evaluate(() => document.fonts.check('900 20px Cinzel') && document.fonts.check('800 20px Nunito')), 'fontes Cinzel e Nunito carregadas');
+  ok(await pg.evaluate(() => document.fonts.check('700 20px Silkscreen') && document.fonts.check('20px VT323')), 'fontes pixel carregadas');
   ok(!(await pg.evaluate(() => document.body.innerText.includes('PERDIDO'))), 'menu normal sem manipulação');
   await clicar(pg, 'Sobreviver');
   await pg.waitForSelector('canvas', { timeout: 20000 });
+  await pg.waitForFunction(() => window.__cinzas && window.__cinzas.store.getState().carga >= 1, { timeout: 60000 });
   await esp(2500); await foto(pg, '2-jogo');
   const px = await pg.evaluate(() => new Promise(res => window.__cinzas.game.renderer.snapshot(img => { const t = document.createElement('canvas'); t.width = img.width; t.height = img.height; const x = t.getContext('2d'); x.drawImage(img, 0, 0); const d = x.getImageData(0, 0, t.width, t.height).data; let n = 0; for (let i = 0; i < d.length; i += 4 * 97) if (d[i] + d[i + 1] + d[i + 2] > 30) n++; res(n); })));
   ok(px > 200, `canvas com pixels (${px})`);
@@ -90,7 +91,7 @@ try {
   // ---- modo estudo
   pg = await abrir('?estudo=1');
   ok(await pg.evaluate(() => document.body.innerText.includes('PERDIDO')), 'estudo: menu mostra aversão à perda');
-  await clicar(pg, 'Sobreviver'); await pg.waitForSelector('canvas'); await esp(1500);
+  await clicar(pg, 'Sobreviver'); await pg.waitForSelector('canvas'); await pg.waitForFunction(() => window.__cinzas && window.__cinzas.store.getState().carga >= 1, { timeout: 60000 }); await esp(1500);
   await pg.evaluate(() => { window.__cinzas.cena().machucar(500, 0); }); await pg.waitForFunction(() => window.__cinzas.store.getState().tela === 'morte', { timeout: 15000 }).catch(() => {}); await pg.waitForFunction(() => /faltaram/i.test(document.body.innerText), { timeout: 10000 }).catch(() => {});
   ok(await pg.evaluate(() => /faltaram só/i.test(document.body.innerText)), 'estudo: quase-vitória fabricada aparece'); await foto(pg, '8-estudo-morte');
   await clicar(pg, 'Reviver'); await esp(300); await foto(pg, '9-loja');

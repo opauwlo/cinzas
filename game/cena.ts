@@ -1,13 +1,14 @@
 import * as Phaser from 'phaser';
 import * as ROT from 'rot-js';
 import { gerarMundo, W, H, T, idx, dentro, type Mundo, type Prop } from './mapa';
-import { gerarAtlas, TS, type Atlas } from './arte';
+import { assarChao, iso, CH } from './chao';
+import { tarefasSprites, DIRS, type Sprites } from './modelos';
+import { tarefasParedes } from './paredes';
 import { ITENS, COR_RARIDADE } from './itens';
 import { useJogo, estadoInicial, horaStr, pesoInv, PESO_MAX } from './store';
 import { ponte, type Rapido } from './ponte';
 import { sfx, setGeiger, setBatimento, vibra } from './audio';
 
-const CH = 16;
 const MIN_POR_SEG = 1440 / (14 * 60); // um dia de jogo = 14 min reais
 type Tipo = 'irr' | 'cao' | 'rato';
 const DEF: Record<Tipo, { hp: number; vel: number; dano: number; raio: number; visao: number }> = {
@@ -18,162 +19,129 @@ const DEF: Record<Tipo, { hp: number; vel: number; dano: number; raio: number; v
 type Ini = {
   tipo: Tipo; x: number; y: number; hp: number; ang: number; estado: 'ocioso' | 'investiga' | 'persegue';
   alvo: { x: number; y: number } | null; caminho: [number, number][]; tCam: number; cd: number; tSent: number; semVer: number; vagar: number;
-  kx: number; ky: number; fase: number; vivo: boolean; spr: Phaser.GameObjects.Image; som: Phaser.GameObjects.Image;
+  kx: number; ky: number; fase: number; vivo: boolean; spr: Phaser.GameObjects.Image; som: Phaser.GameObjects.Image; lvl: number; dir: number;
 };
 type Acao = { rotulo: string; dur: number; t: number; fim: () => void; ruido?: number };
-type Efeito = { k: 'arco' | 'tracer' | 'anel'; x: number; y: number; a: number; r: number; t: number; dur: number; x2?: number; y2?: number };
-const hash = (x: number, y: number) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
+type Efeito = { k: 'arco' | 'tracer' | 'anel'; x: number; y: number; a: number; r: number; t: number; dur: number };
+type Rastreado = { spr: Phaser.GameObjects.Image; i: number; lvl: number };
 const ang = (a: number) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 const sstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+/** direção na tela (0=direita, 2=baixo...) a partir do ângulo no grid */
+const dirTela = (a: number) => (Math.round(Math.atan2((Math.cos(a) + Math.sin(a)) * 0.5, Math.cos(a) - Math.sin(a)) / (Math.PI / 4)) + 8) % 8;
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
+const proj = (x: number, y: number, z = 0) => { const [sx, sy] = iso(x, y); return [sx, sy - z] as const; };
 
 export class Cena extends Phaser.Scene {
-  atlas!: Atlas; mundo!: Mundo; fov!: InstanceType<typeof ROT.FOV.PreciseShadowcasting>;
-  chunks = new Map<string, Phaser.GameObjects.Image>();
-  props: { p: Prop; spr: Phaser.GameObjects.Image }[] = [];
-  portas = new Map<number, { aberta: boolean; spr: Phaser.GameObjects.Image; horiz: boolean; t: number }>();
+  sprites: Sprites = {}; tarefas: (() => void)[] = []; totalTarefas = 1; pronto = false;
+  mundo!: Mundo; fov!: InstanceType<typeof ROT.FOV.PreciseShadowcasting>;
+  chunks = new Map<string, { img: Phaser.GameObjects.Image; paredes: Rastreado[] }>();
+  props: { p: Prop; spr: Phaser.GameObjects.Image; rast: Rastreado }[] = [];
+  portas = new Map<number, { aberta: boolean; spr: Phaser.GameObjects.Image; horiz: boolean; t: number; rast: Rastreado }>();
   inim: Ini[] = []; cadaveres: Phaser.GameObjects.Image[] = [];
-  jog = { x: 0, y: 0, ang: 0, passo: 0, andando: false, spr: null as unknown as Phaser.GameObjects.Image, som: null as unknown as Phaser.GameObjects.Image };
+  jog = { x: 0, y: 0, ang: 0, passo: 0, andando: false, spr: null as unknown as Phaser.GameObjects.Image, som: null as unknown as Phaser.GameObjects.Image, lvl: 0 };
   s = estadoInicial('');
-  lm!: Phaser.Textures.CanvasTexture; lmData!: ImageData; lmA = new Float32Array(W * H).fill(0.96); seen = new Uint8Array(W * H); luzFrame = new Float32Array(W * H);
-  gfx!: Phaser.GameObjects.Graphics; efeitos: Efeito[] = [];
-  clarao!: Phaser.GameObjects.Image; flash = 0;
+  lmA = new Float32Array(W * H).fill(0.95); seen = new Uint8Array(W * H); luzFrame = new Float32Array(W * H);
+  fogC!: Phaser.Textures.CanvasTexture; fogD!: ImageData; fogImg!: Phaser.GameObjects.Image;
+  gfx!: Phaser.GameObjects.Graphics; efeitos: Efeito[] = []; clarao!: Phaser.GameObjects.Image; flash = 0; marca!: Phaser.GameObjects.Graphics;
   acao: Acao | null = null; teclas!: Record<string, Phaser.Input.Keyboard.Key>;
-  morto = false; ambient = 1; hitstop = 0; cdAtaque = 0; tSync = 0; tAlvo = 0; tRuido = 0; tSpawn = 0; tPortas = 0; tAvisoMun = 0;
+  morto = false; ambient = 1; hitstop = 0; cdAtaque = 0; tSync = 0; tAlvo = 0; tRuido = 0; tSpawn = 0; tPortas = 0; tAvisoMun = 0; tCut = 0;
   camX = 0; camY = 0; pathBudget = 3; distAbrigo0 = 1; desktop = false; mouse = { x: 0, y: 0, ativo: false, baixo: false };
-  radSuave = 0; dano = 0; acordado = 0;
+  radSuave = 0; dano = 0; alvoProp: Prop | null = null; interior = false;
+  org: Record<string, [number, number]> = {};
 
   constructor() { super('cena'); }
-
   init(d: { seed: string }) { this.s = { ...estadoInicial(d.seed) }; }
 
+  // ------------------------------------------------------------------ carga da arte (aos poucos, sem travar)
   create() {
-    this.atlas = gerarAtlas();
-    for (const [k, c] of Object.entries(this.atlas)) this.textures.addCanvas(k, c);
-    this.mundo = gerarMundo(this.s.seed);
-    const m = this.mundo;
+    this.tarefas = [...tarefasSprites(this.sprites), ...tarefasParedes(this.sprites)]; this.totalTarefas = this.tarefas.length;
+    this.cameras.main.setRoundPixels(true);
+    useJogo.setState({ carga: 0 });
+  }
+  iniciar() {
+    for (const [k, r] of Object.entries(this.sprites)) { this.textures.addCanvas(k, r.canvas); this.org[k] = [r.ox / r.canvas.width, r.oy / r.canvas.height]; }
+    const so = document.createElement('canvas'); so.width = 22; so.height = 11; const sg = so.getContext('2d')!; sg.fillStyle = 'rgba(0,0,0,.5)';
+    for (let y = 0; y < 11; y++) for (let x = 0; x < 22; x++) { const dx = (x + 0.5 - 11) / 11, dy = (y + 0.5 - 5.5) / 5.5; if (dx * dx + dy * dy < 1 && ((x + y) % 2 === 0 || dx * dx + dy * dy < 0.55)) sg.fillRect(x, y, 1, 1); }
+    this.textures.addCanvas('sombra', so);
+    const fl = document.createElement('canvas'); fl.width = fl.height = 17; const fg = fl.getContext('2d')!; fg.fillStyle = '#fff2b0';
+    for (let i = -8; i <= 8; i++) { const a = 8 - Math.abs(i); fg.fillRect(8 + i, 8, 1, 1); fg.fillRect(8, 8 + i, 1, 1); if (a > 3) fg.fillRect(8 + i, 8 - ((a - 3) >> 1), 1, 1); }
+    fg.fillStyle = '#ffd070'; fg.fillRect(5, 5, 7, 7); fg.fillStyle = '#fff8d8'; fg.fillRect(7, 7, 3, 3); this.textures.addCanvas('clarao', fl);
+
+    this.mundo = gerarMundo(this.s.seed); const m = this.mundo;
     this.fov = new ROT.FOV.PreciseShadowcasting((x, y) => dentro(x, y) && !m.opaco[idx(x, y)]);
     this.desktop = !window.matchMedia('(pointer: coarse)').matches;
     this.distAbrigo0 = Math.hypot(m.abrigo.x - m.jogador.x, m.abrigo.y - m.jogador.y);
 
-    // props e portas
     for (const p of m.props) {
-      const key = this.chaveProp(p);
-      const spr = this.add.image(p.x * TS, p.y * TS, key).setOrigin(0);
-      if (p.tipo === 'arvore') spr.setScale(1.5).setPosition(p.x * TS - 16, p.y * TS - 20).setDepth((p.y + 1) * TS + 60);
-      else if (p.tipo === 'bunker') spr.setDepth(-100);
-      else spr.setDepth(p.y * TS + 16 + (p.h - 1) * TS);
-      this.props.push({ p, spr });
+      const key = this.chaveProp(p), [ox, oy] = this.org[key]; const [sx, sy] = proj(p.x + p.w / 2, p.y + p.h / 2);
+      const spr = this.add.image(sx, sy, key).setOrigin(ox, oy).setDepth(p.tipo === 'bunker' ? -5000 : (p.x + p.y + p.w / 2 + p.h / 2) * 10 - (p.w + p.h) * 4);
+      this.props.push({ p, spr, rast: { spr, i: idx(Math.min(W - 1, p.x + (p.w >> 1)), Math.min(H - 1, p.y + (p.h >> 1))), lvl: -1 } });
     }
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (m.tipos[idx(x, y)] === T.PORTA) {
-      const horiz = m.tipos[idx(x - 1, y)] === T.PAREDE || m.tipos[idx(x + 1, y)] === T.PAREDE;
-      const spr = this.add.image(x * TS + 32, y * TS + 32, 'porta_f').setDepth(y * TS + 20);
-      if (!horiz) spr.setRotation(Math.PI / 2);
-      this.portas.set(idx(x, y), { aberta: false, spr, horiz, t: 0 });
+      const horiz = m.tipos[idx(x - 1, y)] === T.PAREDE || m.tipos[idx(x + 1, y)] === T.PAREDE, k = `porta_${horiz ? 'x' : 'y'}_f`, [ox, oy] = this.org[k], [sx, sy] = proj(x + 0.5, y + 0.5);
+      const spr = this.add.image(sx, sy, k).setOrigin(ox, oy).setDepth((x + y + 1) * 10 - 1);
+      this.portas.set(idx(x, y), { aberta: false, spr, horiz, t: 0, rast: { spr, i: idx(x, y), lvl: -1 } });
     }
-
-    // jogador
     this.jog.x = m.jogador.x + 0.5; this.jog.y = m.jogador.y + 0.5;
-    this.jog.som = this.add.image(0, 0, 'sombra').setAlpha(0.9);
-    this.jog.spr = this.add.image(0, 0, 'jog_melee0');
-    this.camX = this.jog.x * TS; this.camY = this.jog.y * TS;
-
-    // inimigos
+    this.jog.som = this.add.image(0, 0, 'sombra'); this.jog.spr = this.add.image(0, 0, 'jog_melee_2_1');
     for (const sp of m.spawns) this.criarInimigo(sp.tipo, sp.x + 0.5, sp.y + 0.5);
 
-    // luz / fog
-    const lm = this.textures.createCanvas('lm', W, H)!; this.lm = lm;
-    this.lmData = lm.context.createImageData(W, H);
-    this.add.image(0, 0, 'lm').setOrigin(0).setScale(TS).setDepth(100000);
-    this.gfx = this.add.graphics().setDepth(90000);
-    this.clarao = this.add.image(0, 0, 'clarao').setBlendMode(Phaser.BlendModes.ADD).setDepth(90001).setVisible(false);
-
+    // fog de piso (pontilhado) em tela cheia, entre o chão e os objetos
+    this.criarFog();
+    this.gfx = this.add.graphics().setDepth(90000); this.marca = this.add.graphics().setDepth(90001);
+    this.clarao = this.add.image(0, 0, 'clarao').setDepth(90002).setVisible(false);
     this.teclas = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SHIFT,E,F,SPACE') as Record<string, Phaser.Input.Keyboard.Key>;
     if (this.desktop) {
-      this.input.on('pointermove', (p: Phaser.Input.Pointer) => { this.mouse.x = p.worldX / TS; this.mouse.y = p.worldY / TS; this.mouse.ativo = true; });
-      this.input.on('pointerdown', () => { this.mouse.baixo = true; });
-      this.input.on('pointerup', () => { this.mouse.baixo = false; });
-      this.input.keyboard!.on('keydown-E', () => this.interagir());
-      this.input.keyboard!.on('keydown-F', () => this.lanterna());
-      this.input.keyboard!.on('keydown-Q', () => this.trocarArma());
+      this.input.on('pointermove', (p: Phaser.Input.Pointer) => { this.mouse.x = (p.worldX / 16 + p.worldY / 8) / 2; this.mouse.y = (p.worldY / 8 - p.worldX / 16) / 2; this.mouse.ativo = true; });
+      this.input.on('pointerdown', () => { this.mouse.baixo = true; }); this.input.on('pointerup', () => { this.mouse.baixo = false; });
+      this.input.keyboard!.on('keydown-E', () => this.interagir()); this.input.keyboard!.on('keydown-F', () => this.lanterna()); this.input.keyboard!.on('keydown-Q', () => this.trocarArma());
       for (const [k, v] of [['ONE', 'agua'], ['TWO', 'comida'], ['THREE', 'curar'], ['FOUR', 'antirrad']] as [string, Rapido][]) this.input.keyboard!.on('keydown-' + k, () => this.usarRapido(v));
     }
-    this.scale.on('resize', () => this.ajustarZoom());
-    this.ajustarZoom();
+    this.scale.on('resize', () => this.criarFog());
+    const [jx, jy] = proj(this.jog.x, this.jog.y, 14); this.camX = jx; this.camY = jy;
     for (let cy = -1; cy <= 1; cy++) for (let cx = -1; cx <= 1; cx++) this.assar(Math.floor(this.jog.x / CH) + cx, Math.floor(this.jog.y / CH) + cy);
-
     ponte.cmd = {
       interagir: () => this.interagir(), usarRapido: k => this.usarRapido(k), usarItem: id => this.usarItem(id), largar: id => this.largar(id),
       trocarArma: () => this.trocarArma(), lanterna: () => this.lanterna(), tocarMascara: () => this.tocarMascara(),
       pausar: p => { try { if (!this.sys?.isActive() && !this.sys?.isPaused()) return; if (p) this.scene.pause(); else this.scene.resume(); } catch { /* cena já destruída */ } },
     };
     this.events.once('shutdown', () => { ponte.cmd = null; });
-    this.sincronizar(true);
+    this.pronto = true; useJogo.setState({ carga: 1 }); this.sincronizar(true);
+  }
+  criarFog() {
+    const w = this.scale.width, h = this.scale.height;
+    if (this.fogImg) { this.fogImg.destroy(); this.textures.remove('fog'); }
+    this.fogC = this.textures.createCanvas('fog', w, h)!; this.fogD = this.fogC.context.createImageData(w, h);
+    this.fogImg = this.add.image(0, 0, 'fog').setOrigin(0).setScrollFactor(0).setDepth(-9000);
   }
 
-  // ------------------------------------------------------------------ arte / mundo
+  // ------------------------------------------------------------------ mundo
   chaveProp(p: Prop) {
     switch (p.tipo) {
       case 'carro': return 'carro' + (p.cor % 3); case 'carro_v': return 'carro_v' + (p.cor % 3);
-      case 'ferramentas': return 'ferramentas'; case 'barril': return 'barril' + (p.cor % 2); case 'bunker': return 'bunker';
+      case 'ferramentas': return 'ferramentas'; case 'geladeira': return 'geladeira'; case 'barril': return 'barril' + (p.cor % 2); case 'bunker': return 'bunker';
       default: return p.tipo + (p.cor % 3);
-    }
-  }
-  nomeTile(t: number, x: number, y: number) {
-    const h = hash(x, y);
-    switch (t) {
-      case T.TERRA: return 'terra' + [0, 1, 0, 1, 0, 1, 2, 3, 4, 5][h % 10];
-      case T.ESTRADA: return 'estrada' + (h % 4); case T.LINHA_H: return 'linha_h' + (h % 2); case T.LINHA_V: return 'linha_v' + (h % 2);
-      case T.CALCADA: return 'calcada' + (h % 3); case T.MADEIRA: case T.PORTA: return 'madeira' + (h % 3); case T.AZULEJO: return 'azulejo' + (h % 2);
-      case T.PAREDE: return 'parede' + (h % 3); case T.JANELA: return 'janela' + (h % 2); case T.ENTULHO: return 'entulho' + (h % 3);
-      default: return 'concreto' + (h % 2);
     }
   }
   assar(cx: number, cy: number) {
     const key = `ch_${cx}_${cy}`;
     if (cx < 0 || cy < 0 || cx * CH >= W || cy * CH >= H || this.chunks.has(key)) return;
-    const c = document.createElement('canvas'); c.width = c.height = CH * TS; const g = c.getContext('2d')!;
-    const m = this.mundo; const parede = (x: number, y: number) => dentro(x, y) && (m.tipos[idx(x, y)] === T.PAREDE || m.tipos[idx(x, y)] === T.JANELA);
-    const rc = document.createElement('canvas'); rc.width = rc.height = CH; const rg = rc.getContext('2d')!; const rd = rg.createImageData(CH, CH);
-    for (let ty = 0; ty < CH; ty++) for (let tx = 0; tx < CH; tx++) {
-      const X = cx * CH + tx, Y = cy * CH + ty; if (!dentro(X, Y)) continue;
-      g.drawImage(this.atlas[this.nomeTile(m.tipos[idx(X, Y)], X, Y)], tx * TS, ty * TS);
-      const r = m.rad[idx(X, Y)], o = (ty * CH + tx) * 4;
-      rd.data[o] = 150; rd.data[o + 1] = 255; rd.data[o + 2] = 40; rd.data[o + 3] = r > 0.06 ? Math.min(150, r * 190) : 0;
+    const b = assarChao(this.mundo, cx, cy); this.textures.addCanvas(key, b.canvas);
+    const img = this.add.image(b.ox, b.oy, key).setOrigin(0).setDepth(-10000), paredes: Rastreado[] = [], m = this.mundo;
+    for (let j = 0; j < CH; j++) for (let i = 0; i < CH; i++) {
+      const x = cx * CH + i, y = cy * CH + j; if (!dentro(x, y)) continue; const t = m.tipos[idx(x, y)]; if (t !== T.PAREDE && t !== T.JANELA) continue;
+      const k = `${t === T.JANELA ? 'janela' : 'parede'}${m.estilo[idx(x, y)] % 3}_a`, [ox, oy] = this.org[k], [sx, sy] = proj(x + 0.5, y + 0.5);
+      const spr = this.add.image(sx, sy, k).setOrigin(ox, oy).setDepth((x + y + 1) * 10); paredes.push({ spr, i: idx(x, y), lvl: -1 });
     }
-    for (let ty = 0; ty < CH; ty++) for (let tx = 0; tx < CH; tx++) { // faces e sombras das paredes (luz vem do canto superior esquerdo)
-      const X = cx * CH + tx, Y = cy * CH + ty; if (!dentro(X, Y) || parede(X, Y)) continue;
-      const px = tx * TS, py = ty * TS;
-      if (parede(X, Y - 1)) {
-        const f = g.createLinearGradient(0, py, 0, py + 10); f.addColorStop(0, '#3b352d'); f.addColorStop(1, '#25211b'); g.fillStyle = f; g.fillRect(px, py, TS, 10);
-        const s = g.createLinearGradient(0, py + 10, 0, py + 34); s.addColorStop(0, 'rgba(0,0,0,.55)'); s.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = s; g.fillRect(px, py + 10, TS, 24);
-      }
-      if (parede(X - 1, Y)) { const s = g.createLinearGradient(px, 0, px + 16, 0); s.addColorStop(0, 'rgba(0,0,0,.38)'); s.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = s; g.fillRect(px, py, 16, TS); }
-    }
-    rg.putImageData(rd, 0, 0); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-    const ov = document.createElement('canvas'); ov.width = ov.height = CH * TS; const og = ov.getContext('2d')!; og.imageSmoothingEnabled = true; og.drawImage(rc, 0, 0, CH * TS, CH * TS);
-    g.drawImage(ov, 0, 0);
-    g.shadowColor = 'rgba(190,255,80,.9)'; g.shadowBlur = 10; g.strokeStyle = 'rgba(200,255,90,.75)'; g.lineWidth = 2; g.lineCap = 'round';
-    for (let ty = 0; ty < CH; ty++) for (let tx = 0; tx < CH; tx++) {
-      const X = cx * CH + tx, Y = cy * CH + ty; if (!dentro(X, Y) || m.rad[idx(X, Y)] < 0.6 || hash(X, Y) % 3) continue;
-      let x = tx * TS + 10 + (hash(Y, X) % 44), y = ty * TS + 10 + (hash(X + 3, Y) % 44); g.beginPath(); g.moveTo(x, y);
-      for (let k = 0; k < 4; k++) { x += ((hash(X + k, Y) % 21) - 10); y += ((hash(X, Y + k) % 21) - 10); g.lineTo(x, y); } g.stroke();
-    }
-    g.shadowBlur = 0;
-    const tex = this.textures.addCanvas(key, c); void tex;
-    this.chunks.set(key, this.add.image(cx * CH * TS, cy * CH * TS, key).setOrigin(0).setDepth(-1000));
+    this.chunks.set(key, { img, paredes });
   }
   fluxoChunks() {
     const cx = Math.floor(this.jog.x / CH), cy = Math.floor(this.jog.y / CH);
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) this.assar(cx + dx, cy + dy);
-    for (const [k, img] of this.chunks) {
+    for (const [k, c] of this.chunks) {
       const [, a, b] = k.split('_').map(Number);
-      if (Math.abs(a - cx) > 2 || Math.abs(b - cy) > 2) { img.destroy(); this.textures.remove(k); this.chunks.delete(k); }
+      if (Math.abs(a - cx) > 2 || Math.abs(b - cy) > 2) { c.img.destroy(); c.paredes.forEach(p => p.spr.destroy()); this.textures.remove(k); this.chunks.delete(k); }
     }
-  }
-  ajustarZoom() {
-    const dpr = window.devicePixelRatio || 1; const cssW = this.scale.width / dpr;
-    const tile = Math.min(46, Math.max(30, cssW / 11));
-    this.cameras.main.setZoom((tile * dpr) / TS);
   }
 
   // ------------------------------------------------------------------ utilidades
@@ -189,37 +157,44 @@ export class Cena extends Phaser.Scene {
     return true;
   }
   obstaculoAte(x: number, y: number, a: number, max: number) {
-    for (let d = 0.2; d < max; d += 0.15) { const tx = Math.floor(x + Math.cos(a) * d), ty = Math.floor(y + Math.sin(a) * d); if (this.solidoEm(tx, ty) && this.tipoEm(tx, ty) !== T.JANELA) return d; if (this.solidoEm(tx, ty)) return d; }
+    for (let d = 0.2; d < max; d += 0.15) { const tx = Math.floor(x + Math.cos(a) * d), ty = Math.floor(y + Math.sin(a) * d); if (this.solidoEm(tx, ty)) return d; }
     return max;
   }
-  texto(x: number, y: number, t: string, cor = '#ffe9b0') {
-    const o = this.add.text(x * TS, y * TS, t, { fontFamily: 'Nunito, sans-serif', fontStyle: '900', fontSize: '30px', color: cor, stroke: '#0a0806', strokeThickness: 6 }).setOrigin(0.5).setDepth(95000);
-    this.tweens.add({ targets: o, y: o.y - 70, alpha: 0, duration: 800, ease: 'Cubic.easeOut', onComplete: () => o.destroy() });
+  texto(x: number, y: number, t: string, cor = '#e8d9a8') {
+    const [sx, sy] = proj(x, y, 30);
+    const o = this.add.text(Math.round(sx), Math.round(sy), t, { fontFamily: 'VT323, monospace', fontSize: '24px', color: cor, stroke: '#0a0908', strokeThickness: 4 }).setOrigin(0.5).setDepth(95000);
+    this.tweens.add({ targets: o, y: o.y - 22, alpha: 0, duration: 800, ease: 'Cubic.easeOut', onComplete: () => o.destroy() });
   }
   ruido(x: number, y: number, raio: number) {
     if (raio >= 5) this.efeitos.push({ k: 'anel', x, y, a: 0, r: raio, t: 0, dur: 0.7 });
     for (const e of this.inim) {
       if (!e.vivo || e.estado === 'persegue') continue;
-      const d = Math.hypot(e.x - x, e.y - y);
-      if (d < raio) { e.estado = 'investiga'; e.alvo = { x, y }; e.caminho = []; e.tCam = 0; }
+      if (Math.hypot(e.x - x, e.y - y) < raio) { e.estado = 'investiga'; e.alvo = { x, y }; e.caminho = []; e.tCam = 0; }
     }
+  }
+  tom(a: number, noite: number) {
+    const f = 1 - Math.min(1, a) * 0.94, r = Math.round(255 * f * (1 - 0.12 * noite)), g = Math.round(255 * f * (1 - 0.05 * noite)), b = Math.round(255 * f);
+    return (r << 16) | (g << 8) | b;
+  }
+  tingir(r: Rastreado, noite: number) {
+    const a = this.lmA[r.i], l = Math.round(a * 12); if (l === r.lvl) return; r.lvl = l; r.spr.setTint(this.tom(l / 12, noite));
   }
 
   // ------------------------------------------------------------------ inimigos
   criarInimigo(tipo: Tipo, x: number, y: number) {
-    const som = this.add.image(0, 0, 'sombra').setAlpha(0.8);
-    const spr = this.add.image(0, 0, tipo + '0').setAlpha(0);
-    if (tipo === 'rato') spr.setScale(0.75);
-    const e: Ini = { tipo, x, y, hp: DEF[tipo].hp, ang: Math.random() * 6.28, estado: 'ocioso', alvo: null, caminho: [], tCam: 0, cd: 0, tSent: Math.random(), semVer: 0, vagar: Math.random() * 3, kx: 0, ky: 0, fase: Math.random() * 10, vivo: true, spr, som };
+    const som = this.add.image(0, 0, 'sombra').setAlpha(0.9), spr = this.add.image(0, 0, `${tipo}_0_0`).setAlpha(0);
+    if (tipo === 'rato') som.setScale(0.6);
+    const e: Ini = { tipo, x, y, hp: DEF[tipo].hp, ang: Math.random() * 6.28, estado: 'ocioso', alvo: null, caminho: [], tCam: 0, cd: 0, tSent: Math.random(), semVer: 0, vagar: Math.random() * 3, kx: 0, ky: 0, fase: Math.random() * 10, vivo: true, spr, som, lvl: -1, dir: 0 };
     this.inim.push(e); return e;
   }
   ferir(e: Ini, dano: number, de: number) {
     if (!e.vivo) return;
-    e.hp -= dano; this.texto(e.x, e.y - 0.6, String(Math.round(dano)));
+    e.hp -= dano; this.texto(e.x, e.y - 0.4, String(Math.round(dano)));
     e.kx = Math.cos(de) * 5; e.ky = Math.sin(de) * 5; e.estado = 'persegue'; e.semVer = 0; e.alvo = { x: this.jog.x, y: this.jog.y };
-    e.spr.setTint(0xff8a70); this.time.delayedCall(90, () => { if (e.vivo) e.spr.clearTint(); });
+    e.spr.setTint(0xff5a40); e.lvl = -3; this.time.delayedCall(90, () => { e.lvl = -1; });
     if (e.hp <= 0) {
-      e.vivo = false; this.s.abates++; e.som.destroy(); e.spr.setDepth(-500).setTint(0x6a4a44).setAlpha(0.8).setRotation(Math.random() * 6.28);
+      e.vivo = false; this.s.abates++; e.som.destroy();
+      const k = `${e.tipo}_morto_${e.dir}`; e.spr.setTexture(k).setOrigin(...this.org[k]).setDepth(-5000 + e.y); e.lvl = -1;
       this.cadaveres.push(e.spr); if (this.cadaveres.length > 50) this.cadaveres.shift()?.destroy();
     }
   }
@@ -234,7 +209,7 @@ export class Cena extends Phaser.Scene {
       if (!this.morto && dist < alc && this.temLOS(e.x, e.y, J.x, J.y)) { if (e.estado !== 'persegue') e.tCam = 0; e.estado = 'persegue'; e.alvo = { x: J.x, y: J.y }; e.semVer = 0; }
       else if (e.estado === 'persegue') { e.semVer += 0.3; if (e.semVer > 6) { e.estado = 'investiga'; e.caminho = []; } }
     }
-    let vel = d.vel * (1 + noite * 0.25) * (e.estado === 'persegue' ? 1 : 0.5);
+    const vel = d.vel * (1 + noite * 0.25) * (e.estado === 'persegue' ? 1 : 0.5);
     if (e.estado === 'ocioso') {
       e.vagar -= dt;
       if (e.vagar <= 0) { e.vagar = 2 + Math.random() * 4; if (Math.random() < 0.55) { const tx = Math.floor(e.x + (Math.random() - 0.5) * 7), ty = Math.floor(e.y + (Math.random() - 0.5) * 7); if (dentro(tx, ty) && !this.solidoEm(tx, ty)) { e.alvo = { x: tx + 0.5, y: ty + 0.5 }; e.caminho = []; e.tCam = 0; } } else e.alvo = null; }
@@ -268,10 +243,10 @@ export class Cena extends Phaser.Scene {
   }
   machucar(dano: number, chanceSangra: number) {
     this.s.hp -= dano; this.dano = 0.5;
-    if (Math.random() < chanceSangra && !this.s.sangra) { this.s.sangra = true; useJogo.getState().toast('Você está sangrando', '#ff5733'); }
-    this.texto(this.jog.x, this.jog.y - 0.6, '-' + Math.round(dano), '#ff6a4a');
+    if (Math.random() < chanceSangra && !this.s.sangra) { this.s.sangra = true; useJogo.getState().toast('Você está sangrando', '#c9561f'); }
+    this.texto(this.jog.x, this.jog.y - 0.3, '-' + Math.round(dano), '#d9472b');
     this.cameras.main.shake(140, 0.006); sfx.dano(); useJogo.setState({ danoTs: Date.now() });
-    if (this.acao) { this.acao = null; useJogo.getState().toast('Interrompido', '#ffb060'); }
+    if (this.acao) { this.acao = null; useJogo.getState().toast('Interrompido', '#d9a02b'); }
     if (this.s.hp <= 0) this.morrer('Morto por criaturas do ermo');
   }
   spawnDinamico() {
@@ -291,13 +266,13 @@ export class Cena extends Phaser.Scene {
     if (this.cdAtaque > 0 || this.morto || this.acao) return;
     const arma = this.armaAtual(), J = this.jog;
     if (arma?.id === 'pistola') {
-      if (this.s.municao <= 0) { if (performance.now() - this.tAvisoMun > 900) { this.tAvisoMun = performance.now(); sfx.seco(); useJogo.getState().toast('Sem munição', '#ffb060'); } this.cdAtaque = 0.3; return; }
+      if (this.s.municao <= 0) { if (performance.now() - this.tAvisoMun > 900) { this.tAvisoMun = performance.now(); sfx.seco(); useJogo.getState().toast('Sem munição', '#d9a02b'); } this.cdAtaque = 0.3; return; }
       this.s.municao--; this.cdAtaque = 0.38; const a = J.ang + (Math.random() - 0.5) * 0.07;
       const lim = this.obstaculoAte(J.x, J.y, a, 11); let alvo: Ini | null = null, melhor = lim;
-      for (const e of this.inim) { if (!e.vivo) continue; const dx = e.x - J.x, dy = e.y - J.y, proj = dx * Math.cos(a) + dy * Math.sin(a); if (proj < 0 || proj > melhor) continue; const perp = Math.abs(-Math.sin(a) * dx + Math.cos(a) * dy); if (perp < DEF[e.tipo].raio + 0.12) { alvo = e; melhor = proj; } }
+      for (const e of this.inim) { if (!e.vivo) continue; const dx = e.x - J.x, dy = e.y - J.y, proj2 = dx * Math.cos(a) + dy * Math.sin(a); if (proj2 < 0 || proj2 > melhor) continue; const perp = Math.abs(-Math.sin(a) * dx + Math.cos(a) * dy); if (perp < DEF[e.tipo].raio + 0.12) { alvo = e; melhor = proj2; } }
       const fim = alvo ? melhor : lim;
       this.efeitos.push({ k: 'tracer', x: J.x + Math.cos(a) * 0.8, y: J.y + Math.sin(a) * 0.8, a, r: fim, t: 0, dur: 0.08 });
-      this.flash = 0.14; this.clarao.setPosition((J.x + Math.cos(a) * 0.9) * TS, (J.y + Math.sin(a) * 0.9) * TS).setVisible(true).setScale(1.5);
+      this.flash = 0.14; const [fx, fy] = proj(J.x + Math.cos(a) * 0.9, J.y + Math.sin(a) * 0.9, 18); this.clarao.setPosition(Math.round(fx), Math.round(fy)).setVisible(true);
       sfx.tiro(); this.ruido(J.x, J.y, 20); this.cameras.main.shake(90, 0.004);
       if (alvo) { this.ferir(alvo, arma.dano!, a); sfx.acerto(); this.hitstop = 0.05; }
     } else {
@@ -320,7 +295,7 @@ export class Cena extends Phaser.Scene {
     for (const { p } of this.props) {
       const cx = p.x + p.w / 2, cy = p.y + p.h / 2, d = Math.hypot(cx - this.jog.x, cy - this.jog.y);
       if (p.tipo === 'bunker') { if (d < 2.6 && d < md) { md = d; melhor = { p, rot: 'Entrar no ABRIGO 7' }; } continue; }
-      if (!p.loot || p.aberto || d > 1.45 + (Math.max(p.w, p.h) - 1) * 0.5 || d >= md) continue;
+      if (!p.loot || p.aberto || d > 1.45 + (Math.max(p.w, p.h) - 1) * 0.6 || d >= md) continue;
       md = d; melhor = { p, rot: 'Vasculhar ' + this.rotulo(p).toLowerCase() };
     }
     return melhor;
@@ -340,11 +315,11 @@ export class Cena extends Phaser.Scene {
       inv[id] = (inv[id] ?? 0) + 1; st.toast(`+ ${it.nome}`, COR_RARIDADE[it.raridade]);
       if (it.raridade === 'raro') raro = true; if (id === 'lanterna') this.s.lanterna.tem = true;
     }
-    if (resto.length) st.toast('Mochila cheia', '#ff9a5a');
+    if (resto.length) st.toast('Mochila cheia', '#c9561f');
     p.loot = resto; if (!resto.length) p.aberto = true;
-    this.props.find(x => x.p === p)?.spr.setTint(0x6a6a6a);
+    this.props.find(x => x.p === p)?.rast && (this.props.find(x => x.p === p)!.rast.lvl = -2);
     this.s.vasculhados++; useJogo.setState({ inv });
-    if (raro) { sfx.raro(); this.cameras.main.flash(220, 255, 225, 80); } else sfx.achado();
+    if (raro) { sfx.raro(); this.cameras.main.flash(220, 255, 225, 120); } else sfx.achado();
   }
   iniciarUso(rotulo: string, dur: number, fim: () => void) { if (this.acao || this.morto) return; this.acao = { rotulo, dur, t: 0, fim }; }
   consumir(id: string) { const inv = { ...useJogo.getState().inv }; if (!inv[id]) return false; inv[id]--; if (inv[id] <= 0) delete inv[id]; useJogo.setState({ inv }); return true; }
@@ -353,14 +328,14 @@ export class Cena extends Phaser.Scene {
     if (it.fome) s.fome = Math.min(100, s.fome + it.fome); if (it.sede) s.sede = Math.min(100, s.sede + it.sede);
     if (it.hp) s.hp = Math.min(s.maxHp, s.hp + it.hp); if (it.estanca) s.sangra = false; if (it.rad) s.rad = Math.max(0, Math.min(100, s.rad + it.rad));
     if (it.bateria) s.lanterna.bat = Math.min(100, s.lanterna.bat + it.bateria);
-    sfx.comer(); useJogo.getState().toast(it.nome + ' usado', '#9be8b0');
+    sfx.comer(); useJogo.getState().toast(it.nome + ' usado', '#8fe36a');
   }
   usarItem(id: string) {
     const it = ITENS[id]; if (!it) return; const inv = useJogo.getState().inv; if (!inv[id]) return;
     if (it.tipo === 'arma') { this.s.arma = id; useJogo.getState().toast(it.nome + ' equipado'); return; }
     if (id === 'mascara') { this.tocarMascara(); return; }
     if (id === 'lanterna') { this.lanterna(); return; }
-    if (it.tipo === 'especial') { useJogo.getState().toast('Sinal fraco… siga a seta', '#8fe8ff'); return; }
+    if (it.tipo === 'especial') { useJogo.getState().toast('Sinal fraco… siga a seta', '#8fe36a'); return; }
     if (id === 'bateria' && !this.s.lanterna.tem) { useJogo.getState().toast('Precisa de uma lanterna'); return; }
     this.iniciarUso('Usando ' + it.nome.toLowerCase(), 1.0, () => this.efeitoItem(id));
   }
@@ -370,7 +345,7 @@ export class Cena extends Phaser.Scene {
     if (k === 'comida') id = ['enlatado', 'pao', 'carne'].find(tem);
     if (k === 'curar') id = this.s.sangra ? ['bandagem', 'kit'].find(tem) : (this.s.hp < this.s.maxHp ? ['bandagem', 'kit'].find(tem) : undefined);
     if (k === 'antirrad') id = tem('antirrad') ? 'antirrad' : undefined;
-    if (!id) { useJogo.getState().toast({ agua: 'Sem água', comida: 'Sem comida', curar: this.s.sangra || this.s.hp < this.s.maxHp ? 'Sem curativos' : 'Saúde cheia', antirrad: 'Sem antirrad' }[k], '#ffb060'); return; }
+    if (!id) { useJogo.getState().toast({ agua: 'Sem água', comida: 'Sem comida', curar: this.s.sangra || this.s.hp < this.s.maxHp ? 'Sem curativos' : 'Saúde cheia', antirrad: 'Sem antirrad' }[k], '#d9a02b'); return; }
     this.usarItem(id);
   }
   largar(id: string) { if (this.consumir(id)) useJogo.getState().toast(ITENS[id].nome + ' largado'); }
@@ -379,12 +354,15 @@ export class Cena extends Phaser.Scene {
     const i = lista.indexOf(this.s.arma); this.s.arma = lista[(i + 1) % lista.length]; useJogo.getState().toast(this.s.arma ? ITENS[this.s.arma].nome : 'Punhos');
   }
   lanterna() {
-    const l = this.s.lanterna; if (!(useJogo.getState().inv.lanterna)) { useJogo.getState().toast('Sem lanterna', '#ffb060'); return; }
-    l.tem = true; if (l.bat <= 0) { useJogo.getState().toast('Bateria descarregada', '#ffb060'); return; } l.ligada = !l.ligada; sfx.toque();
+    const l = this.s.lanterna; if (!(useJogo.getState().inv.lanterna)) { useJogo.getState().toast('Sem lanterna', '#d9a02b'); return; }
+    l.tem = true; if (l.bat <= 0) { useJogo.getState().toast('Bateria descarregada', '#d9a02b'); return; } l.ligada = !l.ligada; sfx.toque();
   }
-  tocarMascara() { if (!useJogo.getState().inv.mascara) { useJogo.getState().toast('Sem máscara', '#ffb060'); return; } this.s.mascara = !this.s.mascara; useJogo.getState().toast(this.s.mascara ? 'Máscara colocada' : 'Máscara removida'); }
-  abrirPorta(i: number) { const d = this.portas.get(i); if (!d || d.aberta) return; d.aberta = true; d.t = 0; this.mundo.opaco[i] = 0; d.spr.setTexture('porta_a').setRotation(d.horiz ? 0 : -Math.PI / 2).setPosition((i % W) * TS + (d.horiz ? 0 : 0), Math.floor(i / W) * TS).setOrigin(0, 0); sfx.porta(); this.ruido((i % W) + 0.5, Math.floor(i / W) + 0.5, 4); }
-  fecharPorta(i: number) { const d = this.portas.get(i); if (!d || !d.aberta) return; d.aberta = false; this.mundo.opaco[i] = 1; d.spr.setTexture('porta_f').setOrigin(0.5).setRotation(d.horiz ? 0 : Math.PI / 2).setPosition((i % W) * TS + 32, Math.floor(i / W) * TS + 32); }
+  tocarMascara() { if (!useJogo.getState().inv.mascara) { useJogo.getState().toast('Sem máscara', '#d9a02b'); return; } this.s.mascara = !this.s.mascara; useJogo.getState().toast(this.s.mascara ? 'Máscara colocada' : 'Máscara removida'); }
+  abrirPorta(i: number) {
+    const d = this.portas.get(i); if (!d || d.aberta) return; d.aberta = true; d.t = 0; this.mundo.opaco[i] = 0;
+    const k = `porta_${d.horiz ? 'x' : 'y'}_a`; d.spr.setTexture(k); d.rast.lvl = -1; sfx.porta(); this.ruido((i % W) + 0.5, Math.floor(i / W) + 0.5, 4);
+  }
+  fecharPorta(i: number) { const d = this.portas.get(i); if (!d || !d.aberta) return; d.aberta = false; this.mundo.opaco[i] = 1; d.spr.setTexture(`porta_${d.horiz ? 'x' : 'y'}_f`); d.rast.lvl = -1; }
 
   // ------------------------------------------------------------------ fim de jogo
   morrer(causa: string) {
@@ -400,37 +378,47 @@ export class Cena extends Phaser.Scene {
     const dias = Math.floor(this.s.minutos / 1440) + 1; return { causa, dias, hora: horaStr(this.s.minutos), abates: this.s.abates, vasculhados: this.s.vasculhados, radMax: Math.round(this.s.radMax), vitoria, distAbrigo };
   }
 
-  // ------------------------------------------------------------------ luz (cone de visão estilo Zomboid sobre o FOV do rot.js)
+  // ------------------------------------------------------------------ luz: cone de visão (rot.js) + pontilhado no chão + tingimento dos objetos
   atualizarLuz(dt: number) {
     const J = this.jog, px = Math.floor(J.x), py = Math.floor(J.y), amb = this.ambient, noite = 1 - amb;
     this.luzFrame.fill(0);
     const lant = this.s.lanterna.ligada && this.s.lanterna.bat > 0;
-    const meia = 1.22, alcCone = lant ? 12 : amb > 0.5 ? 14 : 6.5, alcLant = 12;
-    const base = noite * 0.78, mem = Math.max(0.55, base + 0.2);
-    const boost = this.flash > 0 ? 1 : 0;
+    const meia = 1.22, alcCone = lant ? 12 : amb > 0.5 ? 14 : 6.5, alcLant = 12, base = noite * 0.78, mem = Math.max(0.55, base + 0.2), boost = this.flash > 0 ? 1 : 0;
     this.fov.compute(px, py, 13, (x: number, y: number) => {
       const dx = x + 0.5 - J.x, dy = y + 0.5 - J.y, d = Math.hypot(dx, dy), da = Math.abs(ang(Math.atan2(dy, dx) - J.ang));
-      const cone = sstep(meia + 0.12, meia - 0.18, da) * (1 - sstep(alcCone * 0.6, alcCone, d));
-      const near = 1 - sstep(2.4, 4.8, d);
-      const fl = boost ? 1 - sstep(4, 7, d) : 0;
-      const luz = Math.max(cone, near, fl); const i = idx(x, y);
-      this.luzFrame[i] = luz; if (luz > 0.5) this.seen[i] = 1;
+      const cone = sstep(meia + 0.12, meia - 0.18, da) * (1 - sstep(alcCone * 0.6, alcCone, d)), near = 1 - sstep(3.4, 6.4, d), fl = boost ? 1 - sstep(4, 7, d) : 0;
+      const luz = Math.max(cone, near, fl), i = idx(x, y); this.luzFrame[i] = luz; if (luz > 0.5) this.seen[i] = 1;
       const lanter = lant ? sstep(meia + 0.12, meia - 0.18, da) * (1 - sstep(alcLant * 0.6, alcLant, d)) : 0;
-      const aLuz = base * (1 - 0.88 * Math.max(lanter, fl)) * (1 - 0.35 * near);
-      const alvo = this.seen[i] ? mem : 0.93;
-      this.lmA[i] = alvo * (1 - luz) + aLuz * luz; // alvo imediato; suavizado abaixo
+      const aLuz = base * (1 - 0.88 * Math.max(lanter, fl)) * (1 - 0.35 * near), alvo = this.seen[i] ? mem : 0.9;
+      this.lmA[i] = alvo * (1 - luz) + aLuz * luz;
     });
-    const cr = Math.round(10 + amb * 0), cg = Math.round(8 + noite * 3), cb = Math.round(8 + noite * 20); const d = this.lmData.data;
-    for (let i = 0; i < W * H; i++) {
-      const alvo = this.luzFrame[i] > 0 || this.lmA[i] < 0.9 ? this.lmA[i] : this.seen[i] ? mem : 0.93;
-      this.lmA[i] += (alvo - this.lmA[i]) * Math.min(1, dt * 16); const o = i * 4;
-      d[o] = cr; d[o + 1] = cg; d[o + 2] = cb; d[o + 3] = Math.round(Math.min(1, Math.max(0, this.lmA[i])) * 255);
+    for (let i = 0; i < W * H; i++) { if (this.luzFrame[i] > 0) continue; const alvo = this.seen[i] ? mem : 0.9; this.lmA[i] += (alvo - this.lmA[i]) * Math.min(1, dt * 16); }
+  }
+  pintarFog() {
+    const w = this.scale.width, h = this.scale.height, cam = this.cameras.main, sx0 = Math.round(cam.scrollX), sy0 = Math.round(cam.scrollY), d = this.fogD.data, noite = 1 - this.ambient;
+    const cr = 8, cg = 8 + noite * 4, cb = 12 + noite * 22, lm = this.lmA;
+    for (let py = 0; py < h; py++) {
+      const wy = sy0 + py + 0.5; let gx = (sx0 + 0.5) / 32 + wy / 16 - 0.5, gy = wy / 16 - (sx0 + 0.5) / 32 - 0.5;
+      for (let px = 0; px < w; px++, gx += 1 / 32, gy -= 1 / 32) {
+        const o = (py * w + px) * 4; let a = 1;
+        if (gx > -0.5 && gy > -0.5 && gx < W - 0.5 && gy < H - 0.5) {
+          const x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0, xa = x0 < 0 ? 0 : x0, ya = y0 < 0 ? 0 : y0, xb = x0 + 1 >= W ? W - 1 : x0 + 1, yb = y0 + 1 >= H ? H - 1 : y0 + 1;
+          a = lm[ya * W + xa] * (1 - fx) * (1 - fy) + lm[ya * W + xb] * fx * (1 - fy) + lm[yb * W + xa] * (1 - fx) * fy + lm[yb * W + xb] * fx * fy;
+        }
+        const q = Math.floor(a * 5 + BAYER[(py & 3) * 4 + (px & 3)]) / 5, al = Math.min(1, q) * 0.9;
+        d[o] = cr; d[o + 1] = cg; d[o + 2] = cb; d[o + 3] = al * 255;
+      }
     }
-    this.lm.context.putImageData(this.lmData, 0, 0); this.lm.refresh();
+    this.fogC.context.putImageData(this.fogD, 0, 0); this.fogC.refresh();
   }
 
   // ------------------------------------------------------------------ laço principal
   update(_t: number, dms: number) {
+    if (!this.pronto) {
+      const t0 = performance.now();
+      while (this.tarefas.length && performance.now() - t0 < 12) this.tarefas.shift()!();
+      useJogo.setState({ carga: 1 - this.tarefas.length / this.totalTarefas }); if (!this.tarefas.length) this.iniciar(); return;
+    }
     const dt = Math.min(0.05, dms / 1000);
     if (this.hitstop > 0) { this.hitstop -= dt; return; }
     const s = this.s; this.pathBudget = 3;
@@ -444,24 +432,26 @@ export class Cena extends Phaser.Scene {
     if (!this.morto && this.tSpawn > 45) { this.tSpawn = 0; this.spawnDinamico(); }
     const ativos = this.inim.filter(e => e.vivo && Math.abs(e.x - this.jog.x) < 34 && Math.abs(e.y - this.jog.y) < 34);
     for (const e of ativos) this.iaInimigo(e, dt, noite);
-    for (let i = 0; i < ativos.length; i++) for (let j = i + 1; j < ativos.length; j++) { // separação simples
+    for (let i = 0; i < ativos.length; i++) for (let j = i + 1; j < ativos.length; j++) {
       const a = ativos[i], b = ativos[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
       if (d > 0 && d < 0.6) { const f = (0.6 - d) * 0.5; if (!this.colide(a.x - dx / d * f, a.y, 0.28)) a.x -= dx / d * f; if (!this.colide(a.x, a.y - dy / d * f, 0.28)) a.y -= dy / d * f; if (!this.colide(b.x + dx / d * f, b.y, 0.28)) b.x += dx / d * f; if (!this.colide(b.x, b.y + dy / d * f, 0.28)) b.y += dy / d * f; }
     }
-    this.atualizarLuz(dt); this.desenharEntidades(dt); this.camera(dt); this.fluxoChunks(); this.desenharEfeitos(dt);
+    this.atualizarLuz(dt); this.desenharEntidades(dt, noite); this.camera(dt); this.fluxoChunks(); this.pintarFog(); this.cortes(dt, noite); this.desenharEfeitos(dt);
     this.tPortas += dt; if (this.tPortas > 0.5) { this.tPortas = 0; for (const [i, d] of this.portas) if (d.aberta) { d.t += 0.5; const x = i % W, y = Math.floor(i / W); if (d.t > 4 && Math.hypot(x + 0.5 - this.jog.x, y + 0.5 - this.jog.y) > 6 && !this.inim.some(e => e.vivo && Math.hypot(e.x - x - 0.5, e.y - y - 0.5) < 1.2)) this.fecharPorta(i); } }
     this.tSync += dt; if (this.tSync > 0.1) { this.tSync = 0; this.sincronizar(false); }
   }
 
   jogador(dt: number) {
-    const e = ponte.entrada, s = this.s, J = this.jog, k = this.teclas;
-    let mx = e.mx, my = e.my; const kx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0), ky = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
-    if (kx || ky) { mx = kx; my = ky; } let m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; m = 1; }
+    const e = ponte.entrada, s = this.s, J = this.jog, k = this.teclas, R2 = Math.SQRT1_2;
+    // entrada em tela -> grid isométrico (girado 45°)
+    let sxm = e.mx, sym = e.my; const kx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0), ky = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
+    if (kx || ky) { sxm = kx; sym = ky; } let m = Math.hypot(sxm, sym); if (m > 1) { sxm /= m; sym /= m; m = 1; }
+    const mx = (sxm + sym) * R2, my = (sym - sxm) * R2;
     const corre = (e.correr || k.SHIFT.isDown) && s.stamina > 2, furtivo = e.furtivo; ponte.entrada.furtivo = furtivo;
     const base = furtivo ? 1.4 : corre ? 4.6 : 2.7, peso = 1 - Math.min(0.25, pesoInv(useJogo.getState().inv) / PESO_MAX * 0.2), cura = s.hp < 30 ? 0.88 : 1;
     const v = m > 0.12 ? base * Math.min(1, m) * peso * cura : 0; J.andando = v > 0;
     if (J.andando) {
-      if (this.acao && m > 0.35) { this.acao = null; useJogo.getState().toast('Interrompido', '#ffb060'); }
+      if (this.acao && m > 0.35) { this.acao = null; useJogo.getState().toast('Interrompido', '#d9a02b'); }
       const sx = (mx / m) * v * dt, sy = (my / m) * v * dt;
       if (!this.colide(J.x + sx, J.y, 0.3)) J.x += sx; if (!this.colide(J.x, J.y + sy, 0.3)) J.y += sy;
       J.passo += v * dt;
@@ -469,20 +459,18 @@ export class Cena extends Phaser.Scene {
       if (corre) s.stamina = Math.max(0, s.stamina - 14 * dt); else s.stamina = Math.min(100, s.stamina + 9 * dt);
     } else s.stamina = Math.min(100, s.stamina + 16 * dt);
     this.tRuido += dt; if (this.tRuido > 0.45) { this.tRuido = 0; const r = !J.andando ? 0 : corre ? 9 : furtivo ? 1.5 : 4; if (r > 2) this.ruido(J.x, J.y, r); }
-    // mira: stick direito > mouse > direção do movimento
     let alvoAng = J.ang, atacando = e.atacar;
-    if (e.mira && Math.hypot(e.ax, e.ay) > 0.2) { alvoAng = Math.atan2(e.ay, e.ax); atacando = Math.hypot(e.ax, e.ay) > 0.6; }
+    if (e.mira && Math.hypot(e.ax, e.ay) > 0.2) { const gx = (e.ax + e.ay) * R2, gy = (e.ay - e.ax) * R2; alvoAng = Math.atan2(gy, gx); atacando = Math.hypot(e.ax, e.ay) > 0.6; }
     else if (this.desktop && this.mouse.ativo) { alvoAng = Math.atan2(this.mouse.y - J.y, this.mouse.x - J.x); atacando = this.mouse.baixo || k.SPACE.isDown; }
     else if (J.andando) alvoAng = Math.atan2(my, mx);
-    if (this.armaAtual()?.id === 'pistola' && (e.mira || this.mouse.baixo)) { // ajuda de mira leve
+    if (this.armaAtual()?.id === 'pistola' && (e.mira || this.mouse.baixo)) {
       let melhor: Ini | null = null, md = 0.18; for (const i of this.inim) { if (!i.vivo || this.luzFrame[idx(Math.floor(i.x), Math.floor(i.y))] < 0.4) continue; const da = Math.abs(ang(Math.atan2(i.y - J.y, i.x - J.x) - alvoAng)), d = Math.hypot(i.x - J.x, i.y - J.y); if (da < md && d < 11) { md = da; melhor = i; } }
       if (melhor) alvoAng += ang(Math.atan2(melhor.y - J.y, melhor.x - J.x) - alvoAng) * 0.5;
     }
     J.ang += ang(alvoAng - J.ang) * Math.min(1, dt * 16);
     this.cdAtaque -= dt; if (atacando) this.atacar();
     if (this.flash > 0) { this.flash -= dt; if (this.flash <= 0) this.clarao.setVisible(false); }
-    this.tAlvo += dt; if (this.tAlvo > 0.12) { this.tAlvo = 0; const a = this.alvoProx(); useJogo.setState({ alvo: a ? a.rot : null }); }
-    // ação com tempo (barra de progresso)
+    this.tAlvo += dt; if (this.tAlvo > 0.12) { this.tAlvo = 0; const a = this.alvoProx(); this.alvoProp = a?.p ?? null; useJogo.setState({ alvo: a ? a.rot : null }); }
     if (this.acao) {
       this.acao.t += dt; if (this.acao.ruido && Math.random() < dt * 0.8) this.ruido(J.x, J.y, this.acao.ruido);
       if (this.acao.t >= this.acao.dur) { const f = this.acao.fim; this.acao = null; f(); }
@@ -501,54 +489,82 @@ export class Cena extends Phaser.Scene {
     let dreno = 0; if (s.sangra) dreno += 0.7; if (s.fome <= 0) dreno += 0.4; if (s.sede <= 0) dreno += 0.8; if (s.rad >= 100) dreno += 2;
     if (dreno) { s.hp -= dreno * dt; if (s.hp <= 0) this.morrer(s.sede <= 0 ? 'Morreu de sede' : s.fome <= 0 ? 'Morreu de fome' : s.sangra ? 'Sangrou até a morte' : 'Envenenado pela radiação'); }
     else if (s.fome > 40 && s.sede > 40 && s.rad < 70) s.hp = Math.min(s.maxHp, s.hp + 0.18 * dt);
-    if (s.lanterna.ligada) { s.lanterna.bat = Math.max(0, s.lanterna.bat - 0.33 * dt); if (s.lanterna.bat <= 0) { s.lanterna.ligada = false; st.toast('A bateria acabou', '#ffb060'); } }
+    if (s.lanterna.ligada) { s.lanterna.bat = Math.max(0, s.lanterna.bat - 0.33 * dt); if (s.lanterna.bat <= 0) { s.lanterna.ligada = false; st.toast('A bateria acabou', '#d9a02b'); } }
     const alvoCpm = 18 + this.radSuave * 900; s.cpm += (alvoCpm - s.cpm) * Math.min(1, dt * 3);
     setGeiger(s.cpm); setBatimento(s.hp < 30 && !this.morto);
-    // objetivos encadeados (barras que ficam incompletas de propósito: Zeigarnik honesto)
     for (let n = 0; n < 4; n++) {
-      if (s.objIdx === 0 && s.vasculhados >= 5) { s.objIdx = 1; st.toast('Objetivo cumprido', '#00ffcc'); }
-      if (s.objIdx === 1 && s.minutos >= 20 * 60) { s.objIdx = 2; st.toast('Objetivo cumprido', '#00ffcc'); }
-      if (s.objIdx === 2 && st.inv.radio) { s.objIdx = 3; s.sabeAbrigo = true; st.toast('Sinal do abrigo captado', '#00ffcc'); }
+      if (s.objIdx === 0 && s.vasculhados >= 5) { s.objIdx = 1; st.toast('Objetivo cumprido', '#8fe36a'); }
+      if (s.objIdx === 1 && s.minutos >= 20 * 60) { s.objIdx = 2; st.toast('Objetivo cumprido', '#8fe36a'); }
+      if (s.objIdx === 2 && st.inv.radio) { s.objIdx = 3; s.sabeAbrigo = true; st.toast('Sinal do abrigo captado', '#8fe36a'); }
     }
   }
 
   // ------------------------------------------------------------------ apresentação
-  desenharEntidades(dt: number) {
+  desenharEntidades(dt: number, noite: number) {
     const J = this.jog, arma = this.armaAtual(), tipoArma = !arma ? 'nenhuma' : arma.id === 'pistola' ? 'pistola' : 'melee';
-    const fr = J.andando ? Math.floor(J.passo * 2.4) % 4 : 0;
-    J.spr.setTexture(`jog_${tipoArma}${fr}`).setPosition(J.x * TS, J.y * TS).setRotation(J.ang).setDepth(J.y * TS);
-    J.som.setPosition(J.x * TS + 5, J.y * TS + 9).setDepth(J.y * TS - 1);
+    const fr = J.andando ? Math.floor(J.passo * 2.2) % 4 : 1, dir = dirTela(J.ang), key = `jog_${tipoArma}_${dir}_${fr}`, [sx, sy] = proj(J.x, J.y);
+    J.spr.setTexture(key).setOrigin(...this.org[key]).setPosition(Math.round(sx), Math.round(sy)).setDepth((J.x + J.y) * 10);
+    J.som.setPosition(Math.round(sx), Math.round(sy)).setDepth((J.x + J.y) * 10 - 5);
+    const ja = this.lmA[idx(Math.min(W - 1, Math.max(0, Math.floor(J.x))), Math.min(H - 1, Math.max(0, Math.floor(J.y))))], jl = Math.round(ja * 12);
+    if (jl !== J.lvl) { J.lvl = jl; J.spr.setTint(this.tom(jl / 12, noite)); }
     for (const e of this.inim) {
-      if (!e.vivo) { const v = this.luzFrame[idx(Math.floor(e.x), Math.floor(e.y))] > 0.4; e.spr.setVisible(v); continue; }
-      const luz = dentro(Math.floor(e.x), Math.floor(e.y)) ? this.luzFrame[idx(Math.floor(e.x), Math.floor(e.y))] : 0, v = luz > 0.4 ? 1 : 0;
-      e.spr.alpha += (v - e.spr.alpha) * Math.min(1, dt * 12); e.som.alpha = e.spr.alpha * 0.8;
-      const f = e.tipo === 'rato' ? Math.floor(e.fase) % 2 : Math.floor(e.fase) % 4;
-      e.spr.setTexture(e.tipo + f).setPosition(e.x * TS, e.y * TS).setRotation(e.ang).setDepth(e.y * TS); e.som.setPosition(e.x * TS + 5, e.y * TS + 8).setDepth(e.y * TS - 1);
+      const ix = Math.min(W - 1, Math.max(0, Math.floor(e.x))), iy = Math.min(H - 1, Math.max(0, Math.floor(e.y))), i = idx(ix, iy);
+      if (!e.vivo) { e.spr.setVisible(this.luzFrame[i] > 0.4); continue; }
+      const luz = this.luzFrame[i], v = luz > 0.4 ? 1 : 0; e.spr.alpha += (v - e.spr.alpha) * Math.min(1, dt * 12); e.som.alpha = e.spr.alpha;
+      const f = e.tipo === 'rato' ? Math.floor(e.fase) % 2 : Math.floor(e.fase) % 4; e.dir = dirTela(e.ang);
+      const k = `${e.tipo}_${e.dir}_${e.tipo === 'rato' ? f : f}`; const [px, py] = proj(e.x, e.y);
+      e.spr.setTexture(k).setOrigin(...this.org[k]).setPosition(Math.round(px), Math.round(py)).setDepth((e.x + e.y) * 10); e.som.setPosition(Math.round(px), Math.round(py)).setDepth((e.x + e.y) * 10 - 5);
+      const l = Math.round(this.lmA[i] * 12); if (e.lvl !== -3 && l !== e.lvl) { e.lvl = l; e.spr.clearTint(); if (l > 0) e.spr.setTint(this.tom(l / 12, noite)); }
     }
+    for (const c of this.cadaveres) c.setVisible(true);
   }
+  /** paredes: cortam (ficam baixas/transparentes) quando estão na frente do jogador; tingem pela luz */
+  cortes(dt: number, noite: number) {
+    this.tCut += dt;
+    const J = this.jog, px = Math.floor(J.x), py = Math.floor(J.y), t = this.tipoEm(px, py);
+    this.interior = t === T.MADEIRA || t === T.AZULEJO || t === T.PORTA || (t === T.CONCRETO && this.mundo.estilo[idx(px, py)] === 0 && this.noPredio(px, py));
+    if (this.tCut > 0.12) {
+      this.tCut = 0;
+      for (const c of this.chunks.values()) for (const w of c.paredes) {
+        const x = w.i % W, y = Math.floor(w.i / W), frente = x + y > px + py && Math.abs(x - px) <= 6 && Math.abs(y - py) <= 6;
+        const t2 = this.mundo.tipos[w.i], base = t2 === T.JANELA ? 'janela' : 'parede', st = this.mundo.estilo[w.i] % 3, baixa = this.interior && frente, k = `${base}${st}_${baixa ? 'b' : 'a'}`;
+        if (w.spr.texture.key !== k) { w.spr.setTexture(k).setOrigin(...this.org[k]); w.lvl = -1; }
+        const perto = !this.interior && x + y > px + py && Math.abs(x - px) <= 2 && Math.abs(y - py) <= 2; w.spr.alpha = perto ? 0.5 : 1;
+      }
+    }
+    for (const c of this.chunks.values()) for (const w of c.paredes) this.tingir(w, noite);
+    for (const p of this.props) { if (p.rast.lvl === -2) { p.rast.lvl = -1; p.spr.setAlpha(0.8); } this.tingir(p.rast, noite); }
+    for (const d of this.portas.values()) this.tingir(d.rast, noite);
+  }
+  noPredio(x: number, y: number) { return this.mundo.predios.some(p => x > p.x && x < p.x + p.w - 1 && y > p.y && y < p.y + p.h - 1); }
   camera(dt: number) {
-    const e = ponte.entrada, J = this.jog, cam = this.cameras.main;
-    const lx = Math.cos(J.ang) * 1.3 * TS, ly = Math.sin(J.ang) * 1.3 * TS;
-    const k = 1 - Math.exp(-dt * 7); this.camX += (J.x * TS + lx * (e.mira ? 1.4 : 0.6) - this.camX) * k; this.camY += (J.y * TS + ly * (e.mira ? 1.4 : 0.6) - this.camY) * k; cam.centerOn(this.camX, this.camY);
+    const e = ponte.entrada, J = this.jog, cam = this.cameras.main, [jx, jy] = proj(J.x, J.y, 16);
+    const la = (e.mira ? 26 : 12); const dx = (Math.cos(J.ang) - Math.sin(J.ang)) * 0.5, dy = (Math.cos(J.ang) + Math.sin(J.ang)) * 0.25;
+    const k = 1 - Math.exp(-dt * 7); this.camX += (jx + dx * la - this.camX) * k; this.camY += (jy + dy * la - this.camY) * k;
+    cam.setScroll(Math.round(this.camX - this.scale.width / 2), Math.round(this.camY - this.scale.height / 2));
   }
   desenharEfeitos(dt: number) {
     const g = this.gfx; g.clear();
     this.efeitos = this.efeitos.filter(f => (f.t += dt) < f.dur);
     for (const f of this.efeitos) {
       const p = f.t / f.dur;
-      if (f.k === 'arco') { g.lineStyle(10 * (1 - p), 0xfff2c0, 0.85 * (1 - p)); g.beginPath(); g.arc(f.x * TS, f.y * TS, (f.r * 0.85) * TS, f.a - 0.9 + p * 0.5, f.a + 0.9 - (1 - p) * 0.2); g.strokePath(); }
-      if (f.k === 'tracer') { g.lineStyle(4, 0xffe9a0, 1 - p); g.beginPath(); g.moveTo(f.x * TS, f.y * TS); g.lineTo((f.x + Math.cos(f.a) * f.r) * TS, (f.y + Math.sin(f.a) * f.r) * TS); g.strokePath(); }
-      if (f.k === 'anel') { g.lineStyle(3, 0xff5733, 0.4 * (1 - p)); g.strokeCircle(f.x * TS, f.y * TS, f.r * TS * (0.15 + p * 0.85)); }
+      if (f.k === 'arco') { g.lineStyle(3, 0xe8dcc0, 1 - p); g.beginPath(); for (let i = 0; i <= 10; i++) { const a = f.a - 0.9 + (1.8 * i) / 10 * (0.4 + p * 0.6), [x, y] = proj(f.x + Math.cos(a) * f.r * 0.85, f.y + Math.sin(a) * f.r * 0.85, 14); if (i === 0) g.moveTo(Math.round(x), Math.round(y)); else g.lineTo(Math.round(x), Math.round(y)); } g.strokePath(); }
+      if (f.k === 'tracer') { g.lineStyle(2, 0xffe0a0, 1 - p); const [x0, y0] = proj(f.x, f.y, 18), [x1, y1] = proj(f.x + Math.cos(f.a) * f.r, f.y + Math.sin(f.a) * f.r, 18); g.beginPath(); g.moveTo(Math.round(x0), Math.round(y0)); g.lineTo(Math.round(x1), Math.round(y1)); g.strokePath(); }
+      if (f.k === 'anel') { g.lineStyle(1, 0xc9561f, 0.7 * (1 - p)); g.beginPath(); const r = f.r * (0.15 + p * 0.85); for (let i = 0; i <= 28; i++) { const a = (i / 28) * 6.283, [x, y] = proj(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r); if (i === 0) g.moveTo(Math.round(x), Math.round(y)); else g.lineTo(Math.round(x), Math.round(y)); } g.strokePath(); }
     }
+    // seta pixelada sobre o alvo de interação
+    const m = this.marca; m.clear();
+    if (this.alvoProp) { const p = this.alvoProp, [x, y] = proj(p.x + p.w / 2, p.y + p.h / 2, p.tipo === 'carro' || p.tipo === 'carro_v' ? 30 : 46), b = Math.round(Math.sin(performance.now() / 160) * 2); m.fillStyle(0x8fe36a, 1); m.fillTriangle(Math.round(x) - 4, Math.round(y) - 8 + b, Math.round(x) + 4, Math.round(y) - 8 + b, Math.round(x), Math.round(y) - 2 + b); m.fillStyle(0x0b0f08, 1); m.fillRect(Math.round(x) - 1, Math.round(y) - 12 + b, 2, 3); }
   }
   sincronizar(forcar: boolean) {
     const s = this.s, J = this.jog, st = useJogo.getState();
     const dx = this.mundo.abrigo.x - J.x, dy = this.mundo.abrigo.y - J.y, dist = Math.hypot(dx, dy);
     let prog = 0;
     if (s.objIdx === 0) prog = s.vasculhados / 5; else if (s.objIdx === 1) prog = Math.min(1, Math.max(0, (s.minutos % 1440 - 480) / 720)); else if (s.objIdx === 2) prog = 0.08; else prog = Math.max(0.05, 1 - dist / this.distAbrigo0);
+    const sdx = (dx - dy) * 16, sdy = (dx + dy) * 8; // direção do abrigo na tela
     useJogo.setState({
       minutos: s.minutos, hp: s.hp, maxHp: s.maxHp, fome: s.fome, sede: s.sede, stamina: s.stamina, rad: s.rad, sangra: s.sangra, municao: s.municao, arma: s.arma, mascara: s.mascara,
-      lanterna: { ...s.lanterna, tem: !!st.inv.lanterna }, cpm: Math.round(s.cpm), objIdx: s.objIdx, objProg: prog, abrigoDist: Math.round(dist), abrigoDir: Math.atan2(dy, dx), sabeAbrigo: s.sabeAbrigo,
+      lanterna: { ...s.lanterna, tem: !!st.inv.lanterna }, cpm: Math.round(s.cpm), objIdx: s.objIdx, objProg: prog, abrigoDist: Math.round(dist), abrigoDir: Math.atan2(sdy, sdx), sabeAbrigo: s.sabeAbrigo,
       vasculhados: s.vasculhados, abates: s.abates, radMax: s.radMax, furtivo: ponte.entrada.furtivo,
     });
     void forcar;
@@ -556,16 +572,15 @@ export class Cena extends Phaser.Scene {
 }
 
 export function criarJogo(pai: HTMLElement, seed: string): Phaser.Game {
-  const dpr = window.devicePixelRatio || 1;
+  const esc = 2, w = () => Math.max(64, Math.round(pai.clientWidth / esc)), h = () => Math.max(64, Math.round(pai.clientHeight / esc));
   const game = new Phaser.Game({
-    type: Phaser.AUTO, parent: pai, backgroundColor: '#050403', disableContextMenu: true,
-    scale: { mode: Phaser.Scale.NONE, width: Math.max(2, pai.clientWidth * dpr), height: Math.max(2, pai.clientHeight * dpr) },
-    render: { antialias: true, pixelArt: false, powerPreference: 'high-performance' }, fps: { target: 60 }, scene: [],
+    type: Phaser.AUTO, parent: pai, backgroundColor: '#0b0a0c', disableContextMenu: true, roundPixels: true,
+    scale: { mode: Phaser.Scale.NONE, width: w(), height: h() },
+    render: { antialias: false, pixelArt: true, roundPixels: true, powerPreference: 'high-performance' }, fps: { target: 60 }, scene: [],
   });
-  game.canvas.style.width = '100%'; game.canvas.style.height = '100%';
+  game.canvas.style.width = '100%'; game.canvas.style.height = '100%'; game.canvas.style.imageRendering = 'pixelated';
   game.scene.add('cena', Cena, true, { seed });
-  const ro = new ResizeObserver(() => game.scale.resize(Math.max(2, pai.clientWidth * dpr), Math.max(2, pai.clientHeight * dpr)));
-  ro.observe(pai); game.events.once('destroy', () => ro.disconnect());
+  const ro = new ResizeObserver(() => game.scale.resize(w(), h())); ro.observe(pai); game.events.once('destroy', () => ro.disconnect());
   return game;
 }
 export { vibra };

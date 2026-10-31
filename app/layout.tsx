@@ -1,16 +1,12 @@
 import type { Metadata, Viewport } from 'next';
-import '@fontsource/cinzel/400.css';
-import '@fontsource/cinzel/700.css';
-import '@fontsource/cinzel/900.css';
-import '@fontsource/nunito/700.css';
-import '@fontsource/nunito/800.css';
-import '@fontsource/nunito/900.css';
-import './fonts.css';
+import '@fontsource/silkscreen/400.css';
+import '@fontsource/silkscreen/700.css';
+import '@fontsource/vt323/400.css';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'CINZAS',
-  description: 'Survival pós-apocalíptico nuclear. Visão de cima, vertical, mobile.',
+  description: 'Survival pós-apocalíptico nuclear em pixel art isométrico.',
 };
 
 export const viewport: Viewport = {
@@ -18,7 +14,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#0c0914',
+  themeColor: '#0b0a0c',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

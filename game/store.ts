@@ -15,7 +15,7 @@ export type Estado = {
   cpm: number; objIdx: number; objProg: number; abrigoDist: number; abrigoDir: number; sabeAbrigo: boolean;
   vasculhados: number; abates: number; radMax: number;
   toasts: Toast[]; acao: { rotulo: string; p: number } | null; alvo: string | null; furtivo: boolean;
-  invAberto: boolean; danoTs: number; resumo: Resumo | null; gemas: number;
+  invAberto: boolean; danoTs: number; resumo: Resumo | null; gemas: number; carga: number;
   set: (p: Partial<Estado>) => void;
   toast: (texto: string, cor?: string) => void;
 };
@@ -40,7 +40,7 @@ export const estadoInicial = (seed: string) => ({
 });
 
 export const useJogo = create<Estado>((set, get) => ({
-  tela: 'menu', ...estadoInicial(''), gemas: 20,
+  tela: 'menu', ...estadoInicial(''), gemas: 20, carga: 0,
   set: p => set(p),
   toast: (texto, cor = '#e8e4d8') => {
     const t = { id: tid++, texto, cor };

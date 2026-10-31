@@ -2,52 +2,52 @@
   "novos": [
     {
       "id": 1,
-      "nome": "Orbe de radiação no lugar da mana",
-      "nota": "Orbe do D2 adaptado: radiação acumulada, verde Geiger; reduz a vida máxima."
+      "nome": "Layout sem sobreposição",
+      "nota": "Topo, mundo e painel são caixas separadas; só botões do polegar ficam nas bordas do mundo."
     },
     {
       "id": 2,
-      "nome": "Layout sem sobreposição",
-      "nota": "Topo, mundo e painel são caixas separadas; só botões do polegar ficam nas bordas."
-    },
-    {
-      "id": 3,
       "nome": "Contador de conceitos novos",
       "nota": "tools/conceitos.mjs e tela Créditos."
     },
     {
+      "id": 3,
+      "nome": "Pipeline voxel para sprite pixel art em 8 direções",
+      "nota": "Motor próprio de ray casting (game/voxel.ts): personagens, bichos, props e paredes saem do mesmo renderer, com a mesma luz e contorno."
+    },
+    {
       "id": 4,
-      "nome": "Arte procedural do ermo (tiles, props e personagens em canvas)",
-      "nota": "Sem pacote CC0 top-down pós-nuclear acessível, então geramos com contorno, sombra e luz de cima."
+      "nome": "Chão isométrico contínuo por ruído em coordenadas de mundo",
+      "nota": "Sem emenda de tiles; a radiação mancha o chão em pontilhado e rachaduras brilham nas crateras."
     },
     {
       "id": 5,
+      "nome": "Neblina pontilhada (Bayer) com memória do mapa e tingimento por objeto",
+      "nota": "Chão em dithering por pixel; paredes, props e bichos escurecem pela luz do próprio tile."
+    },
+    {
+      "id": 6,
+      "nome": "Ícones vetoriais convertidos em pixel art 1-bit em tempo real",
+      "nota": "Os SVGs do game-icons viram pixel art com contorno, para combinar com o resto."
+    },
+    {
+      "id": 7,
       "nome": "Loot determinístico pela seed com raridade real",
       "nota": "Cada contêiner é sorteado na geração: mesmo mundo e mesmo saque para todos no dia."
     },
     {
-      "id": 6,
-      "nome": "Regra de formas: cápsula = seguro, polígono cortado = perigo",
-      "nota": "Todo CTA e chip é cápsula; moodles críticos viram losango/recorte pulsando."
-    },
-    {
-      "id": 7,
+      "id": 8,
       "nome": "Modo Estudo com Revelação (mostrado x verdade)",
       "nota": "Reproduz técnicas sombrias de propósito, sem cobrança real, e registra cada uma para a reportagem."
-    },
-    {
-      "id": 8,
-      "nome": "Contador Geiger ligado ao mesmo ruído que pinta o chão",
-      "nota": "A mancha verde do chão e o clique do Geiger vêm do mesmo mapa de radiação."
     }
   ],
   "adaptados": [
     {
-      "nome": "Estética Diablo 2 (orbes, moldura, cores de raridade)",
-      "origem": "referência de design; CSS e canvas próprios sobre padrões comuns"
+      "nome": "Visão isométrica 2:1 e paredes que cortam na frente do jogador",
+      "origem": "referência do Project Zomboid; implementação própria"
     },
     {
-      "nome": "Visão em cone com memória de mapa estilo Project Zomboid",
+      "nome": "Cone de visão com memória de mapa",
       "origem": "rot-js FOV (BSD-3) + mapa de luz próprio"
     },
     {
@@ -59,12 +59,12 @@
       "origem": "conceito do Project Zomboid, ícones game-icons.net"
     },
     {
-      "nome": "Fontes Cinzel e Nunito",
+      "nome": "Fontes Silkscreen e VT323",
       "origem": "@fontsource (OFL)"
     },
     {
       "nome": "Ícones",
-      "origem": "game-icons.net (CC BY 3.0), tingidos por filtro CSS"
+      "origem": "game-icons.net (CC BY 3.0)"
     },
     {
       "nome": "Joystick virtual",

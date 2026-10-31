@@ -19,7 +19,7 @@
 
 ## Código (npm, em uso)
 
-Next.js, React, Phaser 4.2.1, nipplejs, simplex-noise, alea, zustand, ZzFX (MIT); rot-js (BSD-3-Clause, FOV e A*). Fontes via @fontsource: Cinzel, Nunito (OFL). `app/icon.svg` é o ícone radioactive (Lorc, CC BY 3.0).
+Next.js, React, Phaser 4.2.1, nipplejs, simplex-noise, alea, zustand, ZzFX (MIT); rot-js (BSD-3-Clause, FOV e A*). Fontes via @fontsource: Silkscreen, VT323 (OFL). Ícones convertidos em pixel art em tempo de execução (`components/Ico.tsx`). Personagens, props e paredes são renderizados de modelos voxel próprios (`game/voxel.ts`). `app/icon.svg` é o ícone radioactive (Lorc, CC BY 3.0).
 
 ## Código (a ser incluído — ver HANDOFF.md §5)
 

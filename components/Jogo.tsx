@@ -12,14 +12,14 @@ import { Menu, Fim, Loja, Revelacao, Creditos } from './Telas';
 declare global { interface Window { __cinzas?: unknown } }
 
 export default function Jogo() {
-  const tela = useJogo(s => s.tela); const inv = useJogo(s => s.invAberto); const set = useJogo(s => s.set);
+  const carga = useJogo(s => s.carga); const tela = useJogo(s => s.tela); const inv = useJogo(s => s.invAberto); const set = useJogo(s => s.set);
   const [corrida, setCorrida] = useState(0);
   const mundoRef = useRef<HTMLDivElement>(null); const esq = useRef<HTMLDivElement>(null); const dir = useRef<HTMLDivElement>(null);
   const jogando = tela === 'jogo' || tela === 'morte' || tela === 'vitoria';
 
   const iniciar = async () => {
     void iniciarAudio();
-    try { await Promise.all(['900 20px Cinzel', '800 20px Nunito', '900 20px Nunito'].map(f => document.fonts.load(f))); } catch { /* segue */ }
+    try { await Promise.all(['700 16px Silkscreen', '400 16px VT323'].map(f => document.fonts.load(f))); } catch { /* segue */ }
     const meta = registrarDia(); const seed = hoje(); const e = estadoInicial(seed);
     if (meta.sequencia >= 3) e.inv = { ...e.inv, kit: 1 };
     set({ ...e, tela: 'jogo' }); setCorrida(c => c + 1);
@@ -56,6 +56,7 @@ export default function Jogo() {
         <div ref={mundoRef} style={{ position: 'absolute', inset: 0 }} />
         <div ref={esq} className="zona esq" /><div ref={dir} className="zona dir" />
         <Sobreposicoes /><Botoes />
+        {carga < 1 && <div className="carga"><div className="carga-t">GERANDO O ERMO</div><div className="carga-b"><i style={{ width: `${Math.round(carga * 100)}%` }} /></div></div>}
       </div>
       <Painel />
       {inv && tela === 'jogo' && <Inventario />}

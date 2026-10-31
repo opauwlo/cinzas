@@ -270,3 +270,13 @@ Use este plano se ficar sem npm, ou se preferir Box2D a Rapier.
 - **Modo Estudo** (`?estudo=1`): quase-vitória fabricada, prova social falsa, cronômetro falso, desconto fictício, ancoragem e aversão à perda; sem cobrança; termina na Revelação. Ver `CLAUDE.md`.
 - Arte: tiles, props e personagens são procedurais (`game/arte.ts`). **Pendente: trocar por sprites detalhados CC0 (Kenney Topdown Shooter, OpenGameArt) — o download foi bloqueado pelo classificador; aguardando liberação do Uwlo.**
 - Falta: física WASM, crafting, pathfinding para mais inimigos, saque de inimigos, P2P, PWA, deploy.
+
+## 13. Virada visual (sessão de Code, 31/out/2026)
+
+Pedido do Uwlo: pixel art grande em tamanho normal, visão isométrica como Project Zomboid (personagens de lado, não de cima), visual adulto e coeso, nada de bola/quadrado/cápsula infantil.
+
+- **Projeção:** isométrica 2:1 (tile 32x16 px de arte), jogo renderizado a 1 px de arte = 2 px de CSS, `pixelArt: true`, câmera em pixels inteiros. Joystick e mira são girados 45° para o grid.
+- **Arte (`game/voxel.ts`, `modelos.ts`, `paredes.ts`, `chao.ts`):** modelos em voxel renderizados por ray casting em 8 direções x 4 quadros, com luz em 4 faixas, contorno seletivo e borda interna. Chão calculado por pixel em coordenadas de mundo. Prévia em `/arte/`.
+- **Luz:** FOV do rot.js, neblina pontilhada (Bayer) no chão, tingimento por objeto, paredes baixas/transparentes quando estão na frente do jogador.
+- **UI:** aço, ferrugem, laranja de aviso e fósforo; cantos em degrau, bisel de 2 px, fontes Silkscreen e VT323, ícones convertidos em pixel art 1-bit. Cápsulas e amarelo saíram.
+- Pendente: sprites feitos por artista (os voxels são o plano B coeso), crafting, física WASM, P2P, PWA, deploy, animação de ataque, corpos mais variados.
