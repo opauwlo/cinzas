@@ -7,3 +7,4 @@ vendor/src/
 *.log
 *.status
 .DS_Store
+tsconfig.tsbuildinfo

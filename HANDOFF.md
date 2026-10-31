@@ -253,3 +253,12 @@ Use este plano se ficar sem npm, ou se preferir Box2D a Rapier.
     - dois jogadores se veem no P2P;
     - o SW registra e o manifest é válido.
 11. Deploy (Vercel ou GitHub Pages) **só depois dos testes**, e mandar o link pro Uwlo abrir no celular.
+
+## 11. Progresso (sessão de Code, 31/out/2026)
+
+- npm funciona. Scaffold Next 16 (App Router, TS, `output: 'export'`) feito; `npm run build` gera `out/`.
+- Estilo **Diablo 2 mais nítido**: orbes (HP vermelho, radiação verde), cinto de 4 slots com cor de raridade, moldura de pedra/ferro, fontes Cinzel/Metamorphous. Tudo em `app/globals.css`. Mundo e painel são caixas separadas (sem sobreposição).
+- Phaser: `components/mundo.ts` (chão, ruínas, luz do jogador, Geiger pelo ruído). Joystick esquerdo com nipplejs.
+- **Contador de conceitos novos:** `conceitos.json` + `npm run conceitos` + tela Créditos. Hoje: 4 novos.
+- `npm run smoke` (precisa de `npm run build` antes; `SHOT_DIR` para screenshots): passa.
+- Falta do §10: física WASM, colisão real, cone de visão, inimigos, saque, áudio, P2P, PWA, deploy.

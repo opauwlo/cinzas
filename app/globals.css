@@ -1,0 +1,168 @@
+:root {
+  /* paleta: Diablo 2 mais nítido, tingido pelo pós-nuclear (HANDOFF §7) */
+  --preto: #0b0907;
+  --ferro: #1a1714;
+  --pedra: #2b2620;
+  --pedra-clara: #4a4137;
+  --bronze: #7a6232;
+  --ouro: #c7b377;        /* texto único/títulos */
+  --osso: #d9ccb0;
+  --sangue: #c2412d;
+  --sangue-escuro: #5a120b;
+  --rad: #a6ff3b;
+  --ambar: #ffb000;
+  /* raridade estilo D2: branco, mágico (azul), raro (amarelo) */
+  --r-comum: #e8e4d8;
+  --r-incomum: #7f86ff;
+  --r-raro: #ffff64;
+  --fonte-titulo: 'Cinzel', 'Black Ops One', serif;
+  --fonte-corpo: 'Metamorphous', 'Cinzel', serif;
+  --fonte-hud: 'Share Tech Mono', monospace;
+  --altura-painel: 148px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--preto); color: var(--osso); overflow: hidden; overscroll-behavior: none; }
+body { font-family: var(--fonte-corpo); touch-action: none; user-select: none; -webkit-user-select: none; }
+
+.jogo { display: flex; flex-direction: column; height: 100dvh; max-width: 560px; margin: 0 auto; background: var(--preto); }
+
+/* ---------- mundo ---------- */
+.mundo { position: relative; flex: 1; min-height: 0; overflow: hidden; border-bottom: 3px solid var(--preto); }
+.mundo canvas { display: block; width: 100% !important; height: 100% !important; }
+.mundo::after { /* vinheta de masmorra; só nas bordas, não cobre o centro */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 70px 18px rgba(0, 0, 0, .75);
+}
+
+/* ---------- moldura de pedra/ferro ---------- */
+.moldura {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.35)),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.015) 0 2px, rgba(0,0,0,.05) 2px 5px),
+    var(--pedra);
+  border: 2px solid var(--preto);
+  box-shadow:
+    inset 0 0 0 1px var(--bronze),
+    inset 0 0 0 3px var(--ferro),
+    inset 0 0 0 4px var(--pedra-clara),
+    inset 0 0 14px 4px rgba(0,0,0,.7),
+    0 2px 0 rgba(255,255,255,.04);
+}
+.moldura::before, .moldura::after { /* rebites de ferro nos cantos */
+  content: ''; position: absolute; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #cdbb8a, #5b4a26 60%, #1a1308);
+  top: 5px; left: 5px;
+}
+.moldura::after { left: auto; right: 5px; }
+
+/* ---------- faixa de local (topo do mundo) ---------- */
+.local {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2;
+  padding: 3px 22px; font: 700 13px var(--fonte-titulo); letter-spacing: .18em; text-transform: uppercase;
+  color: var(--ouro); text-shadow: 0 0 6px #000, 0 1px 0 #000;
+  background: linear-gradient(90deg, transparent, rgba(11,9,7,.78) 18%, rgba(11,9,7,.78) 82%, transparent);
+  border-top: 1px solid var(--bronze); border-bottom: 1px solid var(--bronze);
+  white-space: nowrap; pointer-events: none;
+}
+.geiger {
+  position: absolute; top: 40px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px;
+  font: 13px var(--fonte-hud); color: var(--rad); text-shadow: 0 0 8px rgba(166,255,59,.6); pointer-events: none;
+}
+.geiger img { width: 20px; height: 20px; mix-blend-mode: screen; filter: sepia(1) saturate(6) hue-rotate(40deg) brightness(1.1); }
+
+/* ---------- painel inferior ---------- */
+.painel { height: var(--altura-painel); display: grid; grid-template-columns: 112px 1fr 112px; align-items: end; padding: 0 6px 6px; gap: 4px; }
+.painel > .moldura { height: 100%; position: absolute; inset: 0; z-index: 0; }
+.painel { position: relative; }
+.painel > *:not(.moldura) { position: relative; z-index: 1; }
+
+/* ---------- orbes (HP / radiação) ---------- */
+.orbe {
+  --nivel: 100%;
+  position: relative; width: 104px; height: 104px; border-radius: 50%; margin-bottom: 4px;
+  background: radial-gradient(circle at 50% 40%, #1c0c0a, #050303 75%);
+  box-shadow: 0 0 0 3px var(--ferro), 0 0 0 5px var(--bronze), 0 0 0 7px var(--preto), 0 6px 14px #000;
+  overflow: hidden;
+}
+.orbe .liquido {
+  position: absolute; left: -8%; right: -8%; bottom: 0; height: var(--nivel);
+  background: linear-gradient(180deg, var(--c1), var(--c2) 70%, var(--c3));
+  transition: height .35s ease-out;
+}
+.orbe .liquido::before { /* superfície ondulando */
+  content: ''; position: absolute; left: 0; right: 0; top: -6px; height: 12px; border-radius: 50%;
+  background: var(--c1); opacity: .9; animation: onda 3.2s ease-in-out infinite alternate;
+}
+@keyframes onda { from { transform: translateX(-4%) scaleY(1); } to { transform: translateX(4%) scaleY(.7); } }
+.orbe::after { /* vidro: brilho e sombra, igual ao orbe do D2 */
+  content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background:
+    radial-gradient(ellipse 45% 28% at 36% 20%, rgba(255,255,255,.38), transparent 70%),
+    radial-gradient(circle at 50% 50%, transparent 58%, rgba(0,0,0,.65) 100%);
+}
+.orbe.hp { --c1: #e0523a; --c2: #a8200f; --c3: #4a0a05; }
+.orbe.rad { --c1: #c8ff5c; --c2: #5ea314; --c3: #1d3a06; background: radial-gradient(circle at 50% 40%, #0c1a0a, #030503 75%); }
+.orbe .num { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; font: 700 15px var(--fonte-hud); color: var(--osso); text-shadow: 0 1px 3px #000, 0 0 6px #000; letter-spacing: .04em; }
+.orbe.critico { animation: batida .85s ease-in-out infinite; }
+@keyframes batida { 0%,100% { transform: scale(1); } 12% { transform: scale(1.05); } 24% { transform: scale(1); } 36% { transform: scale(1.03); } }
+
+/* ---------- cinto (slots) ---------- */
+.centro { margin: 0 6px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding-bottom: 6px; min-width: 0; }
+.barras { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.barra { position: relative; height: 12px; background: var(--preto); border: 1px solid var(--bronze); box-shadow: inset 0 0 4px #000; }
+.barra i { display: block; height: 100%; width: var(--p, 100%); background: linear-gradient(180deg, var(--b1), var(--b2)); }
+.barra.fome { --b1: #c98a3a; --b2: #6b4417; }
+.barra.sede { --b1: #5aa0d8; --b2: #1f4a73; }
+.barra span { position: absolute; inset: 0; display: grid; place-items: center; font: 9px var(--fonte-hud); color: var(--osso); text-shadow: 0 1px 2px #000; letter-spacing: .1em; text-transform: uppercase; }
+.cinto { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.slot {
+  position: relative; aspect-ratio: 1; min-width: 0; padding: 0; cursor: pointer;
+  background: radial-gradient(circle at 50% 35%, #26211b, #0c0a08 85%);
+  border: 2px solid var(--preto);
+  box-shadow: inset 0 0 0 1px var(--pedra-clara), inset 0 0 9px #000, 0 1px 0 rgba(255,255,255,.05);
+}
+.slot:active { box-shadow: inset 0 0 0 1px var(--ouro), inset 0 0 12px rgba(199,179,119,.35); }
+.slot img { position: absolute; inset: 14%; width: 72%; height: 72%; object-fit: contain; mix-blend-mode: screen; filter: sepia(1) saturate(2.2) hue-rotate(-12deg) brightness(.95) drop-shadow(0 0 4px rgba(0,0,0,.9)); }
+.slot .qtd { position: absolute; right: 3px; bottom: 1px; font: 11px var(--fonte-hud); color: var(--r-comum); text-shadow: 0 1px 2px #000; }
+.slot .tecla { position: absolute; left: 3px; top: 1px; font: 9px var(--fonte-hud); color: var(--bronze); }
+.slot.incomum { box-shadow: inset 0 0 0 1px var(--r-incomum), inset 0 0 10px rgba(127,134,255,.35); }
+.slot.raro { box-shadow: inset 0 0 0 1px var(--r-raro), inset 0 0 10px rgba(255,255,100,.3); }
+
+/* ---------- botões de ação (alcance do polegar direito) ---------- */
+.acoes { position: absolute; right: 10px; bottom: 12px; z-index: 3; display: flex; flex-direction: column; gap: 10px; }
+.acoes .btn { width: 64px; height: 64px; border-radius: 50%; padding: 0; display: grid; place-items: center; cursor: pointer; font: 700 10px var(--fonte-titulo); color: var(--ouro); }
+.btn {
+  background: radial-gradient(circle at 50% 30%, #3a3228, #15110d 80%);
+  border: 2px solid var(--preto);
+  box-shadow: 0 0 0 2px var(--bronze), 0 0 0 4px var(--preto), inset 0 0 10px #000, 0 4px 10px rgba(0,0,0,.7);
+}
+.btn:active { transform: translateY(1px); box-shadow: 0 0 0 2px var(--ouro), 0 0 0 4px var(--preto), inset 0 0 14px rgba(199,179,119,.3); }
+.btn img { width: 34px; height: 34px; mix-blend-mode: screen; filter: sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.05); }
+
+/* ---------- telas (menu / créditos) ---------- */
+.tela { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 20px; max-width: 560px; margin: 0 auto;
+  background: radial-gradient(ellipse at 50% 30%, rgba(60,25,12,.55), rgba(11,9,7,.97) 70%), var(--preto); }
+.tela .caixa { width: 100%; padding: 28px 22px; text-align: center; }
+.titulo { margin: 0 0 4px; font: 900 44px var(--fonte-titulo); letter-spacing: .14em; color: var(--ouro);
+  text-shadow: 0 0 18px rgba(194,65,45,.55), 0 3px 0 #000, 0 0 2px #fff3; }
+.subtitulo { margin: 0 0 22px; font: 400 13px 'IM Fell English SC', var(--fonte-corpo); letter-spacing: .3em; color: var(--sangue); text-transform: uppercase; }
+.divisor { height: 14px; margin: 14px 0; background: linear-gradient(90deg, transparent, var(--bronze) 30%, var(--ouro) 50%, var(--bronze) 70%, transparent) center/100% 1px no-repeat; position: relative; }
+.divisor::after { content: '☢'; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); padding: 0 10px; background: var(--pedra); color: var(--ouro); font-size: 14px; }
+.btn-d2 {
+  display: block; width: 100%; margin: 10px 0 0; padding: 13px 10px; cursor: pointer;
+  font: 700 17px var(--fonte-titulo); letter-spacing: .2em; text-transform: uppercase; color: var(--ouro);
+  background: linear-gradient(180deg, #3b3228, #17120e 55%, #221b14);
+  border: 2px solid var(--preto);
+  box-shadow: inset 0 0 0 1px var(--bronze), inset 0 0 10px #000, 0 3px 8px rgba(0,0,0,.6);
+  text-shadow: 0 2px 2px #000;
+}
+.btn-d2:hover, .btn-d2:focus-visible { color: #fff2c4; box-shadow: inset 0 0 0 1px var(--ouro), inset 0 0 14px rgba(199,179,119,.25), 0 3px 8px rgba(0,0,0,.6); outline: none; }
+.btn-d2.sec { font-size: 13px; letter-spacing: .14em; color: var(--osso); }
+.lista { text-align: left; font: 12px/1.7 var(--fonte-hud); color: var(--osso); max-height: 46dvh; overflow: auto; padding-right: 4px; }
+.lista b { color: var(--ouro); font-weight: 400; }
+.lista a { color: var(--r-incomum); }
+.dica { margin: 14px 0 0; font: 11px var(--fonte-hud); color: var(--pedra-clara); letter-spacing: .08em; }
+
+@media (max-height: 640px) { :root { --altura-painel: 124px; } .orbe { width: 86px; height: 86px; } .painel { grid-template-columns: 94px 1fr 94px; } }

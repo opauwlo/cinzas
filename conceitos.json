@@ -1,0 +1,16 @@
+{
+  "novos": [
+    { "id": 1, "nome": "Orbe de radiação no lugar da mana", "nota": "Orbe de líquido do D2 adaptado: mostra radiação acumulada e fica verde Geiger." },
+    { "id": 2, "nome": "Layout sem sobreposição", "nota": "Mundo e painel são caixas separadas (flex); HUD só flutua com botões do polegar e o local." },
+    { "id": 3, "nome": "Luz do jogador + manchas de radiação do mesmo ruído", "nota": "O mesmo ruído simplex pinta o chão e alimenta o contador Geiger." },
+    { "id": 4, "nome": "Contador de conceitos novos", "nota": "Este contador: tools/conceitos.mjs e tela de créditos." }
+  ],
+  "adaptados": [
+    { "nome": "Estética Diablo 2 (orbes, cinto, moldura de pedra, cores de raridade)", "origem": "referência de design; CSS próprio sobre padrões comuns" },
+    { "nome": "Fontes Cinzel, Metamorphous, IM Fell English SC", "origem": "@fontsource (OFL)" },
+    { "nome": "Ícones", "origem": "game-icons.net (CC BY 3.0), tingidos de ouro por filtro CSS" },
+    { "nome": "Joystick virtual", "origem": "nipplejs (MIT)" },
+    { "nome": "Render e câmera", "origem": "Phaser 4.2.1 (MIT)" },
+    { "nome": "Ruído e RNG com seed", "origem": "simplex-noise, alea (MIT)" }
+  ]
+}

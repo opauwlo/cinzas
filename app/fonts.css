@@ -1,0 +1,10 @@
+@font-face {
+  font-family: 'Black Ops One';
+  src: url('/fonts/BlackOpsOne-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Share Tech Mono';
+  src: url('/fonts/ShareTechMono-Regular.ttf') format('truetype');
+  font-display: swap;
+}

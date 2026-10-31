@@ -17,6 +17,10 @@
 - **Black Ops One** — James Grieshaber, Eben Sorkin. `public/fonts/OFL-BlackOpsOne.txt`
 - **Share Tech Mono** — Carrois Type Design. `public/fonts/OFL-ShareTechMono.txt`
 
+## Código (npm, em uso)
+
+Next.js, React, Phaser 4.2.1, nipplejs, simplex-noise, alea (MIT). Fontes via @fontsource: Cinzel, Metamorphous, IM Fell English SC (OFL). `app/icon.svg` é o ícone radioactive (Lorc, CC BY 3.0).
+
 ## Código (a ser incluído — ver HANDOFF.md §5)
 
 Phaser (MIT), Box2D v3 (MIT), walloc (MIT), Trystero (MIT), @noble/secp256k1 (MIT), nipplejs (MIT), ZzFX (MIT), simplex-noise (MIT), alea (MIT), PathFinding.js e heap.js (MIT). Ao vendorizar qualquer um, copiar o arquivo de licença junto.
