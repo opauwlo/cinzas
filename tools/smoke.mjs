@@ -55,6 +55,9 @@ try {
   await espera(1500); await foto('2-base');
   ok('o canvas usa pixels inteiros do aparelho (grade uniforme)', await ev(() => { const c = document.querySelector('canvas'), r = (parseFloat(c.style.width) * devicePixelRatio) / c.width; return Math.abs(r - Math.round(r)) < 0.01 && r >= 2; }));
 
+  // os testes do manche e do botão de ataque rodam no modo duas mãos; o modo uma mão (padrão do jogo) tem os seus na seção 5c
+  const modo = c => ev(c => { const st = window.__cinzas.store; st.setState({ cfg: { ...st.getState().cfg, controle: c } }); }, c);
+  await modo('manche'); await espera(300);
   // 3. movimento (joystick virtual)
   const p0 = await cena(() => { const j = window.__cinzas.cena().jog; return [j.x, j.y]; });
   await ev(() => { window.__cinzas.ponte.entrada.mx = 0.7; window.__cinzas.ponte.entrada.my = 0.7; }); await espera(1600); await ev(() => { window.__cinzas.ponte.entrada.mx = 0; window.__cinzas.ponte.entrada.my = 0; });
@@ -104,7 +107,7 @@ try {
 
   // 4a0. objetivos em atos, rótulos de coleta com rendimento e ferramenta
   const obj0 = await ev(() => { const t = window.__cinzas.store.getState(); return { idx: t.objIdx, hud: document.querySelector('.obj')?.textContent ?? '' }; });
-  ok('o rastreador mostra o objetivo atual', obj0.idx === 0 && /OBJ/i.test(obj0.hud) && /Ermo/i.test(obj0.hud), JSON.stringify(obj0));
+  ok('o rastreador mostra o objetivo atual (o primeiro passo da campanha)', obj0.idx === 0 && /OBJ/i.test(obj0.hud) && /madeira/i.test(obj0.hud), JSON.stringify(obj0));
   await ev(() => window.__cinzas.store.setState({ painel: 'diario' })); await espera(400); await foto('2e-diario');
   ok('o Diário mostra a campanha em atos', /Ato I/i.test(await ev(() => document.body.innerText)) && /Ato III/i.test(await ev(() => document.body.innerText)));
   await ev(() => window.__cinzas.store.setState({ painel: null }));
@@ -249,6 +252,48 @@ try {
   ok('soltar o botão desliga o automático', await ev(() => window.__cinzas.ponte.entrada.auto === false && document.querySelector('.atk').dataset.auto === '0'));
   const npcSeg = await ev(async () => { const k = window.__cinzas.cena(), en = window.__cinzas.ponte.entrada, J = k.jog, e = k.devNpc('acampado'); e.x = J.x + Math.cos(J.ang) * 1.2; e.y = J.y + Math.sin(J.ang) * 1.2; e.npc.ferido = false; const antes = e.hp; en.auto = true; en.tap++; await new Promise(r => setTimeout(r, 1300)); en.auto = false; return { ferido: e.npc.ferido, hp: e.hp, antes, alvoNpc: k.mirarAuto(J.ang, true) }; });
   ok('o ataque automático nunca mira nem fere NPCs', npcSeg.ferido === false && npcSeg.hp === npcSeg.antes && npcSeg.alvoNpc === null, JSON.stringify(npcSeg));
+  // 5c. modo uma mão (padrão do jogo): tocar anda, tocar num objeto vai e interage, tocar num inimigo persegue e ataca
+  await modo('toque'); await espera(400);
+  ok('no modo uma mão não há manche nem botão de ataque na tela', await ev(() => !document.querySelector('.stick') && !document.querySelector('.atk')));
+  const toca = (alvo, dupla = false) => ev((alvo, dupla) => { // alvo: tile (tx, ty) e altura z em px de arte; dispara o toque na camada do mundo
+    const k = window.__cinzas.cena(), cam = k.cameras.main, sx = (alvo.tx - alvo.ty) * 16, sy = (alvo.tx + alvo.ty) * 8 - (alvo.z ?? 0), camada = document.querySelector('.zona-mundo'), r = camada.getBoundingClientRect(), x = r.left + (sx - cam.scrollX) * k.esc, y = r.top + (sy - cam.scrollY) * k.esc;
+    const d = () => camada.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 21, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true })); d(); if (dupla) d(); return { x: Math.round(x), y: Math.round(y) };
+  }, alvo, dupla);
+  const acharChao = dist => ev(dist => { const k = window.__cinzas.cena(), J = k.jog; for (let a = 0; a < 6.28; a += 0.4) { const tx = Math.floor(J.x + Math.cos(a) * dist), ty = Math.floor(J.y + Math.sin(a) * dist); if (!k.solidoEm(tx, ty) && k.temLOS(J.x, J.y, tx + 0.5, ty + 0.5) && !k.colide(tx + 0.5, ty + 0.5, 0.3)) return { tx: tx + 0.5, ty: ty + 0.5, z: 0 }; } return null; }, dist);
+  await ev(() => { const k = window.__cinzas.cena(); k.jog.x = 40; k.jog.y = 40; cancelaToqueNoTeste(k); function cancelaToqueNoTeste(k) { k.toque.rota = []; k.toque.dest = null; k.toque.it = null; k.toque.alvo = null; } }); await espera(500);
+  const chao = await acharChao(6);
+  await toca(chao);
+  const rotaOk = await ev(() => { const t = window.__cinzas.cena().toque; return !!t.dest && t.rota.length > 0; });
+  const chegou = await ate(a => { const k = window.__cinzas.cena(), J = k.jog; return !k.toque.dest && Math.hypot(J.x - a.tx, J.y - a.ty) < 0.8; }, 60000, chao);
+  ok('tocar no chão calcula o caminho e o jogador anda até lá sozinho', !!chao && rotaOk && chegou, JSON.stringify({ chao, rotaOk, chegou }));
+  const chao2 = await acharChao(8); await toca(chao2, true);
+  ok('toque duplo manda correr', await ev(() => window.__cinzas.cena().toque.correr === true));
+  await ev(() => { const k = window.__cinzas.cena(); k.toque.rota = []; k.toque.dest = null; k.toque.correr = false; });
+  // objeto: de dentro do abrigo, tocar na bancada leva o jogador até lá (passando pela porta) e abre a bancada
+  await ev(() => { const k = window.__cinzas.cena(); for (const [x, y] of [[44.5, 76.5], [46.5, 77.5], [42.5, 75.5], [48.5, 80.5]]) if (!k.colide(x, y, 0.3)) { k.jog.x = x; k.jog.y = y; break; } }); await espera(600);
+  const banca = await ev(() => { const k = window.__cinzas.cena(), it = k.interativos.find(i => /bancada/i.test(i.rot)); return it ? { tx: it.x, ty: it.y, z: (it.alt ?? 30) * 0.5 } : null; });
+  await toca(banca);
+  ok('tocar num objeto distante manda o jogador até ele e interage ao chegar (abre a bancada)', !!banca && await ate(() => window.__cinzas.store.getState().painel === 'craft', 120000), JSON.stringify(banca));
+  await limpaPaineis();
+  // criatura: tocar num inimigo persegue e o ataque automático derruba
+  await ev(() => { const k = window.__cinzas.cena(); k.jog.x = 40; k.jog.y = 40; k.toque.rota = []; k.toque.dest = null; k.toque.it = null; }); await espera(600);
+  const chao3 = await acharChao(6);
+  const alvoId = await ev(c => { const k = window.__cinzas.cena(), J = k.jog, e = k.dev('irradiado', c.tx - J.x, c.ty - J.y); e.hp = e.maxHp = 24; e.estado = 'ocioso'; e.visao = 0; return e.id; }, chao3);
+  await espera(300);
+  const pos = await ev(id => { const e = window.__cinzas.cena().ents.find(x => x.id === id); return { tx: e.x, ty: e.y, z: 14 }; }, alvoId);
+  await toca(pos);
+  const perseguiu = await ev(id => window.__cinzas.cena().toque.alvo?.id === id, alvoId);
+  const caiu = await ate(id => { const e = window.__cinzas.cena().ents.find(x => x.id === id); return !e || !e.vivo; }, 120000, alvoId);
+  ok('tocar num inimigo faz o jogador ir atrás e o ataque automático derrubar', perseguiu && caiu, JSON.stringify({ perseguiu, caiu }));
+  ok('depois do abate o jogador pára de perseguir', await ate(() => !window.__cinzas.cena().toque.alvo, 8000));
+  // o botão do dedo troca entre uma e duas mãos
+  const troca = () => ev(() => { document.querySelector('button[aria-label^="Controle"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); });
+  await troca(); await espera(400);
+  const duas = await ev(() => ({ cfg: window.__cinzas.store.getState().cfg.controle, stick: !!document.querySelector('.stick'), atk: !!document.querySelector('.atk') }));
+  await troca(); await espera(400);
+  const uma = await ev(() => ({ cfg: window.__cinzas.store.getState().cfg.controle, stick: !!document.querySelector('.stick') }));
+  ok('o botão do HUD alterna uma mão ↔ duas mãos (aparece/some o manche)', duas.cfg === 'manche' && duas.stick && duas.atk && uma.cfg === 'toque' && !uma.stick, JSON.stringify({ duas, uma }));
+  await modo('manche'); await espera(400);
 
   // 6. clima (todos os estados, sem exceção)
   for (const t of ['chuva', 'tempestade', 'neblina', 'poeira', 'acida', 'vento', 'limpo']) { await ev(t => window.__cinzas.cena().clima.definir(t, true), t); await espera(450); }
@@ -257,6 +302,7 @@ try {
   // 7. viagem de ida e volta (gasta combustível e troca de zona)
   await limpaPaineis();
   const comb0 = (await estado()).combustivel;
+  const idxJipe = await ev(() => { const k = window.__cinzas.cena(); k.devObjetivo('jipe'); return k.s.objIdx; }); // a campanha é linear: pula para o passo da viagem
   await ev(() => window.__cinzas.ponte.cmd.viajar('ermo'));
   ok('viaja para o Ermo', await ate(() => { const s = window.__cinzas.store.getState(); return s.zonaId === 'ermo' && s.carga >= 1; }, 60000), JSON.stringify(await estado()));
   s = await estado(); ok('a viagem gastou combustível', s.combustivel < comb0, `${comb0} → ${s.combustivel}`);
@@ -266,7 +312,7 @@ try {
 
   await limpaPaineis(); // um nível ganho na viagem abre a escolha de habilidade num momento calmo: resolve antes do saque
   // 7a. objetivo "Viaje até o Ermo" cumprido ao chegar; itens soltos no chão são coletados ao passar por cima
-  ok('o objetivo da viagem é cumprido ao chegar', await ate(() => window.__cinzas.store.getState().objIdx >= 1, 8000), JSON.stringify(await ev(() => window.__cinzas.store.getState().objIdx)));
+  ok('o objetivo da viagem é cumprido ao chegar', await ate(i => window.__cinzas.store.getState().objIdx > i, 8000, idxJipe), JSON.stringify({ idxJipe, agora: await ev(() => window.__cinzas.store.getState().objIdx) }));
   const solto = await ev(() => { const k = window.__cinzas.cena(); if (!k.soltos.length) return null; const o = k.soltos[0], st = window.__cinzas.store.getState(), n0 = k.soltos.length, q0 = st.inv[o.s.item] ?? 0; k.jog.x = o.s.x; k.jog.y = o.s.y; return { id: o.s.id, item: o.s.item, n0, q0 }; });
   ok('o Ermo tem itens soltos no chão', !!solto && (await ev(() => window.__cinzas.cena().soltos.length)) > 5, JSON.stringify(solto));
   ok('passar por cima de um item solto o coleta', solto && await ate(o => { const k = window.__cinzas.cena(), t = window.__cinzas.store.getState(); return k.soltos.length < o.n0 && (t.inv[o.item] ?? 0) > o.q0 && k.ze.coletados.includes(o.id); }, 6000, solto));
@@ -339,6 +385,11 @@ try {
   });
   ok('abrir os suprimentos conclui e vira conquista', abriu && await ate(() => window.__cinzas.store.getState().conquistas.includes('chuvaouro'), 12000));
 
+  // 7g. o mapa abre por nível: um local acima do nível do jogador não deixa viajar (mesmo pelo comando)
+  const bloqueado = await ev(() => { const k = window.__cinzas.cena(), st = window.__cinzas.store; k.s.nivel = 1; st.setState({ nivel: 1 }); const antes = st.getState().zonaId; window.__cinzas.ponte.cmd.viajar('militar'); return { antes, depois: st.getState().zonaId, trava: k.trava }; });
+  await espera(600);
+  ok('o mapa abre por nível: Posto Militar 14 (nível 8) não abre no nível 1', bloqueado.antes === bloqueado.depois && bloqueado.trava === false, JSON.stringify(bloqueado));
+  await ev(() => window.__cinzas.cena().devXp(6000)); await ev(() => { window.__cinzas.cena().perkAvisado = 1e9; }); await espera(400); // sobe de nível para liberar os locais temáticos
   // 7h. locais temáticos carregam (hospital e posto militar)
   for (const [id, rx] of [['hospital', /hospital/i], ['militar', /militar/i], ['torre', /torre/i]]) {
     await limpaPaineis();
@@ -360,13 +411,16 @@ try {
   ok('nível, habilidades e melhorias sobrevivem ao salvar', s.nivel >= 5 && s.perks >= 4 && s.tanque === 1, JSON.stringify(s));
 
   // 9. morte: no Calmo não existe morte permanente (desmaia e acorda no abrigo); no Normal leva à tela final
+  await ev(() => { window.__cinzas.cena().perkAvisado = 1e9; }); await limpaPaineis(); // depois de recarregar a página o painel de habilidades poderia abrir sozinho e pausar a cena
   const antesM = await ev(() => { const k = window.__cinzas.cena(); return { zona: k.s.zonaId, itens: Object.values(window.__cinzas.store.getState().inv).reduce((a, b) => a + b, 0) }; });
   await ev(() => { const k = window.__cinzas.cena(); k.s.dif = 0; k.s.hp = 1; k.dev('corredor', 0.7, 0.1); k.dev('corredor', -0.7, 0.1); });
   ok('no Calmo morrer não é o fim: desmaia e acorda no abrigo', await ate(() => { const t = window.__cinzas.store.getState(); return t.zonaId === 'base' && t.carga >= 1 && t.tela === 'jogo'; }, 40000), JSON.stringify(antesM));
   await espera(1200);
   ok('ao acordar no abrigo a vida volta e a run segue viva', await ev(() => { const t = window.__cinzas.store.getState(); return t.hp >= 50 && t.tela === 'jogo' && t.zonaId === 'base'; }));
   await ev(() => { const k = window.__cinzas.cena(); k.s.dif = 1; k.s.hp = 1; k.dev('corredor', 0.7, 0.1); k.dev('corredor', -0.7, 0.1); });
-  ok('no Normal a morte leva à tela final', await ate(() => window.__cinzas.store.getState().tela === 'morte', 60000));
+  const morreuNormal = await ate(() => window.__cinzas.store.getState().tela === 'morte', 60000);
+  const diagM = morreuNormal ? '' : JSON.stringify(await ev(() => { const t = window.__cinzas.store.getState(), k = window.__cinzas.cena(), J = k.jog; return { tela: t.tela, painel: t.painel, zona: t.zonaId, hp: +k.s.hp.toFixed(1), morto: k.morto, pausada: k.scene.isPaused(), trava: k.trava, dif: k.s.dif, hostis: k.ents.filter(e => e.vivo && e.arq.hostil).map(e => [e.arq.id, +Math.hypot(e.x - J.x, e.y - J.y).toFixed(1), e.estado]) }; }));
+  ok('no Normal a morte leva à tela final', morreuNormal, diagM);
   await espera(800); await foto('5-morte');
   ok('a tela final mostra o resumo da run', /sobreviveu|resumo|dia|abates/i.test(await ev(() => document.body.innerText)));
   ok('a tela final mostra nível e conquistas', /n[ií]vel/i.test(await ev(() => document.body.innerText)));

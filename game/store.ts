@@ -10,10 +10,10 @@ export type DialogoUI = { npcId: number; nome: string; rotulo: string; fala: str
 export type EventoUI = { titulo: string; txt: string; opcoes: { rot: string; ok: boolean; dica?: string }[]; resultado: string | null; cor?: string };
 export type Toast = { id: number; texto: string; cor: string };
 export type Resumo = { causa: string; dias: number; hora: string; abates: number; vasculhados: number; radMax: number; vitoria: boolean; distAbrigo: number; nivel?: number; contratos?: number; conquistas?: string[] };
-export type Configs = { mestre: number; sfx: number; amb: number; mus: number; vibra: boolean; ui: number; escala: number; v?: number; autoMira: boolean; gore: boolean; canhoto: boolean; fps: boolean };
+export type Configs = { mestre: number; sfx: number; amb: number; mus: number; vibra: boolean; ui: number; escala: number; v?: number; autoMira: boolean; gore: boolean; canhoto: boolean; fps: boolean; /** toque = uma mão (point & click) · manche = duas mãos (manche fixo + botão de ataque) */ controle: 'toque' | 'manche' };
 export type ClimaHud = { tipo: ClimaId; chuva: number; vento: number; neblina: number; poeira: number; nuvem: number };
 
-export const CFG0: Configs = { mestre: 0.6, sfx: 0.7, amb: 0.5, mus: 0.3, vibra: true, ui: 1, escala: 1, v: 4, autoMira: true, gore: true, canhoto: false, fps: false };
+export const CFG0: Configs = { mestre: 0.6, sfx: 0.7, amb: 0.5, mus: 0.3, vibra: true, ui: 1, escala: 1, v: 4, autoMira: true, gore: true, canhoto: false, fps: false, controle: 'toque' };
 export function lerCfg(): Configs {
   try { const salvo = JSON.parse(localStorage.getItem('cinzas.cfg') ?? '{}'), c: Configs = { ...CFG0, ...salvo }; if ((salvo.v ?? 1) < 3) c.escala = CFG0.escala; if ((salvo.v ?? 1) < 4) { c.mestre = CFG0.mestre; c.sfx = CFG0.sfx; c.amb = CFG0.amb; c.mus = CFG0.mus; } c.v = 4; return c; } catch { return { ...CFG0 }; }
 }

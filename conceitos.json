@@ -159,6 +159,26 @@
       "id": 32,
       "nome": "Reservatórios de água limpa como fonte de recurso",
       "nota": "Cada bioma tem fontes finitas (4 usos por visita) que enchem garrafa ou matam a sede; em áreas radioativas a água cobra um pouco de radiação."
+    },
+    {
+      "id": 33,
+      "nome": "Movimento por toque (uma mão)",
+      "nota": "Toque no chão anda (A* suavizado), toque duplo corre, toque num objeto/NPC vai e interage, toque num inimigo persegue; ataque automático sempre ligado e que nunca fere NPC."
+    },
+    {
+      "id": 34,
+      "nome": "Ataque automático ao segurar",
+      "nota": "Botão de ataque fixo: toque = golpe com mira assistida; segurar 260 ms liga o ataque que olha em volta (360°) e só gasta tiro/fôlego com alvo ao alcance."
+    },
+    {
+      "id": 35,
+      "nome": "Progressão linear por nível",
+      "nota": "Campanha de 24 passos em 4 atos; locais do mapa e receitas da bancada abrem por nível, com o motivo do bloqueio à vista; teste garante que o XP da campanha libera cada local a tempo."
+    },
+    {
+      "id": 36,
+      "nome": "Calmo sem morte permanente",
+      "nota": "Dificuldade padrão: ao morrer o jogador desmaia, perde parte da mochila e acorda no abrigo, em vez de perder a run."
     }
   ],
   "adaptados": [

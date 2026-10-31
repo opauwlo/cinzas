@@ -66,25 +66,25 @@ export const PESO_RARIDADE: Record<Raridade, number> = { comum: 70, incomum: 24,
 export const COR_RARIDADE: Record<Raridade, string> = { comum: '#d8d3c0', incomum: '#7aa8d8', raro: '#e0b83a' };
 
 // ---------------------------------------------------------------- receitas (bancada do abrigo)
-export type Receita = { id: string; nome: string; entra: [string, number][]; sai: [string, number]; xp?: number; /** nível de melhoria da bancada necessário (0 = sempre) */ nivel?: number };
+export type Receita = { id: string; nome: string; entra: [string, number][]; sai: [string, number]; xp?: number; /** nível de melhoria da bancada necessário (0 = sempre) */ nivel?: number; /** nível do JOGADOR que libera a receita (progressão linear) */ nivelJog?: number };
 export const RECEITAS: Receita[] = [
-  { id: 'r_bandagem', nome: 'Bandagem', entra: [['tecido', 2]], sai: ['bandagem', 1] },
-  { id: 'r_taco', nome: 'Taco', entra: [['madeira', 3]], sai: ['taco', 1] },
-  { id: 'r_faca', nome: 'Faca', entra: [['sucata', 2], ['madeira', 1]], sai: ['faca', 1] },
-  { id: 'r_machado', nome: 'Machado', entra: [['madeira', 2], ['sucata', 3]], sai: ['machado', 1] },
-  { id: 'r_colete', nome: 'Colete improvisado', entra: [['tecido', 4], ['sucata', 3]], sai: ['colete', 1] },
-  { id: 'r_mochila', nome: 'Mochila grande', entra: [['tecido', 6], ['sucata', 2]], sai: ['mochila', 1] },
-  { id: 'r_municao', nome: 'Munição 9mm (x2)', entra: [['sucata', 3], ['alcool', 1]], sai: ['municao', 2] },
-  { id: 'r_cartucho', nome: 'Cartuchos (x2)', entra: [['sucata', 3], ['alcool', 1]], sai: ['cartucho', 2] },
-  { id: 'r_combustivel', nome: 'Combustível', entra: [['alcool', 2], ['sucata', 1]], sai: ['combustivel', 1] },
-  { id: 'r_lanterna', nome: 'Lanterna', entra: [['sucata', 2], ['bateria', 1], ['eletronico', 1]], sai: ['lanterna', 1] },
-  { id: 'r_fogueira', nome: 'Kit de fogueira', entra: [['madeira', 4]], sai: ['kit_fogueira', 1] },
-  { id: 'r_kit', nome: 'Kit médico', entra: [['bandagem', 2], ['alcool', 1], ['tecido', 1]], sai: ['kit', 1], nivel: 1 },
-  { id: 'r_antirrad', nome: 'Antirradiação', entra: [['alcool', 2], ['tecido', 1], ['eletronico', 1]], sai: ['antirrad', 1], nivel: 1 },
-  { id: 'r_bateria', nome: 'Bateria', entra: [['eletronico', 1], ['sucata', 2]], sai: ['bateria', 1], nivel: 1 },
-  { id: 'r_facao', nome: 'Facão', entra: [['sucata', 4], ['madeira', 1], ['alcool', 1]], sai: ['facao', 1], nivel: 2 },
-  { id: 'r_pistola', nome: 'Pistola artesanal', entra: [['sucata', 6], ['eletronico', 2]], sai: ['pistola', 1], nivel: 2 },
-  { id: 'r_escopeta', nome: 'Escopeta artesanal', entra: [['sucata', 8], ['madeira', 2], ['eletronico', 1]], sai: ['escopeta', 1], nivel: 2 },
+  { id: 'r_bandagem', nivelJog: 1, nome: 'Bandagem', entra: [['tecido', 2]], sai: ['bandagem', 1] },
+  { id: 'r_taco', nivelJog: 1, nome: 'Taco', entra: [['madeira', 3]], sai: ['taco', 1] },
+  { id: 'r_faca', nivelJog: 1, nome: 'Faca', entra: [['sucata', 2], ['madeira', 1]], sai: ['faca', 1] },
+  { id: 'r_machado', nivelJog: 2, nome: 'Machado', entra: [['madeira', 2], ['sucata', 3]], sai: ['machado', 1] },
+  { id: 'r_colete', nivelJog: 3, nome: 'Colete improvisado', entra: [['tecido', 4], ['sucata', 3]], sai: ['colete', 1] },
+  { id: 'r_mochila', nivelJog: 3, nome: 'Mochila grande', entra: [['tecido', 6], ['sucata', 2]], sai: ['mochila', 1] },
+  { id: 'r_municao', nivelJog: 4, nome: 'Munição 9mm (x2)', entra: [['sucata', 3], ['alcool', 1]], sai: ['municao', 2] },
+  { id: 'r_cartucho', nivelJog: 4, nome: 'Cartuchos (x2)', entra: [['sucata', 3], ['alcool', 1]], sai: ['cartucho', 2] },
+  { id: 'r_combustivel', nivelJog: 3, nome: 'Combustível', entra: [['alcool', 2], ['sucata', 1]], sai: ['combustivel', 1] },
+  { id: 'r_lanterna', nivelJog: 3, nome: 'Lanterna', entra: [['sucata', 2], ['bateria', 1], ['eletronico', 1]], sai: ['lanterna', 1] },
+  { id: 'r_fogueira', nivelJog: 1, nome: 'Kit de fogueira', entra: [['madeira', 4]], sai: ['kit_fogueira', 1] },
+  { id: 'r_kit', nivelJog: 4, nome: 'Kit médico', entra: [['bandagem', 2], ['alcool', 1], ['tecido', 1]], sai: ['kit', 1], nivel: 1 },
+  { id: 'r_antirrad', nivelJog: 5, nome: 'Antirradiação', entra: [['alcool', 2], ['tecido', 1], ['eletronico', 1]], sai: ['antirrad', 1], nivel: 1 },
+  { id: 'r_bateria', nivelJog: 4, nome: 'Bateria', entra: [['eletronico', 1], ['sucata', 2]], sai: ['bateria', 1], nivel: 1 },
+  { id: 'r_facao', nivelJog: 6, nome: 'Facão', entra: [['sucata', 4], ['madeira', 1], ['alcool', 1]], sai: ['facao', 1], nivel: 2 },
+  { id: 'r_pistola', nivelJog: 7, nome: 'Pistola artesanal', entra: [['sucata', 6], ['eletronico', 2]], sai: ['pistola', 1], nivel: 2 },
+  { id: 'r_escopeta', nivelJog: 8, nome: 'Escopeta artesanal', entra: [['sucata', 8], ['madeira', 2], ['eletronico', 1]], sai: ['escopeta', 1], nivel: 2 },
 ];
 export const COZINHA: { id: string; nome: string; de: string; para: string }[] = [
   { id: 'c_agua', nome: 'Ferver água suja', de: 'agua_suja', para: 'agua' },

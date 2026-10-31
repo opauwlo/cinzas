@@ -21,7 +21,7 @@ type Modo = 'furtivo' | 'andar' | 'correr';
 export const SEGURAR_AUTO_MS = 260;
 export default function Controles() {
   const mundo = useRef<HTMLDivElement>(null), stick = useRef<HTMLDivElement>(null), atk = useRef<HTMLDivElement>(null);
-  const canhoto = useJogo(s => s.cfg.canhoto), arma = useJogo(s => s.arma), balas = useJogo(s => s.balas), am = armaDe(arma);
+  const canhoto = useJogo(s => s.cfg.canhoto), uma = useJogo(s => s.cfg.controle === 'toque'), arma = useJogo(s => s.arma), balas = useJogo(s => s.balas), am = armaDe(arma);
   useEffect(() => {
     const en = ponte.entrada, limpa: (() => void)[] = [];
     const ouve = (el: HTMLElement, tipo: string, fn: (e: PointerEvent) => void) => { el.addEventListener(tipo, fn as EventListener); limpa.push(() => el.removeEventListener(tipo, fn as EventListener)); };
@@ -31,8 +31,9 @@ export default function Controles() {
     const camada = mundo.current!;
     ouve(camada, 'pointerdown', e => { const r = camada.getBoundingClientRect(); ponte.cmd?.tocarMundo(e.clientX - r.left, e.clientY - r.top); });
 
-    // ---- manche fixo
-    const sEl = stick.current!, base = sEl.querySelector('.stick-base') as HTMLElement, knob = base.firstElementChild as HTMLElement;
+    // ---- manche fixo (só no modo duas mãos; no modo uma mão tocar no mundo anda, interage e ataca)
+    const sEl = stick.current, aEl = atk.current; if (!sEl || !aEl) return () => { limpa.forEach(f => f()); en.mx = en.my = en.ax = en.ay = 0; en.mira = en.atacar = en.auto = en.correr = en.furtivo = false; };
+    const base = sEl.querySelector('.stick-base') as HTMLElement, knob = base.firstElementChild as HTMLElement;
     let sid = -1, cx = 0, cy = 0, R = 52, modo: Modo = 'andar';
     const empurra = (px: number, py: number) => {
       const dx = px - cx, dy = py - cy, d = Math.hypot(dx, dy), f = Math.min(1, d / R), nx = d > 4 ? dx / d : 0, ny = d > 4 ? dy / d : 0;
@@ -48,7 +49,7 @@ export default function Controles() {
     for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) ouve(sEl, t, soltaS);
 
     // ---- botão de ataque: tocar = golpe · segurar = automático · arrastar = mira à mão
-    const aEl = atk.current!; let aid = -1, ox = 0, oy = 0, timer: number | undefined;
+    let aid = -1, ox = 0, oy = 0, timer: number | undefined;
     const soltaA = (e: PointerEvent) => { if (e.pointerId !== aid) return; aid = -1; window.clearTimeout(timer); aEl.dataset.on = '0'; aEl.dataset.auto = '0'; en.auto = false; en.atacar = false; en.mira = false; en.ax = 0; en.ay = 0; };
     ouve(aEl, 'pointerdown', e => {
       if (aid >= 0) return; aid = e.pointerId; prende(aEl, e); const r = aEl.getBoundingClientRect(); ox = r.left + r.width / 2; oy = r.top + r.height / 2;
@@ -62,10 +63,11 @@ export default function Controles() {
     for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) ouve(aEl, t, soltaA);
 
     return () => { limpa.forEach(f => f()); window.clearTimeout(timer); en.mx = en.my = en.ax = en.ay = 0; en.mira = en.atacar = en.auto = en.correr = en.furtivo = false; };
-  }, [canhoto]);
+  }, [canhoto, uma]);
   return (
     <>
       <div ref={mundo} className="zona-mundo" />
+      {!uma && <>
       <div ref={stick} className={`stick ${canhoto ? 'dir' : 'esq'}`} data-m="parado" data-on="0" aria-label="Manche: mover"><div className="stick-base"><i className="stick-knob" /></div></div>
       <div ref={atk} className={`atk ${canhoto ? 'esq' : 'dir'}`} data-on="0" data-auto="0" role="button" aria-label="Atacar: toque para um golpe, segure para atacar sozinho">
         <svg className="anel" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" /></svg>
@@ -73,6 +75,7 @@ export default function Controles() {
         {am.alvo === 'tiro' && <span className="q">{balas[am.municao ?? 'municao'] ?? 0}</span>}
         <b className="auto">AUTO</b>
       </div>
+      </>}
     </>
   );
 }

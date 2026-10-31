@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useJogo, horaStr, gravarCfg, OBJETIVOS, type Configs } from '../game/store';
 import { ITENS, RECEITAS, COZINHA, COR_RARIDADE, armaDe } from '../game/dados/itens';
-import { LOCAIS, localPorId, custoViagem } from '../game/dados/locais';
+import { LOCAIS, localPorId, custoViagem, bloqueioLocal } from '../game/dados/locais';
 import { BIOMAS } from '../game/dados/biomas';
 import { ponte } from '../game/ponte';
 import { aplicarVolumes, sfx } from '../game/audio';
@@ -68,22 +68,22 @@ function Mapa() {
     g.putImageData(img, 0, 0); g.fillStyle = '#6a604c';
     const base = LOCAIS[0]; for (const l of LOCAIS.slice(1)) { const n = Math.ceil(Math.hypot(l.x - base.x, l.y - base.y)); for (let i = 0; i < n; i += 2) g.fillRect(Math.round(base.x + (l.x - base.x) * i / n), Math.round(base.y + (l.y - base.y) * i / n), 1, 1); }
   }, []);
-  const alvoObj = OBJETIVOS[Math.min(s.objIdx, OBJETIVOS.length - 1)].local, dest = localPorId(sel), custo = custoViagem(s.zonaId, sel, s.perks.includes('mecanico')), travado = !!dest.requer && !(s.inv[dest.requer] ?? 0), sem = s.combustivel < custo.combustivel, aqui = sel === s.zonaId;
+  const alvoObj = OBJETIVOS[Math.min(s.objIdx, OBJETIVOS.length - 1)].local, dest = localPorId(sel), custo = custoViagem(s.zonaId, sel, s.perks.includes('mecanico')), bloq = bloqueioLocal(dest, s.nivel, s.inv), travado = !!bloq, sem = s.combustivel < custo.combustivel, aqui = sel === s.zonaId;
   return (
     <Cartao titulo="Mapa" larg={560} rodape={
       <div className="card aco degrau" style={{ display: 'grid', gap: 6 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}><b style={{ font: "700 14px var(--f-ui)", color: 'var(--aviso2)' }}>{dest.nome}</b><span className="mini">{'☠'.repeat(0)}{Array.from({ length: dest.perigo }).map((_, i) => <Ico key={i} src={ic('lorc', 'skull-crossed-bones')} n={14} cor="#e0553f" style={{ display: 'inline-block', marginLeft: 2 }} />)}</span></div>
-        <div className="mini">{travado ? 'Bloqueado: você ainda não captou o sinal (precisa do rádio).' : dest.desc}</div>
-        <div className="chips"><span className="chip">{BIOMAS[dest.bioma].nome}</span>{!aqui && <><span className="chip">{custo.horas} h de viagem</span><span className={`chip ${sem ? 'falta' : 'ok'}`}>combustível {s.combustivel}/{custo.combustivel}</span></>}</div>
+        <div className="mini">{travado ? `Bloqueado: ${bloq!.toLowerCase()}.` : dest.desc}</div>
+        <div className="chips"><span className="chip">{BIOMAS[dest.bioma].nome}</span><span className={`chip ${s.nivel >= dest.nivel ? 'ok' : 'falta'}`}>nível {dest.nivel}</span>{!aqui && <><span className="chip">{custo.horas} h de viagem</span><span className={`chip ${sem ? 'falta' : 'ok'}`}>combustível {s.combustivel}/{custo.combustivel}</span></>}</div>
         <button className="btn grande aviso" disabled={aqui || travado || sem} {...p(() => ponte.cmd?.viajar(sel))}>{aqui ? 'Você está aqui' : travado ? 'Bloqueado' : sem ? 'Sem combustível' : `Viajar para ${dest.nome}`}</button>
       </div>}>
       <div style={{ position: 'relative' }}>
         <canvas ref={ref} width={100} height={100} className="mapamundi" />
-        {LOCAIS.filter(l => l.id !== 'abrigo7' || s.sabeAbrigo || (s.inv.radio ?? 0) > 0).map(l => (
+        {LOCAIS.filter(l => l.id !== 'abrigo7' || s.sabeAbrigo || (s.inv.radio ?? 0) > 0).map(l => { const trava = !!bloqueioLocal(l, s.nivel, s.inv); return (
           <button key={l.id} className="btn" aria-label={l.nome} {...p(() => { setSel(l.id); sfx.ui('clique'); })} style={{ position: 'absolute', left: `${l.x}%`, top: `${l.y}%`, transform: 'translate(-50%,-50%)', width: 34, height: 34, padding: 0, boxShadow: l.id === sel ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #f09a50' : l.id === s.zonaId ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #8fe36a' : undefined }}>
-            {l.id === alvoObj && <span className="estrela">★</span>}<span style={{ width: 14, height: 14, background: COR_BIOMA[l.bioma], boxShadow: '0 0 0 2px #050506' }} />
-            <span style={{ position: 'absolute', top: 36, left: '50%', transform: 'translateX(-50%)', font: '17px var(--f-hud)', color: l.id === s.zonaId ? '#8fe36a' : '#cfc7ae', whiteSpace: 'nowrap', textShadow: '0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000' }}>{l.id === s.zonaId ? '▸ ' : ''}{l.nome}</span>
-          </button>))}
+            {l.id === alvoObj && <span className="estrela">★</span>}<span style={{ width: 14, height: 14, background: COR_BIOMA[l.bioma], boxShadow: '0 0 0 2px #050506', opacity: trava ? 0.35 : 1 }} />
+            <span style={{ position: 'absolute', top: 36, left: '50%', transform: 'translateX(-50%)', font: '17px var(--f-hud)', color: l.id === s.zonaId ? '#8fe36a' : '#cfc7ae', whiteSpace: 'nowrap', textShadow: '0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000' }}>{l.id === s.zonaId ? '▸ ' : ''}{l.nome}{trava ? ` · nv ${l.nivel}` : ''}</span>
+          </button>); })}
       </div>
     </Cartao>
   );
@@ -107,13 +107,13 @@ function MapaZona() {
   );
 }
 function Config() {
-  const s = useJogo(), c = s.cfg, set = (k: keyof Configs, v: number | boolean) => { const n = { ...c, [k]: v } as Configs; useJogo.setState({ cfg: n }); gravarCfg(n); aplicarVolumes({ mestre: n.mestre, sfx: n.sfx, amb: n.amb, mus: n.mus, vibra: n.vibra }); };
+  const s = useJogo(), c = s.cfg, set = (k: keyof Configs, v: number | boolean | string) => { const n = { ...c, [k]: v } as Configs; useJogo.setState({ cfg: n }); gravarCfg(n); aplicarVolumes({ mestre: n.mestre, sfx: n.sfx, amb: n.amb, mus: n.mus, vibra: n.vibra }); };
   const sl = (k: 'mestre' | 'sfx' | 'amb' | 'mus', nome: string) => <label className="slider">{nome}<input type="range" min={0} max={1} step={0.05} value={c[k]} onChange={e => set(k, +e.target.value)} /><output>{Math.round(c[k] * 100)}</output></label>;
   const tg = (k: 'vibra' | 'autoMira' | 'gore' | 'canhoto' | 'fps', nome: string) => <div className="troca"><span>{nome}</span><button className={`btn peq ${c[k] ? 'aviso' : ''}`} {...p(() => set(k, !c[k]))}>{c[k] ? 'Ligado' : 'Desligado'}</button></div>;
   return (
     <Cartao titulo="Configurações">
       <div className="card aco">{sl('mestre', 'Geral')}{sl('sfx', 'Efeitos')}{sl('amb', 'Ambiente')}{sl('mus', 'Música')}</div>
-      <div className="card aco">{tg('vibra', 'Vibração')}{tg('autoMira', 'Mira automática')}{tg('gore', 'Sangue e membros')}{tg('canhoto', 'Modo canhoto')}{tg('fps', 'Mostrar FPS')}
+      <div className="card aco"><div className="troca"><span>Controle</span><div style={{ display: 'flex', gap: 5 }}>{([['toque', 'Uma mão'], ['manche', 'Duas mãos']] as const).map(([v, n]) => <button key={v} className={`btn peq ${c.controle === v ? 'aviso' : ''}`} {...p(() => set('controle', v))}>{n}</button>)}</div></div>{tg('vibra', 'Vibração')}{tg('autoMira', 'Mira automática')}{tg('gore', 'Sangue e membros')}{tg('canhoto', 'Modo canhoto')}{tg('fps', 'Mostrar FPS')}
         <div className="troca"><span>Tamanho da interface</span><div style={{ display: 'flex', gap: 5 }}>{[0.85, 1, 1.2].map(v => <button key={v} className={`btn peq ${c.ui === v ? 'aviso' : ''}`} {...p(() => set('ui', v))}>{v === 0.85 ? 'P' : v === 1 ? 'M' : 'G'}</button>)}</div></div>
         <div className="troca"><span>Densidade de pixels (reinicia a run)</span><div style={{ display: 'flex', gap: 5 }}>{([[1, 'Ultra'], [1.5, 'Alta'], [2, 'Média'], [3, 'Leve']] as const).map(([v, n]) => <button key={v} className={`btn peq ${c.escala === v ? 'aviso' : ''}`} {...p(() => set('escala', v))}>{n}</button>)}</div></div>
         <div className="troca"><span>Tela cheia</span><button className="btn peq" {...p(() => { try { void document.documentElement.requestFullscreen?.(); } catch { /* */ } })}>Ativar</button></div>

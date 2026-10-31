@@ -3,7 +3,7 @@ import type { Cena } from '../cena';
 import type { Prop } from '../zona';
 import { T, W, idx } from '../zona';
 import { ITENS, RECEITAS, COZINHA, COR_RARIDADE, pesoDe, armaDe } from '../dados/itens';
-import { custoViagem, localPorId } from '../dados/locais';
+import { custoViagem, localPorId, bloqueioLocal } from '../dados/locais';
 import { useJogo, pesoMax, horaStr } from '../store';
 import { ponte, type Rapido } from '../ponte';
 import { sfx } from '../audio';
@@ -14,6 +14,7 @@ import { Rng } from '../lib/rng';
 import { cabeNaMochila, sincGrade, adicionar, remover, linhasDe, emGrade } from './grade';
 import { EVENTOS_VIAGEM, type Ajuda, type EventoViagem } from '../dados/eventos';
 import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado, dif } from './progresso';
+import { tocarToque } from './toque';
 
 /** registro para módulos que dependem deste (evita import circular): NPCs ligam aqui seus interativos e comandos */
 export const ganchos: { npc: ((c: Cena, e: Ent) => Interativo) | null; cmd: { agir(c: Cena, a: 'trocar' | 'rumor' | 'sair'): void; comprar(c: Cena, item: string): void; vender(c: Cena, item: string): void } | null } = { npc: null, cmd: null };
@@ -115,7 +116,7 @@ function efeitoItem(c: Cena, id: string) {
   const it = ITENS[id], s = c.s; if (!tirar(id)) return;
   if (it.fome) s.fome = Math.min(100, s.fome + it.fome); if (it.sede) s.sede = Math.min(100, s.sede + it.sede); if (it.hp) s.hp = Math.min(s.maxHp, s.hp + it.hp * (pk(s, 'enfermeiro') && it.tipo === 'cura' ? 1.5 : 1)); if (it.estanca) s.sangra = false;
   if (it.rad) s.rad = Math.max(0, Math.min(100, s.rad + it.rad)); if (it.bateria) s.lanterna.bat = Math.min(100, s.lanterna.bat + it.bateria); if (it.combustivel) s.combustivel += it.combustivel;
-  (it.tipo === 'bebida' ? sfx.beber : it.tipo === 'cura' ? sfx.curar : sfx.comer)(); toast(it.nome + ' usado', '#8fe36a');
+  (it.tipo === 'bebida' ? sfx.beber : it.tipo === 'cura' ? sfx.curar : sfx.comer)(); toast(it.nome + ' usado', '#8fe36a'); registrar(c, 'usos');
 }
 export function usarItem(c: Cena, id: string) {
   const it = ITENS[id]; if (!it || !tem(id)) return;
@@ -156,7 +157,7 @@ function ajuda(c: Cena): Ajuda {
 }
 export function viajar(c: Cena, dest: string) {
   const loc = localPorId(dest), cur = c.s.zonaId; if (dest === cur || c.trava) return;
-  if (loc.requer && !tem(loc.requer)) { toast('Você ainda não captou o sinal do Abrigo 7.', '#d9a02b'); sfx.ui('erro'); return; }
+  const bloq = bloqueioLocal(loc, c.s.nivel ?? 1, st().inv); if (bloq) { toast(`${loc.nome}: ${bloq.toLowerCase()}.`, '#d9a02b'); sfx.ui('erro'); return; }
   const custo = custoViagem(cur, dest, pk(c.s, 'mecanico')); if (c.s.combustivel < custo.combustivel) { toast(`Combustível insuficiente (${custo.combustivel} necessário).`, '#c9561f'); sfx.ui('erro'); return; }
   c.trava = true; useJogo.setState({ painel: null });
   const rng = new Rng(`${c.s.seed}|ev|${Math.floor(c.s.minutos)}|${dest}`), dia = Math.floor(c.s.minutos / 1440) + 1;
@@ -221,12 +222,13 @@ export function instalarComandos(c: Cena) {
     trocarArma: () => trocarArma(c), lanterna: () => lanterna(c), tocarMascara: () => tocarMascara(c),
     pausar: p => { try { if (!c.sys?.isActive() && !c.sys?.isPaused()) return; if (p) c.scene.pause(); else c.scene.resume(); } catch { /* cena já destruída */ } },
     tocarMundo: (x, y) => {
+      if (st().cfg.controle === 'toque') return tocarToque(c, x, y); /* uma mão: tocar anda, interage ou ataca */
       const cam = c.cameras.main, wx = cam.scrollX + x / c.esc, wy = cam.scrollY + y / c.esc;
       for (const it of c.interativos) { if (!it.ok()) continue; const d = Math.hypot(it.x - c.jog.x, it.y - c.jog.y); if (d > it.r || !c.alcancavel(it)) continue; const [sx, sy] = proj(it.x, it.y, (it.alt ?? 30) * 0.5); if (Math.hypot(sx - wx, sy - wy) < 44 / c.esc) { c.alvoInter = it; it.exec(); return true; } }
       return false;
     },
     craft: id => {
-      const r = RECEITAS.find(q => q.id === id); if (!r) return; if ((r.nivel ?? 0) > melNivel(c.s, 'bancada')) { toast('Melhore a bancada para fabricar isto.', '#d9a02b'); sfx.ui('erro'); return; } const inv = st().inv; if (r.entra.some(([i, n]) => (inv[i] ?? 0) < n)) { toast('Faltam materiais.', '#d9a02b'); sfx.ui('erro'); return; }
+      const r = RECEITAS.find(q => q.id === id); if (!r) return; if ((r.nivelJog ?? 1) > (c.s.nivel ?? 1)) { toast(`Isto libera no nível ${r.nivelJog}.`, '#d9a02b'); sfx.ui('erro'); return; } if ((r.nivel ?? 0) > melNivel(c.s, 'bancada')) { toast('Melhore a bancada para fabricar isto.', '#d9a02b'); sfx.ui('erro'); return; } const inv = st().inv; if (r.entra.some(([i, n]) => (inv[i] ?? 0) < n)) { toast('Faltam materiais.', '#d9a02b'); sfx.ui('erro'); return; }
       const [si, sn] = r.sai; const cp = ITENS[si].tipo === 'municao' || !emGrade(si) || (() => { let g = st().grade; for (const [i, n] of r.entra) if (emGrade(i)) g = remover(g, i, n); return adicionar(g, linhasDe(inv), si, sn).resto === 0; })(); if (!cp) { toast('Sem espaço na mochila: organize ou largue algo.', '#c9561f'); sfx.ui('erro'); return; }
       for (const [i, n] of r.entra) tirar(i, n); dar(c, si, sn); c.s.craftou = true; c.avancar(10, 1); sfx.ui('ok'); sfx.achado(); registrar(c, 'fabricados'); ganharXp(c, 5, false);
     },

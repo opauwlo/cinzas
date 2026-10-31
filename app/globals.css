@@ -244,3 +244,8 @@ body { font-family: var(--f-txt); font-size: 16px; line-height: 1.35; }
 .dir-bot { right: calc(14px + var(--sr)); bottom: calc(var(--atk) + 34px + var(--sb)); } .dir-bot.esq { right: auto; left: calc(14px + var(--sl)); justify-items: start; }
 .acao { bottom: calc(var(--base) + 40px + var(--sb)); } .dica { bottom: calc(var(--base) + 84px + var(--sb)); }
 .fpsc { right: auto; left: calc(8px + var(--sl)); bottom: calc(var(--base) + 50px + var(--sb)); }
+
+/* ---- modo uma mão (toque): sem manche nem botão de ataque; atalhos em fila e "agir" no canto do polegar ---- */
+.hotbar.um { left: 50%; grid-template-columns: repeat(6, auto); }
+.dir-bot.um { bottom: calc(var(--slot) + 40px + var(--sb)); }
+.acao.um { bottom: calc(var(--slot) + 84px + var(--sb)); }

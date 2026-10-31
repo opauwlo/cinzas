@@ -3,7 +3,8 @@
 import type { Cena } from '../cena';
 import { useJogo, lerMeta, gravarMeta } from '../store';
 import { CONQUISTAS, PERKS, MELHORIAS } from '../dados/meta';
-import { ITENS } from '../dados/itens';
+import { LOCAIS } from '../dados/locais';
+import { ITENS, RECEITAS } from '../dados/itens';
 import { sfx } from '../audio';
 import { Rng } from '../lib/rng';
 import { avancarContratos, garantirContratos, progresso, pronto, temParaEntregar, type CtxEvento } from './contratos';
@@ -26,6 +27,7 @@ export function ganharXp(c: Cena, n: number, mostrar = true) {
   while (s.xp >= xpNivel(s.nivel)) {
     s.xp -= xpNivel(s.nivel); s.nivel++; s.pontos = (s.pontos ?? 0) + 1; sfx.nivel(); c.cameras.main.flash(260, 143, 227, 106);
     toast(`NÍVEL ${s.nivel}! Escolha uma habilidade`, '#8fe36a'); c.s.st!.niveis = s.nivel;
+    const abre = [...LOCAIS.filter(l => l.nivel === s.nivel && l.id !== 'base').map(l => l.nome), ...RECEITAS.filter(r => (r.nivelJog ?? 1) === s.nivel).map(r => r.nome)]; if (abre.length) setTimeout(() => toast(`Liberado: ${abre.slice(0, 4).join(', ')}${abre.length > 4 ? '…' : ''}`, '#e0b83a'), 900);
   }
   useJogo.setState({ xp: s.xp, nivel: s.nivel, pontos: s.pontos }); checarConquistas(c);
 }

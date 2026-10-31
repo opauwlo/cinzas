@@ -23,7 +23,7 @@ export function Diario() {
     <Cartao titulo="Diário">
       <div className="abas">{abas.map(([k, n]) => <button key={k} className={`btn aba ${aba === k ? 'on' : ''}`} {...p(() => { setAba(k); sfx.ui('clique'); })}>{n}</button>)}</div>
       {aba === 'obj' && <>
-        <div className="card aco"><h3>Campanha</h3>{([1, 2, 3] as const).map(ato => <div key={ato}><div className="ato">{ATOS[ato]}</div>{OBJETIVOS.map((o, i) => { if (o.ato !== ato) return null; const feito = i < s.objIdx, atual = i === s.objIdx; return (
+        <div className="card aco"><h3>Campanha</h3>{([1, 2, 3, 4] as const).map(ato => <div key={ato}><div className="ato">{ATOS[ato]}</div>{OBJETIVOS.map((o, i) => { if (o.ato !== ato) return null; const feito = i < s.objIdx, atual = i === s.objIdx; return (
           <div key={o.id} className={`obj-linha ${feito ? 'ok' : atual ? 'atual' : ''}`}><span className="mk">{feito ? '✔' : atual ? '▶' : '○'}</span><div><b>{o.titulo}{atual && o.meta > 1 ? ` · ${Math.min(s.objVal, o.meta)}/${o.meta}` : ''}</b>
             {atual && <><div className="mini">{o.dica}</div>{o.meta > 1 && <div className="seg" style={{ ['--p' as string]: pct((s.objVal / o.meta) * 100) }}><i /></div>}<div className="chips">{o.local && <span className="chip ok">★ {localPorId(o.local).nome}</span>}<span className="chip">+{o.xp} XP</span></div></>}</div></div>); })}</div>)}</div>
         <div className="grade"><div className="stat"><b>{dia}</b><span>dia</span></div><div className="stat"><b>{s.abates}</b><span>abates</span></div><div className="stat"><b>{s.vasculhados}</b><span>saques</span></div><div className="stat"><b>{s.combustivel}</b><span>combustível</span></div></div>
@@ -111,8 +111,8 @@ export function EventoPainel() {
 // ---------------------------------------------------------------- como jogar
 export function Ajuda() {
   const itens: [string, string][] = [
-    ['Mover', 'O manche fica fixo embaixo, de um lado. Empurre de leve para ir furtivo, até o meio para andar e até a borda para correr.'],
-    ['Atacar', 'O botão vermelho fica no outro lado. Toque para um golpe (mira sozinho no inimigo mais próximo). SEGURE para atacar sozinho: o personagem vira para o inimigo mais perto e bate no ritmo da arma, sem gastar tiro nem fôlego se não houver alvo. Arraste a partir do botão para mirar à mão.'],
+    ['Uma mão (toque)', 'É o padrão: toque no chão para andar até lá (duas vezes seguidas para correr), toque num objeto ou NPC para ir até ele e usar, toque num inimigo ou bicho para ir atrás e atacar. Quem chegar perto você ataca sozinho. O botão do dedo, no topo, troca para o manche.'],
+    ['Duas mãos (manche)', 'O manche fica fixo embaixo, de um lado: empurre de leve para ir furtivo, até o meio para andar e até a borda para correr. O botão vermelho do outro lado: toque para um golpe, SEGURE para atacar sozinho (sem gastar tiro nem fôlego se não houver alvo) e arraste a partir dele para mirar à mão.'],
     ['Interagir', 'Chegue perto de um objeto e toque nele ou no botão laranja. Dá para vasculhar, colher, garimpar, ler bilhetes, abrir o baú, fabricar, cozinhar e dormir.'],
     ['Furtivo e correr', 'Furtivo (pé) faz menos barulho. Correr gasta fôlego e chama a atenção de tudo por perto. O modo canhoto, em Config., troca os lados.'],
     ['Sobreviver', 'Fome, sede e radiação cobram caro. Beba água limpa, cozinhe carne e use máscara em áreas radioativas.'],

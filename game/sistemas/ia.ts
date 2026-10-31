@@ -62,7 +62,7 @@ export function ferir(c: Cena, e: Ent, dano: number, de: number, corta = false) 
 function matar(c: Cena, e: Ent) {
   e.vivo = false; e.estado = 'morto'; e.morrT = 0; e.atk = 0; c.s.abates++; c.tensao = tensaoAbate(c.tensao); if (e.sid !== null) c.ze.abatidos.push(e.sid);
   e.bolha?.destroy(); e.bolha = undefined; if (e.npc) { c.ze.npcMortos = [...(c.ze.npcMortos ?? []), e.npc.id]; c.s.traiu = true; c.s.abates--; }
-  else registrar(c, 'abate', 1, { arq: e.arq.id }); if (e.arq.id === 'colosso') registrar(c, 'colossos'); if (['saqueador', 'filho', 'miliciano'].includes(e.arq.id)) registrar(c, 'gangue'); ganharXp(c, e.arq.xp, false);
+  else registrar(c, 'abate', 1, { arq: e.arq.id }); if (e.arq.id === 'colosso') registrar(c, 'colossos'); if (e.arq.modelo === 'quad' && !e.npc) registrar(c, 'bichos'); if (['saqueador', 'filho', 'miliciano'].includes(e.arq.id)) registrar(c, 'gangue'); ganharXp(c, e.arq.xp, false);
   e.som.setAlpha(0); sfx.voz(e.arq.voz, 0, 0, 0.5); c.cadaveres.push(e); if (c.cadaveres.length > 40) { const o = c.cadaveres.shift()!; o.remover = true; o.spr.destroy(); o.som.destroy(); }
   if (e.arq.drops.length || e.arq.ia === 'passivo') mostrarCadaver(c, e);
 }

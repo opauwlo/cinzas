@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useJogo, horaStr, OBJETIVOS } from '../game/store';
+import { useJogo, horaStr, OBJETIVOS, gravarCfg, type Configs } from '../game/store';
+import { sfx } from '../game/audio';
 import { linhasDe, livres } from '../game/sistemas/grade';
 import { ponte } from '../game/ponte';
 import { ITENS, armaDe } from '../game/dados/itens';
@@ -22,6 +23,13 @@ const BMP: Record<string, string[]> = {
   poeira: ['#.#..#.#', '.#.##.#.', '#..#.#..', '.#.#..##', '#.#.##..', '.#..#.#.', '#.#.#..#', '.#..#.#.'],
   vento: ['........', '.####...', '.....#..', '.#####..', '......#.', '.####.#.', '.....#..', '........'],
 };
+const BMP_MODO: Record<string, string[]> = {
+  dedo: ['...##...', '...##...', '...##...', '...###..', '.#######', '########', '.#######', '..#####.'],
+  manche: ['...##...', '..####..', '...##...', '...##...', '...##...', '.######.', '########', '########'],
+};
+/** ícone do modo de controle: dedo = uma mão (toque), manche = duas mãos */
+function IcoModo({ uma }: { uma: boolean }) { const bm = BMP_MODO[uma ? 'dedo' : 'manche']; return <svg width={22} height={22} viewBox="0 0 8 8" shapeRendering="crispEdges">{bm.flatMap((row, y) => [...row].map((c, x) => (c === '#' ? <rect key={`${x}${y}`} x={x} y={y} width="1" height="1" fill="#cfc7ae" /> : null)))}</svg>; }
+function trocaControle() { const c = useJogo.getState().cfg, n: Configs = { ...c, controle: c.controle === 'toque' ? 'manche' : 'toque' }; useJogo.setState({ cfg: n }); gravarCfg(n); sfx.ui('clique'); useJogo.getState().toast(n.controle === 'toque' ? 'Uma mão: toque no chão para andar' : 'Duas mãos: manche e botão de ataque', '#8fe36a'); }
 export function IcoClima({ tipo, noite, n = 14 }: { tipo: string; noite: boolean; n?: number }) {
   const k = tipo === 'limpo' ? (noite ? 'lua' : 'sol') : tipo === 'acida' ? 'chuva' : tipo; const bm = BMP[k] ?? BMP.nublado, cor = tipo === 'acida' ? '#8fe36a' : tipo === 'tempestade' ? '#e0b83a' : k === 'sol' ? '#d99a2b' : '#cfc7ae';
   return <svg width={n} height={n} viewBox="0 0 8 8" shapeRendering="crispEdges">{bm.flatMap((row, y) => [...row].map((c, x) => (c === '#' ? <rect key={`${x}${y}`} x={x} y={y} width="1" height="1" fill={cor} /> : null)))}</svg>;
@@ -76,6 +84,7 @@ export function Hud() {
       <div className={`obj vidro degrau ${trackerAberto ? '' : 'min'}`} onPointerDown={e => { e.stopPropagation(); useJogo.setState({ painel: 'diario' }); }}><b><em>OBJ</em> {obj.titulo}{obj.meta > 1 && <span className="cnt"> {Math.min(s.objVal, obj.meta)}/{obj.meta}</span>}</b><div className="seg" style={{ ['--p' as string]: pct(obj.meta > 1 ? (s.objVal / obj.meta) * 100 : s.objVal >= obj.meta ? 100 : 5) }}><i /></div>{ct && <b className={`ct ${ctPronto ? 'ok' : ''}`}>◆ {ctPronto ? 'Contrato pronto: receba no abrigo' : `${ct.titulo} ${progresso(ct)}/${ct.qtd}`}</b>}</div>
       <div className="topo-dir">
         {s.pontos > 0 && <button className="btn qbtn pisca" aria-label="Habilidades" {...press(() => useJogo.setState({ painel: 'perk' }))}><b style={{ font: "700 13px var(--f-ui)", color: 'var(--fosf)' }}>★{s.pontos}</b></button>}
+        <button className="btn qbtn" aria-label={s.cfg.controle === 'toque' ? 'Controle: uma mão (toque). Toque para usar o manche.' : 'Controle: duas mãos (manche). Toque para jogar com uma mão.'} {...press(trocaControle)}><IcoModo uma={s.cfg.controle === 'toque'} /><small>{s.cfg.controle === 'toque' ? '1' : '2'}</small></button>
         <button className="btn qbtn" aria-label="Mapa da zona" {...press(() => useJogo.setState({ painel: 'mapaZona' }))}><Ico src={ic('lorc', 'radar-sweep')} n={22} /></button>
         <button className="btn qbtn" aria-label="Mochila" {...press(() => useJogo.setState({ painel: 'inv' }))}><Ico src={ic('delapouite', 'backpack')} n={22} /><small style={{ color: lv <= 3 ? '#e0553f' : undefined }}>{lv}</small></button>
         <button className="btn qbtn" aria-label="Pausa" {...press(() => useJogo.setState({ painel: 'pausa' }))}><svg width="14" height="14" viewBox="0 0 8 8" shapeRendering="crispEdges"><rect x="1" y="0" width="2" height="8" fill="#cfc7ae" /><rect x="5" y="0" width="2" height="8" fill="#cfc7ae" /></svg></button>
@@ -83,12 +92,12 @@ export function Hud() {
       {s.seta && s.painel === null && <Seta dx={s.seta.dx} dy={s.seta.dy} d={s.seta.d} />}
       {s.banner && <div key={s.banner.id} className="banner"><b>{s.banner.titulo.toUpperCase()}</b><strong>{s.banner.sub}</strong>{s.banner.extra && <small>{s.banner.extra}</small>}</div>}
       <div className="toasts">{s.toasts.map(t => <div key={t.id} className="toast" style={{ color: t.cor }}>{t.texto}</div>)}</div>
-      {s.acao && <div className="acao"><div className="r">{s.acao.rotulo}</div><div className="seg" style={{ ['--p' as string]: pct(s.acao.p * 100) }}><i /></div></div>}
+      {s.acao && <div className={`acao ${s.cfg.controle === 'toque' ? 'um' : ''}`}><div className="r">{s.acao.rotulo}</div><div className="seg" style={{ ['--p' as string]: pct(s.acao.p * 100) }}><i /></div></div>}
       {s.dica && <div className="dica">{s.dica}</div>}
-      <div className={`dir-bot ${s.cfg.canhoto ? 'esq' : ''}`}>
+      <div className={`dir-bot ${s.cfg.canhoto ? 'esq' : ''} ${s.cfg.controle === 'toque' ? 'um' : ''}`}>
         <div className={`inter ${s.alvo ? 'on' : ''}`}><div className="rot vidro degrau">{s.alvo ?? ' '}</div><button className="btn aviso" aria-label="Interagir" {...press(() => ponte.cmd?.interagir())}><Ico src={icoAcao(s.alvo)} n={38} cor="#1c0e04" /></button></div>
       </div>
-      <div className={`hotbar vidro degrau ${s.cfg.canhoto ? 'canh' : ''} ${hotRecente || slots.some(x => x.urg) ? '' : 'dim'}`}>{slots.map(sl => <button key={sl.k} className={`slot ${sl.n === 0 ? 'vazio' : ''} ${sl.on ? 'on' : ''} ${sl.urg ? 'urgente' : ''}`} aria-label={sl.k} {...press(sl.fn)}><Ico src={sl.ico} n={28} cor={sl.cor} />{sl.n >= 0 && <span className="q">{sl.n}</span>}<span className="k">{sl.t}</span></button>)}</div>
+      <div className={`hotbar vidro degrau ${s.cfg.canhoto ? 'canh' : ''} ${s.cfg.controle === 'toque' ? 'um' : ''} ${hotRecente || slots.some(x => x.urg) ? '' : 'dim'}`}>{slots.map(sl => <button key={sl.k} className={`slot ${sl.n === 0 ? 'vazio' : ''} ${sl.on ? 'on' : ''} ${sl.urg ? 'urgente' : ''}`} aria-label={sl.k} {...press(sl.fn)}><Ico src={sl.ico} n={28} cor={sl.cor} />{sl.n >= 0 && <span className="q">{sl.n}</span>}<span className="k">{sl.t}</span></button>)}</div>
       {s.cfg.fps && <div className="fpsc">{s.fps} fps</div>}
     </div>
   );

@@ -395,3 +395,28 @@ Mascate (visita o abrigo a cada 3 dias; troca por **fichas**), sobrevivente acam
 ### Pendências
 Mais NPCs (médico que cura por fichas, mecânico), contratos dados por NPC, cão companheiro, testar o equilíbrio em partidas longas no celular e ajustar as metas.
 
+
+## 20. Controles fixos, uma mão, dificuldade gentil e progressão linear (31/out/2026)
+
+**Pedidos do Uwlo:** manche fixo + botão de ataque (segurar = ataque automático); depois "tô achando muito difícil", "progressão linear (olhar o Last Day on Earth)" e "movimento point & click para jogar com uma mão só". O site roda na **Vercel** (https://cinzas-green.vercel.app, reconstrói a cada push na `main`); o workflow do GitHub Pages saiu e entrou `.github/workflows/ci.yml` (testes, tipos, build e smoke).
+
+### Controles (`components/Controles.tsx`, `game/sistemas/toque.ts`, `cfg.controle`)
+- **Uma mão (`'toque'`, padrão):** tocar no chão anda até lá (A* em 4 direções, rot.js, suavizado em linha reta; **toque duplo corre**); tocar num objeto/NPC vai até ele e interage ao chegar; tocar numa criatura persegue e ataca. O **ataque automático fica sempre ligado** (360°, só com alvo ao alcance, nunca fere NPC). Marcador pulsante no destino (verde), na criatura (vermelho) e no objeto (laranja).
+- **Duas mãos (`'manche'`):** manche FIXO embaixo (leve = furtivo · médio = andar · borda = correr) + botão de ataque fixo (tocar = golpe com mira assistida; **segurar 260 ms = ataque automático**; arrastar a partir do botão = mira à mão). Modo canhoto espelha os lados; atalhos em grade 3×2 no vão entre os dois.
+- Troca por um botão no topo do HUD (dedo = uma mão, manche = duas) e na Config. Tela estreita: tamanhos encolhem (`--base`, `--atk`, `--slot`).
+- Ganchos de teste: `cena().toque` (rota, destino, alvo), `cena().mirarAuto(ang, amplo, foco)`, `ponte.entrada.auto`.
+
+### Dificuldade (números em `balanco.ts`, `criaturas.ts`, `biomas.ts`; metas em `npm run teste`, 36 testes)
+- Dano dos inimigos −20%, grupos menores, menos fauna hostil no Ermo/Floresta, menos gangues e Colossos; multiplicadores Calmo/Normal/Brutal de dano 0,5/0,75/1,1, fome 0,6/0,8/1,1, spawn 0,45/0,7/1,2, XP 1,2/1/1,2, invasão 0,5/0,8/1,3.
+- Fome 100→0 em ~34 min reais e sede em ~22 min (Normal). Bandagem 15, kit 60, regeneração 0,35/s alimentado, +4 de vida máxima por nível (até +40).
+- Início: 3 águas, 4 bandagens, 3 enlatados, faca; 8 de combustível e viagens ~40% mais baratas. Invasões só a partir do dia 3 (1–2 invasores).
+- **Calmo é o padrão e não tem morte permanente:** desmaia, perde ~40% da mochila (menos arma, equipamento e rádio) e acorda no abrigo 6 h depois com 60% da vida. Meta v2 volta quem tinha Normal salvo para o Calmo uma vez.
+
+### Progressão linear (`dados/objetivos.ts`, `dados/locais.ts`, `dados/itens.ts`)
+- **Campanha de 24 passos em 4 atos** (Sobreviver → Crescer → Território → A saída), sempre com o próximo passo no HUD, estrela no mapa e recompensa em XP/itens. Saves antigos recontam em silêncio (`OBJ_VER`).
+- **O mapa abre por nível** (`Local.nivel`: Ermo 1, Posto/Floresta 2, Cidade 4, Hospital/Pântano 5, Torre 6, Refinaria 7, Posto Militar/Abrigo 7 = 8) e **as receitas da bancada também** (`Receita.nivelJog`). O mapa e a bancada dizem o motivo do bloqueio; ao subir de nível aparece "Liberado: …".
+- Teste de projeto: a campanha só pede um local depois de ter pago o XP do nível dele, e ≥ 50% do XP de cada passo de nível vem da campanha.
+- Ganchos: `cena().devObjetivo('id')`; o smoke usa `devXp` para liberar os locais temáticos.
+
+### Pendências (pedidas e ainda não feitas)
+Som equalizado (`game/dados/sons.ts` já tem a normalização de volume por categoria; falta religar `audio.ts` com EQ/limitador/reverb/ducking), mundo mais cheio (pontos de interesse, mais recursos e interações), mais detalhe visual no cenário e a viagem de carro animada com sprites das cidades.

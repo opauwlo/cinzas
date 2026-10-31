@@ -31,6 +31,7 @@ import { iniciarZona, atualizarDiretor, desenharBeacon, setaAirdrop, type Airdro
 import { dif, pk, melNivel, ganharXp, registrar, tickProgresso } from './sistemas/progresso';
 import { MIN_POR_SEG, FOME_POR_MIN, SEDE_POR_MIN, DIF, REGEN_VIDA, VIDA_POR_NIVEL } from './dados/balanco';
 import { alvoHostis, escolherArq, tamanhoGrupo, intervaloSpawn, podeSpawnar, pontoSpawn, tensaoDecai, type CtxSpawn } from './sistemas/spawn';
+import { toqueNovo, passoToque, cancelarToque, desenharToque, toqueAtivo } from './sistemas/toque';
 
 export { MIN_POR_SEG };
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
@@ -59,7 +60,7 @@ export class Cena extends Phaser.Scene {
   evPend: import('./sistemas/acoes').EvPend | null = null;
   soltos: { s: Solto; spr: Phaser.GameObjects.Image }[] = []; avisoCheia = -99; flN = 0; flT = 0;
   fz = 2; cz = 1; fogLw = 0; fogLh = 0; climaLw = 0; climaLh = 0;
-  tensao = 0; tSpawnUlt = -999; nSpawn = 0; npcDia = 0;
+  tensao = 0; tSpawnUlt = -999; nSpawn = 0; npcDia = 0; toque = toqueNovo();
   airdrop: Airdrop | null = null; raid: Raid | null = null; perkAvisado = 0; novasConquistas: string[] = [];
   tarefas: (() => void)[] = []; totalTarefas = 1; estCache = new Map<string, Quadro>(); recToco!: RecEstatica; pausadoPor = false; noiteAnterior = false; tempo = 0; trava = false; intro = 0;
   _dados!: { run: Run; zonaId: string; esc: number };
@@ -69,7 +70,7 @@ export class Cena extends Phaser.Scene {
     this._dados = { run: d.run, zonaId: d.zonaId, esc: d.esc ?? 2 }; this.s = d.run; this.s.zonaId = d.zonaId;
     this.chunks = new Map(); this.props = []; this.floras = []; this.portas = new Map(); this.ents = []; this.cadaveres = []; this.interativos = []; this.luzes = []; this.tracers = []; this.aneis = []; this.estCache = new Map(); this.recCache = new Map();
     this.lmA.fill(0.9); this.seen.fill(0); this.luzFrame.fill(0); this.pronto = false; this.morto = false; this.vitoria = false; this.acao = null; this.alvoInter = null; this.tempo = 0; this.trava = false; this.intro = 0;
-    this.soltos = []; this.tensao = 0; this.tSpawnUlt = -999; this.fogW = 0; this.fogH = 0; // a mesma instância da cena é reaproveitada na viagem: força recriar as camadas (as antigas foram destruídas)
+    this.soltos = []; this.tensao = 0; this.tSpawnUlt = -999; this.toque = toqueNovo(); this.fogW = 0; this.fogH = 0; // a mesma instância da cena é reaproveitada na viagem: força recriar as camadas (as antigas foram destruídas)
   }
   private aoRedimensionar = () => this.criarCamadas();
 
@@ -173,6 +174,8 @@ export class Cena extends Phaser.Scene {
   /** auxiliar de teste (playtests headless): cria uma criatura perto do jogador */
   dev(arq: string, dx: number, dy: number, grupo = -1, faccao?: number) { return criarEnt(this, arq, this.jog.x + dx, this.jog.y + dy, null, grupo, faccao); }
   devXp(n: number) { ganharXp(this, n); }
+  /** (teste) pula a campanha para o passo `id` */
+  devObjetivo(id: string) { const i = OBJETIVOS.findIndex(o => o.id === id); if (i >= 0) this.s.objIdx = i; }
   /** (teste) cria um NPC ao lado do jogador */
   devNpc(tipo: 'mascate' | 'acampado' | 'viajante') {
     const J = this.jog; let px = J.x + 0.1, py = J.y;
@@ -340,8 +343,11 @@ export class Cena extends Phaser.Scene {
     const e = ponte.entrada, s = this.s, J = this.jog, k = this.teclas, R2 = Math.SQRT1_2, st = useJogo.getState();
     J.dano = Math.max(0, J.dano - dt); J.atk = Math.max(0, J.atk - dt);
     let sxm = e.mx, sym = e.my; const kx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0), ky = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
-    if (kx || ky) { sxm = kx; sym = ky; } let m = Math.hypot(sxm, sym); if (m > 1) { sxm /= m; sym /= m; m = 1; }
-    const mx = (sxm + sym) * R2, my = (sym - sxm) * R2, corre = (e.correr || k.SHIFT.isDown) && s.stamina > 2, furtivo = e.furtivo; ponte.entrada.furtivo = furtivo;
+    if (kx || ky) { sxm = kx; sym = ky; } let m = Math.hypot(sxm, sym);
+    const toqueModo = st.cfg.controle === 'toque'; /* uma mão: o caminho do toque vira o movimento; qualquer manche/tecla cancela */
+    if (m > 0.12 || !toqueModo) { if (toqueAtivo(this)) cancelarToque(this); } else { const p = passoToque(this, dt); if (p) { sxm = (p.dx - p.dy) * R2; sym = (p.dx + p.dy) * R2; m = 1; } }
+    if (m > 1) { sxm /= m; sym /= m; m = 1; }
+    const mx = (sxm + sym) * R2, my = (sym - sxm) * R2, corre = (e.correr || k.SHIFT.isDown || (toqueModo && this.toque.correr && toqueAtivo(this))) && s.stamina > 2, furtivo = e.furtivo; ponte.entrada.furtivo = furtivo;
     const base = furtivo ? 1.5 : corre ? 4.6 : 2.8, peso = 1, cura = s.hp < 30 ? 0.88 : 1, agua = this.tipoEm(Math.floor(J.x), Math.floor(J.y)) === T.AGUA_RASA ? 0.65 : 1;
     const v = m > 0.12 ? base * peso * cura * agua : 0; /* a velocidade vem do modo (furtivo/andar/correr) do stick, não da força */ J.andando = v > 0;
     if (J.andando) {
@@ -357,7 +363,7 @@ export class Cena extends Phaser.Scene {
     if (manual) { alvoAng = Math.atan2((e.ay - e.ax) * R2, (e.ax + e.ay) * R2); atacando = true; }
     else if (this.desktop && this.mouse.ativo) { alvoAng = Math.atan2(this.mouse.y - J.y, this.mouse.x - J.x); atacando = this.mouse.baixo || k.SPACE.isDown || atacando; }
     else if (J.andando && !atacando) alvoAng = Math.atan2(my, mx);
-    if (e.auto && !manual) { /* ataque automático (botão segurado): olha para o inimigo mais próximo em volta e só bate com alvo ao alcance */ const a = this.mirarAuto(alvoAng, true); this.atqAuto = true; if (a !== null) { alvoAng = a; atacando = true; } else atacando = novoTap; }
+    if ((e.auto || toqueModo) && !manual) { /* ataque automático (botão segurado ou modo uma mão): olha para o inimigo mais próximo em volta e só bate com alvo ao alcance */ const a = this.mirarAuto(alvoAng, true, this.toque.alvo); if (a !== null) { alvoAng = a; atacando = true; this.atqAuto = true; } else atacando = novoTap || e.atacar; /* sem alvo: só bate se você mandou */ }
     else if (atacando && !manual && (st.cfg.autoMira || this.desktop === false)) { const a = this.mirarAuto(alvoAng); if (a !== null) alvoAng = a; }
     J.ang += ang(alvoAng - J.ang) * Math.min(1, dt * 16);
     this.cdAtaque -= dt; if (atacando) atacarJogador(this);
@@ -367,8 +373,9 @@ export class Cena extends Phaser.Scene {
     useJogo.setState(q => (q.acao?.p === (this.acao ? this.acao.t / this.acao.dur : undefined) ? q : { acao: this.acao ? { rotulo: this.acao.rotulo, p: this.acao.t / this.acao.dur } : null }));
   }
   /** direção para o inimigo mais próximo (visível) na frente do jogador; null se não há. `amplo` (ataque automático) olha em volta (360°) e só conta o que está ao alcance do golpe. */
-  mirarAuto(base: number, amplo = false): number | null {
-    const J = this.jog, arma = armaDe(this.s.arma), alc = arma.alvo === 'tiro' ? arma.alcance : arma.alcance + (amplo ? 0.5 : 1.5); let melhor: Ent | null = null, md = 1e9;
+  mirarAuto(base: number, amplo = false, foco: Ent | null = null): number | null {
+    const J = this.jog, arma = armaDe(this.s.arma), alc = arma.alvo === 'tiro' ? (amplo ? Math.min(arma.alcance, 7.5) : arma.alcance) : arma.alcance + (amplo ? 0.5 : 1.5); let melhor: Ent | null = null, md = 1e9;
+    if (foco && foco.vivo && !foco.npc && Math.hypot(foco.x - J.x, foco.y - J.y) <= alc && this.temLOS(J.x, J.y, foco.x, foco.y)) return Math.atan2(foco.y - J.y, foco.x - J.x); /* a criatura em que você tocou tem prioridade */
     for (const e of this.ents) { if (!e.vivo || !e.arq.hostil || e.npc) continue; const d = Math.hypot(e.x - J.x, e.y - J.y); if (d > alc || this.luzFrame[idx(Math.min(W - 1, Math.max(0, Math.floor(e.x))), Math.min(H - 1, Math.max(0, Math.floor(e.y))))] < 0.4) continue; const da = Math.abs(ang(Math.atan2(e.y - J.y, e.x - J.x) - base)); const sc = d + (amplo ? da * 0.4 : da * 3); if ((amplo || da < 1.9) && sc < md && this.temLOS(J.x, J.y, e.x, e.y)) { md = sc; melhor = e; } }
     return melhor ? Math.atan2(melhor.y - J.y, melhor.x - J.x) : null;
   }
@@ -406,10 +413,11 @@ export class Cena extends Phaser.Scene {
   dicas() {
     const st = useJogo.getState(), s = this.s, J = this.jog, d = s.dicas, mostrar = (id: string, t: string) => { if (d.includes(id) || st.dica) return false; d.push(id); st.set({ dica: t }); setTimeout(() => useJogo.setState({ dica: null }), 6500); return true; };
     if (this.tempo < 3) return;
-    if (!J.andando && this.tempo < 25 && mostrar('mover', 'Use o MANCHE, embaixo à esquerda, para andar. Empurre de leve para ir furtivo, até a borda para correr.')) return;
+    const uma = useJogo.getState().cfg.controle === 'toque';
+    if (!J.andando && this.tempo < 25 && mostrar('mover', uma ? 'Toque no chão para andar até lá. Toque duas vezes para correr. Toque num objeto ou num inimigo para ir até ele.' : 'Use o MANCHE, embaixo à esquerda, para andar. Empurre de leve para ir furtivo, até a borda para correr.')) return;
     if (this.alvoInter && mostrar('interagir', 'Toque no botão laranja (ou no objeto) para interagir.')) return;
     if (this.zona.id === 'base' && mostrar('jipe', 'Use o JIPE no portão para viajar. Cada viagem gasta combustível.')) return;
-    if (this.ents.some(e => e.vivo && e.arq.hostil && Math.hypot(e.x - J.x, e.y - J.y) < 12) && mostrar('atacar', 'Toque no botão vermelho para atacar. SEGURE para atacar sozinho; arraste a partir dele para mirar.')) return;
+    if (this.ents.some(e => e.vivo && e.arq.hostil && Math.hypot(e.x - J.x, e.y - J.y) < 12) && mostrar('atacar', uma ? 'Seu personagem ataca sozinho quem chegar perto. Toque num inimigo para ir atrás dele.' : 'Toque no botão vermelho para atacar. SEGURE para atacar sozinho; arraste a partir dele para mirar.')) return;
     if (s.hp < 40 && mostrar('curar', 'Vida baixa! Use bandagem ou kit nos atalhos de baixo.')) return;
     if (this.ambient < 0.4 && mostrar('noite', 'Escureceu. Acenda a lanterna e evite barulho.')) return;
     if (this.clima.tipo === 'acida' && mostrar('acida', 'Chuva ácida sobe a radiação. Procure abrigo coberto.')) return;
@@ -478,6 +486,7 @@ export class Cena extends Phaser.Scene {
     this.tracers = this.tracers.filter(t => (t.t += dt) < 0.09); for (const t of this.tracers) { g.lineStyle(2, t.cor, 1 - t.t / 0.09); g.beginPath(); g.moveTo(Math.round(t.x0), Math.round(t.y0)); g.lineTo(Math.round(t.x1), Math.round(t.y1)); g.strokePath(); }
     this.aneis = this.aneis.filter(a => (a.t += dt) < 0.7); for (const a of this.aneis) { const p = a.t / 0.7, r = a.r * (0.15 + p * 0.85); g.lineStyle(1, 0xc9561f, 0.7 * (1 - p)); g.beginPath(); for (let i = 0; i <= 28; i++) { const an = (i / 28) * 6.283, [x, y] = proj(a.x + Math.cos(an) * r, a.y + Math.sin(an) * r); if (i === 0) g.moveTo(Math.round(x), Math.round(y)); else g.lineTo(Math.round(x), Math.round(y)); } g.strokePath(); }
     const m = this.marca; m.clear(); const it = this.alvoInter; if (it) { const [x, y] = proj(it.x, it.y, it.alt ?? 40), b = Math.round(Math.sin(performance.now() / 160) * 2); m.fillStyle(0x8fe36a, 1); m.fillTriangle(Math.round(x) - 4, Math.round(y) - 8 + b, Math.round(x) + 4, Math.round(y) - 8 + b, Math.round(x), Math.round(y) - 2 + b); m.fillStyle(0x0b0f08, 1); m.fillRect(Math.round(x) - 1, Math.round(y) - 12 + b, 2, 3); }
+    desenharToque(this, m);
     // áudio ambiente (10x por segundo)
     this.tAmb += dt; if (this.tAmb > 0.1) { this.tAmb = 0; const fogo = this.luzes.reduce((a, l) => Math.max(a, 1 - Math.min(1, Math.hypot(l.x - J.x, l.y - J.y) / 9)), 0), perigo = Math.min(1, this.ents.filter(e => e.vivo && e.arq.hostil && e.estado === 'persegue').length / 4); ambiente({ hora: h, vento: cl.rajada, chuva: cl.chuva, interior: this.interior, bioma: this.bioma.ambiente, fogo, perigo }); }
   }

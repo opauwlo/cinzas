@@ -1,7 +1,7 @@
 // Campanha em atos: confere os objetivos a cada segundo, paga XP/itens, mostra o banner "Objetivo cumprido" e libera o sinal do Abrigo 7.
 import type { Cena } from '../cena';
 import { useJogo } from '../store';
-import { OBJETIVOS, type Objetivo } from '../dados/objetivos';
+import { OBJETIVOS, OBJ_VER, type Objetivo } from '../dados/objetivos';
 import { ITENS } from '../dados/itens';
 import { sfx } from '../audio';
 import { ganharXp, registrar } from './progresso';
@@ -24,9 +24,10 @@ export function avancarObjetivos(c: Cena) {
     s.sabeAbrigo = true; if (!s.descobertos.includes('abrigo7')) s.descobertos.push('abrigo7'); useJogo.setState({ sabeAbrigo: true, descobertos: [...s.descobertos] });
     useJogo.getState().toast('Sinal do Abrigo 7 captado', '#8fe36a'); registrar(c, 'radio'); ganharXp(c, 60);
   }
-  const silencioso = s.objVer !== 2, cumpridos: Objetivo[] = []; // saves antigos: recontar sem pagar de novo
+  const silencioso = s.objVer !== OBJ_VER, cumpridos: Objetivo[] = []; // saves antigos: recontar sem pagar de novo
+  if (silencioso) s.objIdx = 0; // a lista de passos mudou: recomeça a conta do zero, em silêncio
   while (s.objIdx < OBJETIVOS.length - 1) { const o = OBJETIVOS[s.objIdx]; if (o.valor(s, inv) < o.meta) break; cumpridos.push(o); s.objIdx++; }
-  s.objVer = 2;
+  s.objVer = OBJ_VER;
   if (cumpridos.length && !silencioso) {
     let xp = 0; const itens: string[] = [];
     for (const o of cumpridos) { xp += o.xp; ganharXp(c, o.xp, false); for (const [i, q] of o.premio ?? []) { darOuBau(c, i, q); itens.push(`${q}× ${ITENS[i]?.nome ?? i}`); } }

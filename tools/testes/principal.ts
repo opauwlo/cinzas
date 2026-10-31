@@ -2,10 +2,10 @@
 // Cada meta de dificuldade do jogo está aqui como número; se um ajuste quebrar o equilíbrio, o teste falha dizendo qual.
 import assert from 'node:assert/strict';
 import { ARQS } from '../../game/dados/criaturas';
-import { ARMAS, ITENS } from '../../game/dados/itens';
+import { ARMAS, ITENS, RECEITAS } from '../../game/dados/itens';
 import { BIOMAS } from '../../game/dados/biomas';
-import { LOCAIS, custoViagem } from '../../game/dados/locais';
-import { estadoInicial } from '../../game/store';
+import { LOCAIS, custoViagem, bloqueioLocal } from '../../game/dados/locais';
+import { estadoInicial, novoRun } from '../../game/store';
 import { Rng } from '../../game/lib/rng';
 import { gerarZona } from '../../game/zona';
 import { DIF, FOME_POR_MIN, SEDE_POR_MIN, REGEN_VIDA, RAID_DIA_MIN, VIDA_POR_NIVEL, danoPorAcao, acoesParaMatar, dpsInimigo, perdaEmLuta, segundosAteZerar, tamanhoRaid, xpNivel, xpAcumulado, nivelPorXp } from '../../game/dados/balanco';
@@ -137,6 +137,33 @@ teste('início acolhedor: o kit inicial cobre a primeira meia hora, a vida volta
 });
 teste('viagens: o combustível inicial dá para ir e voltar ao Ermo e à Floresta sem precisar achar combustível', () => {
   const e = estadoInicial('inicio'); let gasto = 0; for (const d of ['ermo', 'floresta']) gasto += 2 * custoViagem('base', d).combustivel; assert.ok(gasto <= e.combustivel, `ida e volta custa ${gasto} de ${e.combustivel}`);
+});
+
+// ================================================================ progressão linear: campanha, mapa e receitas por nível
+teste('campanha linear: passos únicos, em ordem de atos, com meta, dica e XP; o último é a vitória e nenhum nasce cumprido', () => {
+  const ids = new Set<string>(); let ultAto = 1; const r = novoRun('prog');
+  OBJETIVOS.forEach((o, i) => {
+    assert.ok(!ids.has(o.id), `id repetido ${o.id}`); ids.add(o.id); assert.ok(o.ato >= ultAto, `ato fora de ordem em ${o.id}`); ultAto = o.ato;
+    assert.ok(o.meta >= 1 && o.dica.length > 15 && o.titulo.length > 5, `${o.id} incompleto`); assert.ok(i === OBJETIVOS.length - 1 ? o.xp === 0 : o.xp > 0, `xp de ${o.id}`);
+    const v = o.valor(r, r.inv); assert.ok(v >= 0 && v <= o.meta, `${o.id}: valor ${v} fora de [0, ${o.meta}]`); assert.ok(v < o.meta, `${o.id} já nasce cumprido`);
+  });
+  assert.equal(OBJETIVOS[OBJETIVOS.length - 1].id, 'abrigo7'); entre(OBJETIVOS.length, 20, 30, 'passos da campanha'); assert.equal(OBJETIVOS[0].local, undefined, 'o primeiro passo é no abrigo');
+  assert.deepEqual([...new Set(OBJETIVOS.map(o => o.ato))], [1, 2, 3, 4]);
+});
+teste('o mapa abre por nível, crescente com o perigo, e o XP da campanha libera cada local a tempo', () => {
+  const ord = [...LOCAIS].sort((a, b) => a.perigo - b.perigo || a.nivel - b.nivel); for (let i = 1; i < ord.length; i++) assert.ok(ord[i].nivel >= ord[i - 1].nivel, `${ord[i].id} (perigo ${ord[i].perigo}) abre antes de ${ord[i - 1].id}`);
+  assert.equal(LOCAIS.find(l => l.id === 'ermo')!.nivel, 1); assert.ok(LOCAIS.every(l => l.nivel >= 1 && l.nivel <= 8));
+  let xp = 0; for (const o of OBJETIVOS) { if (o.local) { const l = LOCAIS.find(x => x.id === o.local)!; assert.ok(xpAcumulado(l.nivel) <= xp, `${o.id}: ${l.nome} pede nível ${l.nivel} (${xpAcumulado(l.nivel)} XP) mas a campanha só pagou ${xp} XP antes`); } xp += o.xp; }
+  xp = 0; for (const o of OBJETIVOS) { const m = /^nivel(\d+)$/.exec(o.id); if (m) assert.ok(xp >= xpAcumulado(+m[1]) * 0.5, `${o.id}: a campanha paga só ${xp} XP de ${xpAcumulado(+m[1])} necessários (≥ 50% deve vir dela)`); xp += o.xp; }
+  assert.equal(bloqueioLocal(LOCAIS.find(l => l.id === 'ermo')!, 1, {}), null); assert.ok(bloqueioLocal(LOCAIS.find(l => l.id === 'militar')!, 3, {})?.includes('nível 8'));
+  const a7 = LOCAIS.find(l => l.id === 'abrigo7')!; assert.ok(bloqueioLocal(a7, 9, {})?.includes('rádio')); assert.equal(bloqueioLocal(a7, 8, { radio: 1 }), null);
+});
+teste('receitas por nível: básicas no começo, armas fortes só no fim, e o machado da campanha já está liberado quando o passo chega', () => {
+  const por = (id: string) => RECEITAS.find(r => r.id === id)!.nivelJog!; assert.ok(RECEITAS.every(r => (r.nivelJog ?? 1) >= 1 && (r.nivelJog ?? 1) <= 8), 'nível de receita fora de [1, 8]');
+  assert.ok(por('r_bandagem') === 1 && por('r_taco') === 1 && por('r_faca') === 1 && por('r_fogueira') === 1, 'o começo precisa de receitas básicas');
+  assert.ok(por('r_pistola') > por('r_faca') && por('r_escopeta') >= por('r_pistola') && por('r_facao') > por('r_machado'), 'armas melhores abrem depois');
+  const iM = OBJETIVOS.findIndex(o => o.id === 'machado'), xpAntes = OBJETIVOS.slice(0, iM).reduce((s, o) => s + o.xp, 0); assert.ok(xpAcumulado(por('r_machado')) <= xpAntes, 'o passo do machado pede uma receita que o nível ainda não liberou');
+  const iF = OBJETIVOS.findIndex(o => o.id === 'fabricar'); assert.ok(RECEITAS.filter(r => (r.nivelJog ?? 1) === 1 && (r.nivel ?? 0) === 0).length >= 3 && iF < iM, 'o passo de fabricar precisa de receitas de nível 1');
 });
 void DIF;
 
