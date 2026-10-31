@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useJogo, pesoInv, pesoMax, OBJETIVOS, horaStr, gravarCfg, type Configs } from '../game/store';
+import { useJogo, horaStr, gravarCfg, type Configs } from '../game/store';
 import { ITENS, RECEITAS, COZINHA, COR_RARIDADE, armaDe } from '../game/dados/itens';
 import { LOCAIS, localPorId, custoViagem } from '../game/dados/locais';
 import { BIOMAS } from '../game/dados/biomas';
@@ -10,6 +10,9 @@ import { W, H, T } from '../game/zona';
 import Ico, { ic } from './Ico';
 import { Cartao, fechar, p } from './Cartao';
 import { Diario, PerkPainel, Melhorias, EventoPainel, Ajuda, Intro } from './PaineisMeta';
+import { Mochila } from './Mochila';
+import { Bancada } from './Bancada';
+import { linhasDe, livres } from '../game/sistemas/grade';
 
 function Linha({ id, qtd, acoes }: { id: string; qtd: number; acoes: React.ReactNode }) {
   const it = ITENS[id], cor = COR_RARIDADE[it.raridade];
@@ -18,34 +21,12 @@ function Linha({ id, qtd, acoes }: { id: string; qtd: number; acoes: React.React
 const ORDEM = ['raro', 'incomum', 'comum'];
 const CATS: [string, string, (t: string) => boolean][] = [['todos', 'Tudo', () => true], ['comida', 'Comida', t => t === 'comida' || t === 'bebida'], ['cura', 'Cura', t => t === 'cura'], ['arma', 'Armas', t => t === 'arma' || t === 'municao'], ['equip', 'Equip.', t => t === 'equip' || t === 'ferramenta' || t === 'especial'], ['mat', 'Material', t => t === 'material']];
 
-function Mochila() {
-  const s = useJogo(), [cat, setCat] = useState('todos'), peso = pesoInv(s.inv), pm = pesoMax(s.inv), f = CATS.find(c => c[0] === cat)![2];
-  const ids = Object.keys(s.inv).filter(id => ITENS[id] && f(ITENS[id].tipo)).sort((a, b) => ORDEM.indexOf(ITENS[a].raridade) - ORDEM.indexOf(ITENS[b].raridade));
-  const acao = (id: string) => { const it = ITENS[id]; if (it.tipo === 'arma') return s.arma === id ? 'Em uso' : 'Equipar'; if (id === 'mascara') return s.mascara ? 'Tirar' : 'Colocar'; if (id === 'lanterna') return s.lanterna.ligada ? 'Apagar' : 'Acender'; if (it.tipo === 'especial') return 'Sintonizar'; if (it.tipo === 'comida' || it.tipo === 'bebida' || it.tipo === 'cura' || id === 'kit_fogueira' || id === 'combustivel' || id === 'bateria') return 'Usar'; return ''; };
-  return (
-    <Cartao titulo="Mochila" rodape={<div className="mini">Arma: <b>{s.arma ? ITENS[s.arma].nome : 'Punhos'}</b> · Balas 9mm <b>{s.balas.municao}</b> · Cartuchos <b>{s.balas.cartucho}</b> · Combustível <b>{s.combustivel}</b></div>}>
-      <div className="card aco"><div className="mini" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><span>Peso</span><b>{peso.toFixed(1)} / {pm} kg</b></div><div className="seg" style={{ ['--p' as string]: `${Math.min(100, peso / pm * 100)}%`, ['--c' as string]: peso > pm * 0.85 ? 'var(--sangue2)' : 'var(--fosf)' }}><i /></div></div>
-      <div className="abas">{CATS.map(([k, n]) => <button key={k} className={`btn aba ${cat === k ? 'on' : ''}`} {...p(() => setCat(k))}>{n}</button>)}</div>
-      {ids.length === 0 && <div className="card mini aco">Nada por aqui.</div>}
-      {ids.map(id => { const a = acao(id); return <Linha key={id} id={id} qtd={s.inv[id]} acoes={<>{a && <button className="btn aviso peq" disabled={s.arma === id} {...p(() => { ponte.cmd?.usarItem(id); const t = ITENS[id].tipo; if (t === 'comida' || t === 'bebida' || t === 'cura' || id === 'kit_fogueira' || id === 'combustivel') useJogo.setState({ painel: null }); })}>{a}</button>}<button className="btn peq" {...p(() => ponte.cmd?.largar(id))}>Largar</button></>} />; })}
-    </Cartao>
-  );
-}
-function Crafting() {
-  const s = useJogo(), nb = s.mel.bancada ?? 0;
-  return (
-    <Cartao titulo={`Bancada${nb ? ' nv ' + (nb + 1) : ''}`} rodape={<div style={{ display: 'grid', gap: 6 }}><button className="btn aviso" {...p(() => useJogo.setState({ painel: 'melhorias' }))}>Melhorias do abrigo</button><div className="mini">Materiais vêm das viagens: madeira (árvores), sucata (carros), tecido (colchões e sofás).</div></div>}>
-      {RECEITAS.map(r => { const trava = (r.nivel ?? 0) > nb, ok = !trava && r.entra.every(([i, n]) => (s.inv[i] ?? 0) >= n), it = ITENS[r.sai[0]];
-        return <div key={r.id} className="linha-item" style={{ ['--rc' as string]: trava ? '#3a3d42' : COR_RARIDADE[it.raridade], opacity: trava ? 0.6 : 1 }}><div className="im"><Ico src={it.icone} n={28} cor={trava ? '#565c64' : it.tom ?? COR_RARIDADE[it.raridade]} /></div><div><b>{r.nome}</b>{trava ? <div className="mini">Requer bancada nível {(r.nivel ?? 0) + 1} (Melhorias)</div> : <div className="chips">{r.entra.map(([i, n]) => <span key={i} className={`chip ${(s.inv[i] ?? 0) >= n ? 'ok' : 'falta'}`}>{ITENS[i].nome} {(s.inv[i] ?? 0)}/{n}</span>)}</div>}</div><button className={`btn peq ${ok ? 'aviso' : ''}`} disabled={!ok} {...p(() => ponte.cmd?.craft(r.id))}>{trava ? 'Travado' : 'Fabricar'}</button></div>; })}
-    </Cartao>
-  );
-}
 function Bau() {
   const s = useJogo(), inv = Object.keys(s.inv).filter(i => ITENS[i]), bau = Object.keys(s.bau).filter(i => ITENS[i]);
   return (
     <Cartao titulo="Baú do abrigo" larg={620}>
       <div className="duas">
-        <div><div className="mini"><b>Mochila</b> {pesoInv(s.inv).toFixed(1)}/{pesoMax(s.inv)} kg</div>{inv.length === 0 && <div className="mini">vazia</div>}{inv.map(id => <Linha key={id} id={id} qtd={s.inv[id]} acoes={<><button className="btn peq" {...p(() => ponte.cmd?.bauMover(id, 1, true))}>→1</button><button className="btn peq" {...p(() => ponte.cmd?.bauMover(id, 99, true))}>→tudo</button></>} />)}</div>
+        <div><div className="mini"><b>Mochila</b> {livres(s.grade, linhasDe(s.inv))} livres</div>{inv.length === 0 && <div className="mini">vazia</div>}{inv.map(id => <Linha key={id} id={id} qtd={s.inv[id]} acoes={<><button className="btn peq" {...p(() => ponte.cmd?.bauMover(id, 1, true))}>→1</button><button className="btn peq" {...p(() => ponte.cmd?.bauMover(id, 99, true))}>→tudo</button></>} />)}</div>
         <div><div className="mini"><b>Baú</b></div>{bau.length === 0 && <div className="mini">vazio</div>}{bau.map(id => <Linha key={id} id={id} qtd={s.bau[id]} acoes={<><button className="btn peq" {...p(() => ponte.cmd?.bauMover(id, 1, false))}>←1</button><button className="btn peq" {...p(() => ponte.cmd?.bauMover(id, 99, false))}>←tudo</button></>} />)}</div>
       </div>
     </Cartao>
@@ -156,7 +137,7 @@ function Pausa() {
 export default function Paineis() {
   const painel = useJogo(s => s.painel);
   switch (painel) {
-    case 'inv': return <Mochila />; case 'craft': return <Crafting />; case 'bau': return <Bau />; case 'cozinha': return <Cozinha />; case 'dormir': return <Dormir />;
+    case 'inv': return <Mochila />; case 'craft': return <Bancada />; case 'bau': return <Bau />; case 'cozinha': return <Cozinha />; case 'dormir': return <Dormir />;
     case 'mapa': return <Mapa />; case 'mapaZona': return <MapaZona />; case 'diario': return <Diario />; case 'config': return <Config />; case 'pausa': return <Pausa />;
     case 'perk': return <PerkPainel />; case 'melhorias': return <Melhorias />; case 'evento': return <EventoPainel />; case 'ajuda': return <Ajuda />; case 'intro': return <Intro />;
     default: return null;

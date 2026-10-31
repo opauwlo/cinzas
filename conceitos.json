@@ -114,6 +114,21 @@
       "id": 23,
       "nome": "Locais temáticos pelo mesmo gerador",
       "nota": "Hospital, posto de combustível, torre de rádio e posto militar = bioma-base + tema (predios, inimigos e saque próprios) sem código novo de geração."
+    },
+    {
+      "id": 24,
+      "nome": "Stick dinâmico por zonas (furtivo, andar, correr)",
+      "nota": "O círculo nasce no dedo e acompanha o dedo; a força do empurrão escolhe o modo, com histerese, cores de zona e vibração ao trocar. Sem botões de correr/furtivo para segurar."
+    },
+    {
+      "id": 25,
+      "nome": "HUD adaptativo por atenção",
+      "nota": "Vitais, rastreador e atalhos se acalmam quando está tudo bem e acendem ao mudar ou ficar críticos; o atalho certo pulsa quando a necessidade aparece; o botão de agir só existe com alvo."
+    },
+    {
+      "id": 26,
+      "nome": "Mochila em grade com encaixe, giro e baú de excesso",
+      "nota": "O espaço (células) substitui o peso: peças de tamanhos diferentes, arrastar, girar, organizar; o que não cabe vai ao baú e nunca some."
     }
   ],
   "adaptados": [
@@ -184,6 +199,10 @@
     {
       "nome": "Eventos de estrada com escolhas",
       "origem": "referência: livros-jogo e roguelikes de estrada (FTL, Oregon Trail); texto e regras próprios"
+    },
+    {
+      "nome": "Maleta em grade e cartões de fabricação",
+      "origem": "referência de design: inventário do Resident Evil 4; implementação e arte próprias"
     }
   ]
 }

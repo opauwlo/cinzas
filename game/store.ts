@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { ITENS, pesoDe } from './dados/itens';
 import type { ClimaId } from './dados/biomas';
 import type { Contrato } from './sistemas/contratos';
+import type { Peca } from './sistemas/grade';
 
 export type Tela = 'menu' | 'jogo' | 'morte' | 'vitoria' | 'creditos' | 'loja' | 'revelacao';
 export type Painel = null | 'inv' | 'craft' | 'bau' | 'mapa' | 'cozinha' | 'dormir' | 'pausa' | 'config' | 'diario' | 'mapaZona' | 'perk' | 'melhorias' | 'evento' | 'ajuda' | 'intro';
@@ -11,9 +12,9 @@ export type Resumo = { causa: string; dias: number; hora: string; abates: number
 export type Configs = { mestre: number; sfx: number; amb: number; mus: number; vibra: boolean; ui: number; escala: number; v?: number; autoMira: boolean; gore: boolean; canhoto: boolean; fps: boolean };
 export type ClimaHud = { tipo: ClimaId; chuva: number; vento: number; neblina: number; poeira: number; nuvem: number };
 
-export const CFG0: Configs = { mestre: 0.8, sfx: 0.9, amb: 0.8, mus: 0.5, vibra: true, ui: 1, escala: 1, v: 3, autoMira: true, gore: true, canhoto: false, fps: false };
+export const CFG0: Configs = { mestre: 0.6, sfx: 0.7, amb: 0.5, mus: 0.3, vibra: true, ui: 1, escala: 1, v: 4, autoMira: true, gore: true, canhoto: false, fps: false };
 export function lerCfg(): Configs {
-  try { const salvo = JSON.parse(localStorage.getItem('cinzas.cfg') ?? '{}'), c: Configs = { ...CFG0, ...salvo }; if ((salvo.v ?? 1) < 3) { c.escala = CFG0.escala; c.v = 3; } return c; } catch { return { ...CFG0 }; }
+  try { const salvo = JSON.parse(localStorage.getItem('cinzas.cfg') ?? '{}'), c: Configs = { ...CFG0, ...salvo }; if ((salvo.v ?? 1) < 3) c.escala = CFG0.escala; if ((salvo.v ?? 1) < 4) { c.mestre = CFG0.mestre; c.sfx = CFG0.sfx; c.amb = CFG0.amb; c.mus = CFG0.mus; } c.v = 4; return c; } catch { return { ...CFG0 }; }
 }
 export function gravarCfg(c: Configs) { try { localStorage.setItem('cinzas.cfg', JSON.stringify(c)); } catch { /* sem storage */ } }
 
@@ -26,7 +27,7 @@ export type Estado = {
   clima: ClimaHud; interior: boolean; tanque: number;
   toasts: Toast[]; acao: { rotulo: string; p: number } | null; alvo: string | null; furtivo: boolean;
   danoTs: number; resumo: Resumo | null; gemas: number; carga: number; descobertos: string[]; dica: string | null; cfg: Configs; temSave: boolean; fps: number;
-  xp: number; nivel: number; pontos: number; perks: string[]; contratos: Contrato[]; mel: Record<string, number>; conquistas: string[]; evento: EventoUI | null; seta: { dx: number; dy: number; d: number } | null; dif: number;
+  grade: Peca[]; xp: number; nivel: number; pontos: number; perks: string[]; contratos: Contrato[]; mel: Record<string, number>; conquistas: string[]; evento: EventoUI | null; seta: { dx: number; dy: number; d: number } | null; dif: number;
   set: (p: Partial<Estado>) => void;
   toast: (texto: string, cor?: string) => void;
 };
@@ -53,7 +54,7 @@ export const estadoInicial = (seed: string) => ({
   cpm: 18, objIdx: 0, objProg: 0, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
   clima: { tipo: 'limpo', chuva: 0, vento: 0.1, neblina: 0, poeira: 0, nuvem: 0.1 } as ClimaHud, interior: false, tanque: 0,
   toasts: [] as Toast[], acao: null, alvo: null, furtivo: false, danoTs: 0, resumo: null, descobertos: ['base'] as string[], dica: null,
-  xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
+  grade: [] as Peca[], xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
 });
 
 export const useJogo = create<Estado>((set, get) => ({
@@ -62,7 +63,7 @@ export const useJogo = create<Estado>((set, get) => ({
   toast: (texto, cor = '#d8d3c0') => {
     const t = { id: tid++, texto, cor };
     set({ toasts: [...get().toasts.slice(-3), t] });
-    setTimeout(() => set({ toasts: get().toasts.filter(x => x.id !== t.id) }), 2600);
+    setTimeout(() => set({ toasts: get().toasts.filter(x => x.id !== t.id) }), 2300);
   },
 }));
 
@@ -91,6 +92,6 @@ export function novoRun(seed: string, bonus = false, dif = 1): Run {
 export function aplicarRun(r: Run) {
   useJogo.setState({ seed: r.seed, zonaId: r.zonaId, minutos: r.minutos, hp: r.hp, maxHp: r.maxHp, fome: r.fome, sede: r.sede, stamina: r.stamina, rad: r.rad, sangra: r.sangra, inv: { ...r.inv }, bau: { ...r.bau }, arma: r.arma, balas: { ...r.balas }, mascara: r.mascara, combustivel: r.combustivel, lanterna: { ...r.lanterna },
     objIdx: r.objIdx, objProg: 0, vasculhados: r.vasculhados, abates: r.abates, radMax: r.radMax, sabeAbrigo: r.sabeAbrigo, descobertos: [...r.descobertos], tanque: r.tanque, toasts: [], acao: null, alvo: null, painel: null, dica: null, resumo: null,
-    xp: r.xp ?? 0, nivel: r.nivel ?? 1, pontos: r.pontos ?? 0, perks: [...(r.perks ?? [])], contratos: [...(r.contratos ?? [])], mel: { ...(r.mel ?? {}) }, conquistas: lerMeta().conquistas, evento: null, seta: null, dif: r.dif ?? 1 });
+    grade: [...(r.grade ?? [])], xp: r.xp ?? 0, nivel: r.nivel ?? 1, pontos: r.pontos ?? 0, perks: [...(r.perks ?? [])], contratos: [...(r.contratos ?? [])], mel: { ...(r.mel ?? {}) }, conquistas: lerMeta().conquistas, evento: null, seta: null, dif: r.dif ?? 1 });
 }
 export { ITENS };

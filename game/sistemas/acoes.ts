@@ -11,6 +11,7 @@ import { proj } from '../util';
 import { apagarRun } from './salvar';
 import type { Ent } from './ia';
 import { Rng } from '../lib/rng';
+import { cabeNaMochila, sincGrade, adicionar, remover, linhasDe, emGrade } from './grade';
 import { EVENTOS_VIAGEM, type Ajuda, type EventoViagem } from '../dados/eventos';
 import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado } from './progresso';
 
@@ -19,14 +20,14 @@ const st = () => useJogo.getState();
 const FERR = ['pe_de_cabra', 'machado', 'facao', 'faca', 'taco'];
 const toast = (t: string, cor?: string) => st().toast(t, cor);
 
-export function cabe(id: string, qtd = 1) { const inv = st().inv; return pesoDe(inv) + ITENS[id].peso * qtd <= pesoMax(inv) + 1e-6; }
+export function cabe(id: string, qtd = 1) { return cabeNaMochila(id, qtd); }
 export function dar(c: Cena, id: string, qtd = 1, quieto = false): boolean {
   const it = ITENS[id]; if (!it) return false;
   if (it.tipo === 'municao') { c.s.balas[it.municaoTipo!] = (c.s.balas[it.municaoTipo!] ?? 0) + it.balas! * qtd; if (!quieto) toast(`+ ${it.nome}`, COR_RARIDADE[it.raridade]); return true; }
   if (!cabe(id, qtd)) { toast('Mochila cheia', '#c9561f'); return false; }
-  const inv = { ...st().inv }; inv[id] = (inv[id] ?? 0) + qtd; useJogo.setState({ inv }); if (id === 'lanterna') c.s.lanterna.tem = true; if (!quieto) toast(`+ ${it.nome}${qtd > 1 ? ' x' + qtd : ''}`, COR_RARIDADE[it.raridade]); return true;
+  const inv = { ...st().inv }; inv[id] = (inv[id] ?? 0) + qtd; useJogo.setState({ inv, grade: emGrade(id) ? adicionar(st().grade, linhasDe(inv), id, qtd).g : st().grade }); if (id === 'lanterna') c.s.lanterna.tem = true; if (!quieto) toast(`+ ${it.nome}${qtd > 1 ? ' x' + qtd : ''}`, COR_RARIDADE[it.raridade]); return true;
 }
-export function tirar(id: string, qtd = 1): boolean { const inv = { ...st().inv }; if ((inv[id] ?? 0) < qtd) return false; inv[id] -= qtd; if (inv[id] <= 0) delete inv[id]; useJogo.setState({ inv }); return true; }
+export function tirar(id: string, qtd = 1): boolean { const inv = { ...st().inv }; if ((inv[id] ?? 0) < qtd) return false; inv[id] -= qtd; if (inv[id] <= 0) delete inv[id]; useJogo.setState({ inv, grade: emGrade(id) ? remover(st().grade, id, qtd) : st().grade }); return true; }
 const tem = (id: string, q = 1) => (st().inv[id] ?? 0) >= q;
 const temFerr = () => FERR.some(f => tem(f));
 const ri = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
@@ -181,7 +182,7 @@ export function executarVitoria(c: Cena) {
 export function instalarComandos(c: Cena) {
   ponte.ref = c; ponte.cmd = {
     interagir: () => { if (c.acao || c.morto) return; let a = c.alvoInter; if (!a || !a.ok() || !c.alcancavel(a)) a = c.alvoProx(); if (a) a.exec(); },
-    usarRapido: k => usarRapido(c, k), usarItem: id => usarItem(c, id), largar: id => { if (tirar(id)) { toast(ITENS[id].nome + ' largado'); sfx.ui('clique'); } },
+    usarRapido: k => usarRapido(c, k), usarItem: id => usarItem(c, id), largar: (id, n = 1) => { if (tirar(id, Math.min(n, st().inv[id] ?? 0))) { toast(ITENS[id].nome + ' largado'); sfx.ui('clique'); } },
     trocarArma: () => trocarArma(c), lanterna: () => lanterna(c), tocarMascara: () => tocarMascara(c),
     pausar: p => { try { if (!c.sys?.isActive() && !c.sys?.isPaused()) return; if (p) c.scene.pause(); else c.scene.resume(); } catch { /* cena já destruída */ } },
     tocarMundo: (x, y) => {
@@ -191,16 +192,16 @@ export function instalarComandos(c: Cena) {
     },
     craft: id => {
       const r = RECEITAS.find(q => q.id === id); if (!r) return; if ((r.nivel ?? 0) > melNivel(c.s, 'bancada')) { toast('Melhore a bancada para fabricar isto.', '#d9a02b'); sfx.ui('erro'); return; } const inv = st().inv; if (r.entra.some(([i, n]) => (inv[i] ?? 0) < n)) { toast('Faltam materiais.', '#d9a02b'); sfx.ui('erro'); return; }
-      const [si, sn] = r.sai; const cp = ITENS[si].tipo === 'municao' ? true : (pesoDe(inv) - r.entra.reduce((a, [i, n]) => a + ITENS[i].peso * n, 0) + ITENS[si].peso * sn <= pesoMax(inv) + 1e-6); if (!cp) { toast('Mochila cheia.', '#c9561f'); sfx.ui('erro'); return; }
+      const [si, sn] = r.sai; const cp = ITENS[si].tipo === 'municao' || !emGrade(si) || (() => { let g = st().grade; for (const [i, n] of r.entra) if (emGrade(i)) g = remover(g, i, n); return adicionar(g, linhasDe(inv), si, sn).resto === 0; })(); if (!cp) { toast('Sem espaço na mochila: organize ou largue algo.', '#c9561f'); sfx.ui('erro'); return; }
       for (const [i, n] of r.entra) tirar(i, n); dar(c, si, sn); c.s.craftou = true; c.avancar(10, 1); sfx.ui('ok'); sfx.achado(); registrar(c, 'fabricados'); ganharXp(c, 5, false);
     },
     cozinhar: id => { const r = COZINHA.find(q => q.id === id); if (!r) return; if (!tirar(r.de)) { toast('Falta ' + ITENS[r.de].nome.toLowerCase() + '.', '#d9a02b'); sfx.ui('erro'); return; } dar(c, r.para, 1); c.avancar(15, 1); sfx.comer(); registrar(c, 'cozinhados'); ganharXp(c, 2, false); },
     dormir: h => dormir(c, h),
     bauMover: (id, qtd, paraBau) => {
-      const inv = { ...st().inv }, bau = { ...st().bau };
-      if (paraBau) { const n = Math.min(qtd, inv[id] ?? 0); if (!n) return; inv[id] -= n; if (inv[id] <= 0) delete inv[id]; bau[id] = (bau[id] ?? 0) + n; }
-      else { let n = Math.min(qtd, bau[id] ?? 0); while (n > 0 && pesoDe(inv) + ITENS[id].peso * n > pesoMax(inv) + 1e-6) n--; if (!n) { toast('Mochila cheia.', '#c9561f'); sfx.ui('erro'); return; } bau[id] -= n; if (bau[id] <= 0) delete bau[id]; inv[id] = (inv[id] ?? 0) + n; }
-      useJogo.setState({ inv, bau }); sfx.ui('clique'); c.s.inv = inv; c.s.bau = bau;
+      const inv = { ...st().inv }, bau = { ...st().bau }; let grade = st().grade;
+      if (paraBau) { const n = Math.min(qtd, inv[id] ?? 0); if (!n) return; inv[id] -= n; if (inv[id] <= 0) delete inv[id]; bau[id] = (bau[id] ?? 0) + n; if (emGrade(id)) grade = remover(grade, id, n); }
+      else { let n = Math.min(qtd, bau[id] ?? 0); while (n > 0 && !cabeNaMochila(id, n)) n--; if (!n) { toast('Sem espaço na mochila.', '#c9561f'); sfx.ui('erro'); return; } bau[id] -= n; if (bau[id] <= 0) delete bau[id]; inv[id] = (inv[id] ?? 0) + n; if (emGrade(id)) grade = adicionar(grade, linhasDe(inv), id, n).g; }
+      useJogo.setState({ inv, bau, grade }); sfx.ui('clique'); c.s.inv = inv; c.s.bau = bau;
     },
     viajar: d => viajar(c, d), salvar: () => c.salvar(), atacarBotao: () => { ponte.entrada.tap++; },
     eventoEscolher: i => eventoEscolher(c, i), eventoFim: () => eventoFim(c), escolherPerk: id => escolherPerk(c, id), receberContrato: id => receberContrato(c, id), melhorar: id => melhorar(c, id),

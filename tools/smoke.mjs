@@ -60,6 +60,21 @@ try {
   const p1 = await cena(() => { const j = window.__cinzas.cena().jog; return [j.x, j.y]; });
   ok('o jogador anda', Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) > 0.5, `deslocou ${Math.hypot(p1[0] - p0[0], p1[1] - p0[1]).toFixed(2)} tiles`);
 
+  // 3b. stick dinâmico: a velocidade vem da força do toque (furtivo → andar → correr), sem botões
+  const stick = await ev(() => {
+    const z = document.querySelector('.zona.esq'), en = window.__cinzas.ponte.entrada, out = {}; const ptr = (t, x, y) => z.dispatchEvent(new PointerEvent(t, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true }));
+    ptr('pointerdown', 120, 600); ptr('pointermove', 132, 600); out.suave = { f: en.furtivo, c: en.correr };            // 12 px: empurrão leve
+    ptr('pointermove', 160, 600); out.medio = { f: en.furtivo, c: en.correr };                                          // 40 px: andar
+    ptr('pointermove', 175, 600); out.forte = { f: en.furtivo, c: en.correr };                                          // 55 px: borda = correr
+    const j = document.querySelector('.joy.mover'); ptr('pointermove', 260, 600); out.seguiu = parseFloat(j.style.left) > 125;       // o stick acompanha o dedo
+    ptr('pointerup', 260, 600); out.solto = { f: en.furtivo, c: en.correr, mx: en.mx }; return out;
+  });
+  ok('stick: empurrão leve = furtivo', stick.suave.f === true && stick.suave.c === false, JSON.stringify(stick.suave));
+  ok('stick: empurrão médio = andar', stick.medio.f === false && stick.medio.c === false, JSON.stringify(stick.medio));
+  ok('stick: até a borda = correr', stick.forte.c === true, JSON.stringify(stick.forte));
+  ok('stick: o círculo acompanha o dedo e soltar zera tudo', stick.seguiu === true && stick.solto.c === false && stick.solto.f === false && stick.solto.mx === 0, JSON.stringify(stick.solto));
+  ok('não existem botões de correr/furtivo na tela', await ev(() => !document.querySelector('[aria-label="Correr"], [aria-label="Furtivo"]')));
+
   // 4. estações da base abrem seus painéis
   for (const [rx, painel] of [['bancada', 'craft'], ['baú do abrigo', 'bau'], ['jipe', 'mapa'], ['^dormir', 'dormir'], ['fogão', 'cozinha']]) {
     const achou = await ev(rx => {
@@ -97,6 +112,33 @@ try {
   ok('beber água repõe a sede', (await ev(() => window.__cinzas.cena().s.sede)) > 30);
   const m0 = (await estado()).minutos; await ev(() => window.__cinzas.ponte.cmd.dormir(1)); await espera(1500);
   ok('dormir faz o tempo passar', (await estado()).minutos >= m0 + 50, `${Math.round(m0)} → ${Math.round((await estado()).minutos)} min`);
+  await ev(() => window.__cinzas.store.setState({ painel: null }));
+
+  // 4b2. mochila em grade (estilo RE4): peças com posição, espaço no lugar de peso, arrastar, girar, organizar
+  const consistente = () => ev(() => { const t = window.__cinzas.store.getState(), soma = {}; for (const p of t.grade) soma[p.id] = (soma[p.id] ?? 0) + p.q; return Object.entries(t.inv).every(([id, q]) => ['mochila', 'colete'].includes(id) || soma[id] === q) && Object.entries(soma).every(([id, q]) => t.inv[id] === q); });
+  ok('a mochila é uma grade de peças e bate com o inventário', (await ev(() => window.__cinzas.store.getState().grade.length)) > 0 && await consistente());
+  await ev(() => { const st = window.__cinzas.store, i = st.getState().inv; st.setState({ inv: { ...i, rifle: 6 } }); }); await espera(1500);
+  const sobra = await ev(() => { const t = window.__cinzas.store.getState(); return { grade: t.grade.filter(p => p.id === 'rifle').reduce((a, p) => a + p.q, 0), inv: t.inv.rifle ?? 0, bau: t.bau.rifle ?? 0 }; });
+  ok('o que não cabe na grade vai para o baú (nada some)', sobra.grade === sobra.inv && sobra.inv + sobra.bau === 6 && sobra.bau >= 1, JSON.stringify(sobra));
+  await ev(() => { const st = window.__cinzas.store, t = st.getState(), i = { ...t.inv }, b = { ...t.bau }; delete i.rifle; delete b.rifle; st.setState({ inv: i, bau: b }); }); await espera(1500);
+  ok('a grade volta a bater depois de tirar itens', await consistente());
+  await ev(() => window.__cinzas.store.setState({ painel: 'inv' })); await espera(500); await foto('2c-mochila');
+  ok('a mochila não mostra peso em kg', !/\d\s*kg/i.test(await ev(() => document.body.innerText)));
+  const arrastou = await ev(async () => {
+    const st = window.__cinzas.store, t0 = st.getState(); if (!document.querySelector('.peca')) return null; const i = t0.grade.findIndex(p => p.id === 'bandagem'); if (i < 0) return null;
+    const el = document.querySelectorAll('.peca')[i], r = el.getBoundingClientRect(), box = document.querySelector('.mochila-grade').getBoundingClientRect(), cel = r.width, passo = cel + 2, linhas = Math.round((box.height + 2) / passo);
+    const alvoX = 7, alvoY = linhas - 1, p = t0.grade[i], dx = (alvoX - p.x) * passo, dy = (alvoY - p.y) * passo, cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const ev = (tp, x, y) => el.dispatchEvent(new PointerEvent(tp, { pointerId: 11, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true }));
+    ev('pointerdown', cx, cy); ev('pointermove', cx + dx / 2, cy + dy / 2); ev('pointermove', cx + dx, cy + dy); ev('pointerup', cx + dx, cy + dy);
+    await new Promise(r => setTimeout(r, 200)); const q = st.getState().grade.find(g => g.id === 'bandagem'); return { de: [p.x, p.y], para: [q.x, q.y], alvo: [alvoX, alvoY] };
+  });
+  ok('arrastar uma peça a muda de lugar na grade', arrastou && arrastou.para[0] === arrastou.alvo[0] && arrastou.para[1] === arrastou.alvo[1], JSON.stringify(arrastou));
+  const longa = await ev(() => { const t = window.__cinzas.store.getState(); return t.grade.findIndex(p => p.id === 'pe_de_cabra'); });
+  ok('tocar numa peça comprida e girar', longa >= 0 && await ev(i => { document.querySelectorAll('.peca')[i].dispatchEvent(new PointerEvent('pointerdown', { pointerId: 12, pointerType: 'touch', isPrimary: true, clientX: 5, clientY: 5, bubbles: true })); document.querySelectorAll('.peca')[i].dispatchEvent(new PointerEvent('pointerup', { pointerId: 12, pointerType: 'touch', isPrimary: true, clientX: 5, clientY: 5, bubbles: true })); return true; }, longa) && await toque('^Girar') && await ate(i => window.__cinzas.store.getState().grade[i].r === 1, 3000, longa));
+  ok('"Organizar" reempacota sem perder itens', await toque('^Organizar') && await consistente());
+  await ev(() => window.__cinzas.store.setState({ painel: 'craft' })); await espera(500); await foto('2d-bancada');
+  const cartoes = await ev(() => document.querySelectorAll('.craft-card').length); await toque('^Prontas'); const prontas = await ev(() => document.querySelectorAll('.craft-card').length);
+  ok('a bancada mostra cartões e filtra por "Prontas"', cartoes >= 8 && prontas <= cartoes, `${cartoes} → ${prontas}`);
   await ev(() => window.__cinzas.store.setState({ painel: null }));
 
   // 4c. melhorias do abrigo e receitas de bancada avançada

@@ -9,12 +9,13 @@ import type { RecEstr } from './lib/props';
 import { Rng } from './lib/rng';
 import { gerarHumano, type RecHumano } from './lib/humano';
 import { gerarFlora } from './lib/flora';
-import { armaDe, pesoDe } from './dados/itens';
+import { armaDe } from './dados/itens';
 import { BIOMAS, type Bioma } from './dados/biomas';
 import { biomaDe } from './dados/meta';
 import { localPorId } from './dados/locais';
 import { ARQS, type Arq } from './dados/criaturas';
-import { useJogo, horaStr, pesoMax, OBJETIVOS } from './store';
+import { useJogo, horaStr, OBJETIVOS } from './store';
+import { sincGrade } from './sistemas/grade';
 import { ponte } from './ponte';
 import { sfx, ambiente, setGeiger, setBatimento, aplicarVolumes, trovao } from './audio';
 import { Clima, luzDia, gradeCor, sombraSol } from './sistemas/clima';
@@ -227,14 +228,14 @@ export class Cena extends Phaser.Scene {
   tingir(r: Rastreado, noite: number) { const a = this.lmA[r.i], l = Math.round(a * 12); if (l === r.lvl) return; r.lvl = l; r.spr.setTint(this.tom(l / 12, noite)); }
   hora() { return (this.s.minutos % 1440) / 60; }
   superficie(t: number) { return t === T.MADEIRA || t === T.PORTA ? 'madeira' : t === T.AZULEJO ? 'azulejo' : t === T.METAL ? 'metal' : [T.ESTRADA, T.LINHA_H, T.LINHA_V, T.CALCADA, T.CONCRETO].includes(t as 1) ? 'concreto' : t === T.AREIA ? 'areia' : t === T.AGUA_RASA || t === T.LAMA ? 'agua' : 'terra'; }
-  salvar() { const st = useJogo.getState(); this.s.inv = { ...st.inv }; this.s.bau = { ...st.bau }; const copia: Run = { ...this.s, px: this.jog?.x, py: this.jog?.y }; salvarRun(copia); useJogo.setState({ temSave: true }); }
+  salvar() { const st = useJogo.getState(); this.s.inv = { ...st.inv }; this.s.bau = { ...st.bau }; this.s.grade = st.grade.map(g => ({ ...g })); const copia: Run = { ...this.s, px: this.jog?.x, py: this.jog?.y }; salvarRun(copia); useJogo.setState({ temSave: true }); }
   dentroPredio(x: number, y: number) { return this.zona.predios.some(p => x > p.x && x < p.x + p.w - 1 && y > p.y && y < p.y + p.h - 1); }
 
   // ------------------------------------------------------------------ luz: cone de visão (rot.js) + pontilhado no chão + tingimento dos objetos
   atualizarLuz(dt: number) {
     const J = this.jog, px = Math.floor(J.x), py = Math.floor(J.y), amb = this.ambient, noite = 1 - amb, vis = this.clima.visibilidade;
     this.luzFrame.fill(0); const lant = this.s.lanterna.ligada && this.s.lanterna.bat > 0, meia = 1.22, alcCone = (lant ? 12 : amb > 0.5 ? 14 : 6.5 + (pk(this.s, 'noturno') ? 3 : 0)) * vis, alcLant = 12 * vis;
-    const nv = pk(this.s, 'noturno') ? noite * 3 : 0, nearA = (3.4 + amb * 11 + nv) * vis, nearB = (6.4 + amb * 12.5 + nv) * vis, base = noite * 0.74 + this.clima.nuvem * 0.06 * amb, mem = Math.max(0.55, base + 0.2), boost = this.flash > 0 || this.flashRaio > 0.2 ? 1 : 0, fontes = this.luzes.filter(l => Math.hypot(l.x - J.x, l.y - J.y) < 22 && (l.noite ? noite > 0.3 : true));
+    const nv = pk(this.s, 'noturno') ? noite * 3 : 0, nearA = (3.4 + amb * 11 + nv) * vis, nearB = (6.4 + amb * 12.5 + nv) * vis, base = noite * 0.74 + this.clima.nuvem * 0.02 * amb, mem = Math.max(0.55, base + 0.2), boost = this.flash > 0 || this.flashRaio > 0.2 ? 1 : 0, fontes = this.luzes.filter(l => Math.hypot(l.x - J.x, l.y - J.y) < 22 && (l.noite ? noite > 0.3 : true));
     this.fov.compute(px, py, 21, (x: number, y: number) => {
       const dx = x + 0.5 - J.x, dy = y + 0.5 - J.y, d = Math.hypot(dx, dy), da = Math.abs(ang(Math.atan2(dy, dx) - J.ang));
       const cone = sstep(meia + 0.12, meia - 0.18, da) * (1 - sstep(alcCone * 0.6, alcCone, d)), near = 1 - sstep(nearA, nearB, d), fl = boost ? 1 - sstep(4, 7, d) : 0;
@@ -271,7 +272,7 @@ export class Cena extends Phaser.Scene {
     if (this.hitstop > 0) { this.hitstop -= dt; return; }
     const s = this.s; this.pathBudget = 3;
     if (!this.morto) {
-      s.minutos += dt * MIN_POR_SEG; const h = this.hora(); this.ambient = luzDia(h) * (1 - this.clima.nuvem * 0.12);
+      s.minutos += dt * MIN_POR_SEG; const h = this.hora(); this.ambient = luzDia(h) * (1 - this.clima.nuvem * 0.05);
       this.jogador(dt); this.necessidades(dt);
     }
     const noite = 1 - this.ambient; this.tSpawn += dt;
@@ -283,7 +284,7 @@ export class Cena extends Phaser.Scene {
     this.tPortas += dt; if (this.tPortas > 0.5) { this.tPortas = 0; for (const [i, d] of this.portas) if (d.aberta) { d.t += 0.5; const x = i % W, y = Math.floor(i / W); if (d.t > 4 && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) > 6 && !this.ents.some(e => e.vivo && Math.hypot(e.x - x - 0.5, e.y - y - 0.5) < 1.2)) this.fecharPorta(i); } }
     this.tSync += dt; if (this.tSync > 0.1) { this.tSync = 0; this.sincronizar(); }
     this.tSave += dt; if (this.tSave > 30 && !this.morto) { this.tSave = 0; this.salvar(); }
-    this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); atualizarDiretor(this, 1); }
+    this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); atualizarDiretor(this, 1); sincGrade(); }
   }
   separar() {
     const at = this.ents.filter(e => e.vivo && e.arq.hostil && Math.abs(e.x - this.jog.x) < 20 && Math.abs(e.y - this.jog.y) < 20);
@@ -301,8 +302,8 @@ export class Cena extends Phaser.Scene {
     let sxm = e.mx, sym = e.my; const kx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0), ky = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
     if (kx || ky) { sxm = kx; sym = ky; } let m = Math.hypot(sxm, sym); if (m > 1) { sxm /= m; sym /= m; m = 1; }
     const mx = (sxm + sym) * R2, my = (sym - sxm) * R2, corre = (e.correr || k.SHIFT.isDown) && s.stamina > 2, furtivo = e.furtivo; ponte.entrada.furtivo = furtivo;
-    const base = furtivo ? 1.4 : corre ? 4.6 : 2.7, peso = 1 - Math.min(0.25, pesoDe(st.inv) / pesoMax(st.inv) * 0.2), cura = s.hp < 30 ? 0.88 : 1, agua = this.tipoEm(Math.floor(J.x), Math.floor(J.y)) === T.AGUA_RASA ? 0.65 : 1;
-    const v = m > 0.12 ? base * Math.min(1, m) * peso * cura * agua : 0; J.andando = v > 0;
+    const base = furtivo ? 1.5 : corre ? 4.6 : 2.8, peso = 1, cura = s.hp < 30 ? 0.88 : 1, agua = this.tipoEm(Math.floor(J.x), Math.floor(J.y)) === T.AGUA_RASA ? 0.65 : 1;
+    const v = m > 0.12 ? base * peso * cura * agua : 0; /* a velocidade vem do modo (furtivo/andar/correr) do stick, não da força */ J.andando = v > 0;
     if (J.andando) {
       if (this.acao && m > 0.35) { this.acao = null; useJogo.getState().toast('Interrompido', '#d9a02b'); }
       const sx = (mx / m) * v * dt, sy = (my / m) * v * dt; if (!this.colide(J.x + sx, J.y, 0.3)) J.x += sx; if (!this.colide(J.x, J.y + sy, 0.3)) J.y += sy; J.passo += v * dt;

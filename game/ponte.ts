@@ -2,7 +2,7 @@
 export type Entrada = { mx: number; my: number; ax: number; ay: number; mira: boolean; atacar: boolean; correr: boolean; furtivo: boolean; tap: number };
 export type Rapido = 'agua' | 'comida' | 'curar' | 'antirrad';
 export type Cmd = {
-  interagir(): void; usarRapido(k: Rapido): void; usarItem(id: string): void; largar(id: string): void;
+  interagir(): void; usarRapido(k: Rapido): void; usarItem(id: string): void; largar(id: string, n?: number): void;
   trocarArma(): void; lanterna(): void; pausar(p: boolean): void; tocarMascara(): void;
   /** toque na tela (coordenadas CSS relativas ao mundo); devolve true se virou interação */
   tocarMundo(x: number, y: number): boolean;

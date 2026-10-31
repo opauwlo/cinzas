@@ -6,6 +6,7 @@ import { DICAS_CARGA } from '../game/dados/meta';
 import { ponte } from '../game/ponte';
 import { iniciarAudio, aplicarVolumes } from '../game/audio';
 import { lerRun, temRun, type Run } from '../game/sistemas/salvar';
+import { sincGrade } from '../game/sistemas/grade';
 import { Hud, Sobreposicoes } from './Hud';
 import Controles from './Controles';
 import Paineis from './Paineis';
@@ -23,7 +24,7 @@ export default function Jogo() {
     void iniciarAudio();
     try { await Promise.all(['700 16px Silkscreen', '400 18px VT323'].map(f => document.fonts.load(f))); } catch { /* segue */ }
     const meta = registrarDia(); let run = nova ? null : lerRun(); if (!run) run = novoRun(hoje(), meta.sequencia >= 3, lerMeta().dif ?? 1);
-    runRef.current = run; aplicarRun(run); set({ tela: 'jogo', painel: null, carga: 0 }); setCorrida(c => c + 1);
+    runRef.current = run; aplicarRun(run); sincGrade(); set({ tela: 'jogo', painel: null, carga: 0 }); setCorrida(c => c + 1);
   };
   useEffect(() => {
     if (!jogando || !corrida || !mundoRef.current) return;

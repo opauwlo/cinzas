@@ -8,11 +8,11 @@ const ALVOS: Record<ClimaId, Alvo> = {
   limpo: { chuva: 0, vento: 0.1, neblina: 0, poeira: 0, nuvem: 0.1, tempestade: 0, acida: false },
   nublado: { chuva: 0, vento: 0.25, neblina: 0, poeira: 0, nuvem: 0.7, tempestade: 0, acida: false },
   vento: { chuva: 0, vento: 0.85, neblina: 0, poeira: 0, nuvem: 0.3, tempestade: 0, acida: false },
-  chuva: { chuva: 0.6, vento: 0.35, neblina: 0.1, poeira: 0, nuvem: 0.85, tempestade: 0, acida: false },
-  tempestade: { chuva: 1, vento: 0.85, neblina: 0.1, poeira: 0, nuvem: 1, tempestade: 1, acida: false },
+  chuva: { chuva: 0.6, vento: 0.35, neblina: 0.04, poeira: 0, nuvem: 0.7, tempestade: 0, acida: false },
+  tempestade: { chuva: 1, vento: 0.85, neblina: 0.05, poeira: 0, nuvem: 0.85, tempestade: 1, acida: false },
   neblina: { chuva: 0, vento: 0.1, neblina: 0.8, poeira: 0, nuvem: 0.5, tempestade: 0, acida: false },
   poeira: { chuva: 0, vento: 0.95, neblina: 0, poeira: 0.85, nuvem: 0.4, tempestade: 0, acida: false },
-  acida: { chuva: 0.55, vento: 0.3, neblina: 0.2, poeira: 0, nuvem: 0.85, tempestade: 0, acida: true },
+  acida: { chuva: 0.55, vento: 0.3, neblina: 0.1, poeira: 0, nuvem: 0.7, tempestade: 0, acida: true },
 };
 export const NOME_CLIMA: Record<ClimaId, string> = { limpo: 'Céu limpo', nublado: 'Nublado', vento: 'Ventania', chuva: 'Chuva', tempestade: 'Tempestade', neblina: 'Neblina', poeira: 'Tempestade de poeira', acida: 'Chuva ácida' };
 
@@ -23,8 +23,8 @@ const KEYS: [number, [number, number, number]][] = [[0, [96, 112, 178]], [5, [10
 export function gradeCor(h: number, nuvem: number, tempestade: number): number {
   let i = 0; while (i < KEYS.length - 2 && h >= KEYS[i + 1][0]) i++;
   const [h0, c0] = KEYS[i], [h1, c1] = KEYS[i + 1], t = Math.max(0, Math.min(1, (h - h0) / (h1 - h0))), mix = (a: number, b: number) => a + (b - a) * t;
-  const cn = 1 - nuvem * 0.18 - tempestade * 0.18; let r = mix(c0[0], c1[0]) * cn, g = mix(c0[1], c1[1]) * cn, b = mix(c0[2], c1[2]) * (1 - nuvem * 0.08 - tempestade * 0.08);
-  const gray = (r + g + b) / 3, d = nuvem * 0.25; r += (gray - r) * d; g += (gray - g) * d; b += (gray - b) * d;
+  const cn = 1 - nuvem * 0.09 - tempestade * 0.1; let r = mix(c0[0], c1[0]) * cn, g = mix(c0[1], c1[1]) * cn, b = mix(c0[2], c1[2]) * (1 - nuvem * 0.04 - tempestade * 0.05);
+  const gray = (r + g + b) / 3, d = nuvem * 0.12; r += (gray - r) * d; g += (gray - g) * d; b += (gray - b) * d;
   return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
 }
 /** direção e tamanho da sombra do sol (em tela) e opacidade */
@@ -59,7 +59,7 @@ export class Clima {
   /** nome para o HUD */
   get nome() { return NOME_CLIMA[this.tipo]; }
   /** visibilidade (multiplicador do alcance de visão) */
-  get visibilidade() { return 1 - this.neblina * 0.45 - this.poeira * 0.4 - this.chuva * 0.12; }
+  get visibilidade() { return 1 - this.neblina * 0.35 - this.poeira * 0.3 - this.chuva * 0.03; }
   /** multiplicador do alcance de ruído */
   get ruidoMult() { return 1 - this.chuva * 0.3 - this.vento * 0.12; }
   ativo() { return (this.chuva > 0.03 && this.dentro < 0.95) || this.neblina > 0.04 || this.poeira > 0.04; }
@@ -69,11 +69,11 @@ export class Clima {
     d.fill(0); let algo = false; const vis = 1 - this.dentro, ch = this.chuva * vis, vx = -(0.15 + this.rajada * 0.9) * 40 / z;
     const px = (x: number, y: number, r: number, g: number, b: number, a: number) => { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= w || y >= h) return; const o = (y * w + x) * 4; d[o] = r; d[o + 1] = g; d[o + 2] = b; d[o + 3] = a; };
     if (ch > 0.03) {
-      algo = true; const n = Math.min(this.nGotas, Math.floor(360 * Math.min(1, ch) * (w * z * h * z) / (206 * 440))), cor = this.acida ? [150, 235, 110] : [176, 196, 214], len = 3 + Math.round(ch * 2);
+      algo = true; const n = Math.min(this.nGotas, Math.floor(200 * Math.min(1, ch) * (w * z * h * z) / (206 * 440))), cor = this.acida ? [150, 235, 110] : [176, 196, 214], len = 3 + Math.round(ch * 2);
       for (let i = 0; i < n; i++) {
         const o = i * 4; let x = this.gotas[o] * w, y = this.gotas[o + 1] * h; const sp = this.gotas[o + 2] * (150 + ch * 90) / z;
         x += vx * dt; y += sp * dt; if (y >= h) { if (this.rng.chance(0.25) && this.splash.length < 40) this.splash.push({ x, y: this.rng.range(h * 0.1, h * 0.95), t: 0 }); y -= h; this.gotas[o + 3] = this.rng.f(); } if (x < 0) x += w; this.gotas[o] = x / w; this.gotas[o + 1] = y / h;
-        const tail = vx / sp; for (let k = 0; k < len; k++) px(x - tail * k * 2, y - k, cor[0], cor[1], cor[2], 190 - k * 28);
+        const tail = vx / sp; for (let k = 0; k < len; k++) px(x - tail * k * 2, y - k, cor[0], cor[1], cor[2], 120 - k * 20);
       }
       for (let i = this.splash.length - 1; i >= 0; i--) { const s = this.splash[i]; s.t += dt; if (s.t > 0.28) { this.splash.splice(i, 1); continue; } const r = 1 + Math.floor(s.t * 10), a = 170 * (1 - s.t / 0.28); px(s.x - r, s.y, 190, 210, 225, a); px(s.x + r, s.y, 190, 210, 225, a); px(s.x, s.y - 1, 190, 210, 225, a * 0.7); }
     }

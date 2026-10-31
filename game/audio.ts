@@ -3,7 +3,7 @@
 type Z = typeof import('zzfx');
 let z: Z | null = null, ctx: AudioContext | null = null, ligado = false;
 let mestre: GainNode, bSfx: GainNode, bAmb: GainNode, bMus: GainNode;
-let vol = { mestre: 0.8, sfx: 0.9, amb: 0.8, mus: 0.5 }, vibraOn = true;
+let vol = { mestre: 0.6, sfx: 0.7, amb: 0.5, mus: 0.3 }, vibraOn = true;
 let cpm = 0, batendo = false, ruidoBuf: AudioBuffer | null = null;
 type Camadas = { vento: GainNode; ventoF: BiquadFilterNode; chuva: GainNode; chuvaF: BiquadFilterNode; fogo: GainNode };
 let cam: Camadas | null = null, musica: { g: GainNode; f: BiquadFilterNode } | null = null;
@@ -45,7 +45,7 @@ export async function iniciarAudio() {
   try {
     z = await import('zzfx'); try { void z.ZZFX.audioContext.close(); } catch { /* */ }
     ctx = new AudioContext({ latencyHint: 'interactive' });
-    mestre = ctx.createGain(); const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; mestre.connect(comp).connect(ctx.destination);
+    mestre = ctx.createGain(); const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -22; comp.ratio.value = 6; comp.knee.value = 12; mestre.connect(comp).connect(ctx.destination);
     bSfx = ctx.createGain(); bAmb = ctx.createGain(); bMus = ctx.createGain(); bSfx.connect(mestre); bAmb.connect(mestre); bMus.connect(mestre); aplicarVolumes();
     await ctx.resume(); ruidoBuf = criarRuido(); construirAmbiente(); geigerLoop(); batimentoLoop(); grilosLoop(); musicaLoop();
   } catch { ligado = false; }
@@ -61,12 +61,12 @@ function fonteRuido(loop = true) { const s = ctx!.createBufferSource(); s.buffer
 
 function buffers(nome: string): AudioBuffer[] {
   let a = cache.get(nome); if (a) return a; const p = PRE[nome]; if (!p || !z || !ctx) return []; a = [];
-  for (let i = 0; i < 3; i++) { const s = z.ZZFX.buildSamples(...p), b = ctx.createBuffer(1, s.length, z.ZZFX.sampleRate); b.getChannelData(0).set(s); a.push(b); }
+  for (let i = 0; i < 3; i++) { const s = z.ZZFX.buildSamples(...(p.map((v, k) => (k === 0 ? v * 0.62 : v)) as number[])), b = ctx.createBuffer(1, s.length, z.ZZFX.sampleRate); b.getChannelData(0).set(s); a.push(b); }
   cache.set(nome, a); return a;
 }
 export function tocar(nome: Som, o: { vol?: number; pan?: number; rate?: number } = {}) {
   if (!ctx || !z) return; const bs = buffers(nome); if (!bs.length) return; const s = ctx.createBufferSource(); s.buffer = bs[(Math.random() * bs.length) | 0]; s.playbackRate.value = (o.rate ?? 1) * (0.94 + Math.random() * 0.12);
-  const g = ctx.createGain(); g.gain.value = (o.vol ?? 1) * 0.35; s.connect(g); if (o.pan) { const p = new StereoPannerNode(ctx, { pan: Math.max(-1, Math.min(1, o.pan)) }); g.connect(p).connect(bSfx); } else g.connect(bSfx); s.start();
+  const g = ctx.createGain(); g.gain.value = (o.vol ?? 1) * 0.28; s.connect(g); if (o.pan) { const p = new StereoPannerNode(ctx, { pan: Math.max(-1, Math.min(1, o.pan)) }); g.connect(p).connect(bSfx); } else g.connect(bSfx); s.start();
 }
 /** volume por distância (em tiles) e pan pelo deslocamento horizontal em tela */
 export const aDist = (d: number) => Math.max(0, 1 - d / 22) ** 1.4;
@@ -83,20 +83,20 @@ function construirAmbiente() {
 /** chamado ~10 vezes por segundo pela cena */
 export function ambiente(e: Partial<typeof estado>) {
   Object.assign(estado, e); if (!ctx || !cam) return; const t = ctx.currentTime, i = estado.interior ? 0.28 : 1;
-  cam.vento.gain.setTargetAtTime(Math.min(0.55, estado.vento * 0.5) * i, t, 0.6); cam.ventoF.frequency.setTargetAtTime(260 + estado.vento * 700, t, 0.8);
-  cam.chuva.gain.setTargetAtTime(Math.min(0.5, estado.chuva * 0.5) * (estado.interior ? 0.35 : 1), t, 0.5); cam.chuvaF.frequency.setTargetAtTime(estado.interior ? 1400 : 7500, t, 0.3);
-  cam.fogo.gain.setTargetAtTime(estado.fogo * 0.18, t, 0.3);
-  if (musica) { const noite = estado.hora < 6 || estado.hora >= 20; musica.g.gain.setTargetAtTime((0.12 + estado.perigo * 0.2 + (noite ? 0.06 : 0)), t, 1.2); musica.f.frequency.setTargetAtTime(180 + estado.perigo * 520, t, 1.5); }
+  cam.vento.gain.setTargetAtTime(Math.min(0.36, estado.vento * 0.34) * i, t, 0.6); cam.ventoF.frequency.setTargetAtTime(260 + estado.vento * 700, t, 0.8);
+  cam.chuva.gain.setTargetAtTime(Math.min(0.26, estado.chuva * 0.26) * (estado.interior ? 0.35 : 1), t, 0.5); cam.chuvaF.frequency.setTargetAtTime(estado.interior ? 1400 : 7500, t, 0.3);
+  cam.fogo.gain.setTargetAtTime(estado.fogo * 0.11, t, 0.3);
+  if (musica) { const noite = estado.hora < 6 || estado.hora >= 20; musica.g.gain.setTargetAtTime((0.07 + estado.perigo * 0.12 + (noite ? 0.04 : 0)), t, 1.2); musica.f.frequency.setTargetAtTime(180 + estado.perigo * 520, t, 1.5); }
 }
 export function trovao(atraso: number) {
   if (!ctx) return; const c = ctx, t = c.currentTime + atraso, s = fonteRuido(false), f = c.createBiquadFilter(), g = c.createGain(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(90, t + 2.2);
-  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.9, t + 0.06); g.gain.exponentialRampToValueAtTime(0.01, t + 2.6); s.connect(f).connect(g).connect(bAmb); s.start(t, Math.random() * 1.5, 2.8); vibraEm(atraso, [60, 40, 90]);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.06); g.gain.exponentialRampToValueAtTime(0.01, t + 2.6); s.connect(f).connect(g).connect(bAmb); s.start(t, Math.random() * 1.5, 2.8); vibraEm(atraso, [60, 40, 90]);
 }
 const vibraEm = (s: number, p: number[]) => setTimeout(() => vibra(p), s * 1000);
 function grilosLoop() { const passo = () => { if (!ligado) return; const noite = estado.hora < 6 || estado.hora >= 19.5, calmo = estado.chuva < 0.2 && estado.vento < 0.6 && !estado.interior; if (calmo && noite && ['ermo', 'floresta', 'pantano', 'base'].includes(estado.bioma)) { const n = 3 + ((Math.random() * 3) | 0); for (let i = 0; i < n; i++) setTimeout(() => tocar('grilo', { vol: 0.35, rate: 0.95 + Math.random() * 0.1 }), i * 70); } else if (calmo && !noite && estado.hora > 7 && Math.random() < 0.5 && estado.bioma !== 'industrial') tocar('passaro', { vol: 0.6, pan: Math.random() * 2 - 1, rate: 0.8 + Math.random() * 0.6 }); setTimeout(passo, 700 + Math.random() * 1800); }; passo(); }
 function musicaLoop() { const escala = [0, 3, 5, 7, 10, 12]; const passo = () => { if (!ligado) return; if (ctx && vol.mus > 0.02 && Math.random() < 0.7) { const n = 55 * Math.pow(2, escala[(Math.random() * escala.length) | 0] / 12) * (Math.random() < 0.5 ? 2 : 4), o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime; o.type = 'triangle'; o.frequency.value = n; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.08 + estado.perigo * 0.1, t + 0.04); g.gain.exponentialRampToValueAtTime(0.001, t + 2.4); o.connect(g).connect(bMus); o.start(t); o.stop(t + 2.6); } setTimeout(passo, 3500 + Math.random() * 7000 - estado.perigo * 2500); }; passo(); }
 export const setGeiger = (v: number) => { cpm = v; };
-function geigerLoop() { const passo = () => { if (!ligado) return; const taxa = Math.max(0.05, cpm / 60); if (cpm > 0) tocar('geiger', { vol: 0.6, rate: 0.9 + Math.random() * 0.3 }); setTimeout(passo, Math.min(4000, -Math.log(1 - Math.random()) / taxa * 1000)); }; passo(); }
+function geigerLoop() { const passo = () => { if (!ligado) return; const taxa = Math.max(0.05, cpm / 60); if (cpm > 0) tocar('geiger', { vol: 0.4, rate: 0.9 + Math.random() * 0.3 }); setTimeout(passo, Math.min(4000, -Math.log(1 - Math.random()) / taxa * 1000)); }; passo(); }
 export const setBatimento = (b: boolean) => { batendo = b; };
 function batimentoLoop() { const passo = () => { if (!ligado) return; if (batendo) { tocar('bat1', { vol: 1 }); setTimeout(() => tocar('bat2', { vol: 0.8 }), 190); vibra([30, 70, 30]); } setTimeout(passo, 900); }; passo(); }
 

@@ -306,7 +306,7 @@ Pedido do Uwlo: pixel art grande em tamanho normal, visão isométrica como Proj
 Base (abrigo com cama, baú, bancada, fogão, horta, tanque de chuva) → jipe → mapa → viagem (gasta combustível e horas) → saque/combate/gangues/colosso → volta. Salva sozinho (continuar no menu). Vitória: rádio de campanha → Abrigo 7.
 
 ### Testes e ferramentas
-- `npm run build` e depois `npm run smoke`: 64 verificações em Chrome headless (menu, manifesto PWA, introdução, base, movimento, estações, interação bloqueada por parede, fabricar, cozinhar, baú, sono, melhorias, XP e habilidades, conquistas, combate, climas, viagem, evento de viagem, contratos, invasão, lançamento de suprimentos, locais temáticos, salvar/continuar, morte, Modo Estudo). ~4 min em GL por software. Capturas: `node tools/smoke.mjs <pasta>`.
+- `npm run build` e depois `npm run smoke`: 77 verificações em Chrome headless (menu, manifesto PWA, introdução, base, movimento, estações, interação bloqueada por parede, fabricar, cozinhar, baú, sono, melhorias, XP e habilidades, conquistas, combate, climas, viagem, evento de viagem, contratos, invasão, lançamento de suprimentos, locais temáticos, salvar/continuar, morte, Modo Estudo). ~4 min em GL por software. Capturas: `node tools/smoke.mjs <pasta>`.
 - Para depurar no console: `window.__cinzas` (`cena()`, `store`, `ponte`) e `cena().dev('lobo', 3, 0)` cria criatura perto do jogador.
 - `tools/icones.mjs` gera `public/pwa/*`. `tools/empacotar.mjs`/`entrada.tsx` (artifact em arquivo único) são **legado: não usar mais**.
 
@@ -340,4 +340,23 @@ Base (abrigo com cama, baú, bancada, fogão, horta, tanque de chuva) → jipe �
 ### Pendências / ideias
 - Testar em celular real (Ultra gasta mais GPU; Alta/Média são a alternativa) e ajustar o equilíbrio (XP, preço das melhorias, tamanho das invasões).
 - Comerciante, armadilhas no abrigo, mais eventos, arte em 2× de resolução (sprites supersampled) se quiser ainda mais detalhe.
+
+## 17. Controles, HUD, som, chuva e mochila — revisão de UX (31/out/2026)
+
+**Feedback do Uwlo:** controles ruins (quer dinâmico), sons altos, chuva atrapalha a visão, craft e mochila sem inovação (quer algo tipo Resident Evil 4, sem o jeito antigo de peso), botões de correr/andar devagar que precisam ficar apertados são ruins, repensar controles e HUD com psicologia/UX.
+
+### Princípios aplicados
+- **Lei de Fitts e zona do polegar:** só o que se toca fica nos cantos de baixo (stick, agir, atalhos); informação (vitais, relógio, rastreador) fica no topo e não captura toque, exceto o rastreador (abre o Diário).
+- **Carga cognitiva (Hick/Miller):** de ~9 controles fixos para 3: stick, botão de agir contextual e atalhos. Correr/furtivo viraram *gesto* (força do empurrão), não botão.
+- **Feedback e affordance:** o stick mostra as zonas (verde tracejado = furtivo, laranja = borda de correr), o dedo muda de cor e vibra ao trocar de modo; o botão de agir só aparece com alvo e o ícone muda conforme a ação; o atalho certo pulsa quando a necessidade aparece (sede, fome, cura, antirrad, lanterna à noite).
+- **Divulgação progressiva e atenção guiada:** vitais discretos quando >70%; acendem ao mudar (3 s) ou ficar críticos; o rastreador recolhe após 9 s sem mudança; a barra de atalhos esmaece após 6 s.
+- **Mochila = decisões, não contabilidade:** o espaço (grade 8×4, +2 linhas com a mochila grande) substitui o peso: peças de tamanhos diferentes (rifle 5×2, pé de cabra 1×3…), arrastar, girar, **Organizar**; mochila e colete são vestidos (não ocupam espaço); o que não cabe vai ao baú. Bancada em cartões com ingredientes em ícones, filtro "Prontas" e o resultado indo direto para a grade.
+- **Som e clima:** níveis de áudio ~−10 dB (config migra para `v:4`); a chuva é clima/atmosfera: o alcance de visão cai só 3% (neblina e poeira continuam reduzindo), menos escuridão e menos gotas.
+
+### Código
+`components/Controles.tsx` (stick dinâmico com histerese), `components/Hud.tsx` (VRow, useRecente, atalhos urgentes, agir contextual), `components/Mochila.tsx` + `game/sistemas/grade.ts` (grade pura + `sincGrade()` que mantém `inv` e `grade` iguais), `components/Bancada.tsx`. `inv` continua a verdade do jogo; `grade` guarda a posição.
+
+### Pendências / ideias
+- Combinar itens arrastando um sobre o outro (estilo RE4), roda de atalhos configurável, mais tamanhos/pilhas e arma/ícone próprios na grade.
+- Ajustar `ZONA_*` do stick (limites 0,3/0,46/0,76/0,9 em `Controles.tsx`) depois de testar no celular.
 
