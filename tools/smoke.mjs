@@ -149,18 +149,21 @@ try {
   ok('baú devolve o item', (i2.bandagem ?? 0) === (d.bandagem ?? 0));
   await ev(() => { window.__cinzas.cena().s.sede = 30; window.__cinzas.store.setState({ sede: 30 }); }); await ev(() => window.__cinzas.ponte.cmd.usarRapido('agua')); await espera(1800); // usar item leva 1 s de ação
   ok('beber água repõe a sede', (await ev(() => window.__cinzas.cena().s.sede)) > 30);
-  const m0 = (await estado()).minutos; await ev(() => window.__cinzas.ponte.cmd.dormir(1)); await espera(1500);
-  ok('dormir faz o tempo passar', (await estado()).minutos >= m0 + 50, `${Math.round(m0)} → ${Math.round((await estado()).minutos)} min`);
+  const m0 = (await estado()).minutos; await ev(() => window.__cinzas.ponte.cmd.dormir(1));
+  const dormiu = await ate(m => window.__cinzas.store.getState().minutos >= m + 50, 12000, m0); await espera(900); // espera o salto da hora e o fim do fade
+  ok('dormir faz o tempo passar', dormiu, `${Math.round(m0)} → ${Math.round((await estado()).minutos)} min`);
   await ev(() => window.__cinzas.store.setState({ painel: null }));
 
   // 4b2. mochila em grade (estilo RE4): peças com posição, espaço no lugar de peso, arrastar, girar, organizar
   const consistente = () => ev(() => { const t = window.__cinzas.store.getState(), soma = {}; for (const p of t.grade) soma[p.id] = (soma[p.id] ?? 0) + p.q; return Object.entries(t.inv).every(([id, q]) => ['mochila', 'colete'].includes(id) || soma[id] === q) && Object.entries(soma).every(([id, q]) => t.inv[id] === q); });
   ok('a mochila é uma grade de peças e bate com o inventário', (await ev(() => window.__cinzas.store.getState().grade.length)) > 0 && await consistente());
-  await ev(() => { const st = window.__cinzas.store, i = st.getState().inv; st.setState({ inv: { ...i, rifle: 6 } }); }); await espera(1500);
+  await ev(() => { const st = window.__cinzas.store, i = st.getState().inv; st.setState({ inv: { ...i, rifle: 6 } }); });
+  await ate(() => { const t = window.__cinzas.store.getState(), g = t.grade.filter(p => p.id === 'rifle').reduce((a, p) => a + p.q, 0); return g === (t.inv.rifle ?? 0) && (t.inv.rifle ?? 0) + (t.bau.rifle ?? 0) === 6; }, 10000); // o ajuste da grade roda a cada 1 s de jogo
   const sobra = await ev(() => { const t = window.__cinzas.store.getState(); return { grade: t.grade.filter(p => p.id === 'rifle').reduce((a, p) => a + p.q, 0), inv: t.inv.rifle ?? 0, bau: t.bau.rifle ?? 0 }; });
   ok('o que não cabe na grade vai para o baú (nada some)', sobra.grade === sobra.inv && sobra.inv + sobra.bau === 6 && sobra.bau >= 1, JSON.stringify(sobra));
-  await ev(() => { const st = window.__cinzas.store, t = st.getState(), i = { ...t.inv }, b = { ...t.bau }; delete i.rifle; delete b.rifle; st.setState({ inv: i, bau: b }); }); await espera(1500);
-  ok('a grade volta a bater depois de tirar itens', await consistente());
+  await ev(() => { const st = window.__cinzas.store, t = st.getState(), i = { ...t.inv }, b = { ...t.bau }; delete i.rifle; delete b.rifle; st.setState({ inv: i, bau: b }); });
+  let batendo = false; for (let k = 0; k < 40 && !batendo; k++) { batendo = await consistente(); if (!batendo) await espera(250); }
+  ok('a grade volta a bater depois de tirar itens', batendo);
   await ev(() => window.__cinzas.store.setState({ painel: 'inv' })); await espera(500); await foto('2c-mochila');
   ok('a mochila não mostra peso em kg', !/\d\s*kg/i.test(await ev(() => document.body.innerText)));
   const arrastou = await ev(async () => {
@@ -212,7 +215,8 @@ try {
   const morreu = await ate(id => { const k = window.__cinzas.cena(); const e = k.ents.find(x => x.id === id); return !e || !e.vivo; }, 14000, idZ);
   await ev(() => { window.__cinzas.ponte.entrada.atacar = false; });
   ok('o jogador mata um irradiado com a arma branca', morreu);
-  await espera(700); ok('o abate é contado', (await estado()).abates > abates0);
+  const contou = await ate(a0 => window.__cinzas.store.getState().abates > a0, 8000, abates0); // o HUD espelha a cena a cada 0,1 s de jogo; em máquina lenta isso passa de 700 ms
+  ok('o abate é contado', contou, JSON.stringify({ antes: abates0, depois: (await estado()).abates }));
   await foto('3-combate');
 
   // 6. clima (todos os estados, sem exceção)
