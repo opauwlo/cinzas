@@ -306,7 +306,7 @@ Pedido do Uwlo: pixel art grande em tamanho normal, visão isométrica como Proj
 Base (abrigo com cama, baú, bancada, fogão, horta, tanque de chuva) → jipe → mapa → viagem (gasta combustível e horas) → saque/combate/gangues/colosso → volta. Salva sozinho (continuar no menu). Vitória: rádio de campanha → Abrigo 7.
 
 ### Testes e ferramentas
-- `npm run build` e depois `npm run smoke`: 33 verificações em Chrome headless (menu, manifesto PWA, base, movimento, estações, fabricar, cozinhar, baú, sono, combate, climas, viagem, saque, salvar/continuar, morte, Modo Estudo). ~3 min em GL por software. Capturas: `node tools/smoke.mjs <pasta>`.
+- `npm run build` e depois `npm run smoke`: 64 verificações em Chrome headless (menu, manifesto PWA, introdução, base, movimento, estações, interação bloqueada por parede, fabricar, cozinhar, baú, sono, melhorias, XP e habilidades, conquistas, combate, climas, viagem, evento de viagem, contratos, invasão, lançamento de suprimentos, locais temáticos, salvar/continuar, morte, Modo Estudo). ~4 min em GL por software. Capturas: `node tools/smoke.mjs <pasta>`.
 - Para depurar no console: `window.__cinzas` (`cena()`, `store`, `ponte`) e `cena().dev('lobo', 3, 0)` cria criatura perto do jogador.
 - `tools/icones.mjs` gera `public/pwa/*`. `tools/empacotar.mjs`/`entrada.tsx` (artifact em arquivo único) são **legado: não usar mais**.
 
@@ -317,4 +317,27 @@ Base (abrigo com cama, baú, bancada, fogão, horta, tanque de chuva) → jipe �
 - Testar em celular de verdade (desempenho, toque, áudio) e ajustar `cfg.escala`/qualidade.
 - Habilidades/XP, coquetel molotov, evento de lançamento de suprimentos, mais eventos de viagem, mais biomas, multiplayer P2P (§8).
 - Modo Estudo: `executarMorte` usa uma distância placeholder (143) para a "quase-vitória" — trocar por distância real ao Abrigo 7.
+
+## 16. Camada "sempre instiga" + acabamento (sessão de Code, 31/out/2026)
+
+**Pedido:** mundo completo, gameplay que sempre instiga, cara de produto finalizado. Depois: *bug* de interagir através de paredes e *gráfico muito pixelado*.
+
+### O que entrou
+- **Progressão** (`game/sistemas/progresso.ts`, `game/dados/meta.ts`): XP por abate/saque/fabricar/explorar/contrato; níveis (50 + 40·(n−1) XP); a cada nível **1 habilidade entre 3** (12 habilidades com efeito real: dano, ruído, fome/sede, radiação, combustível, saque, visão noturna). O painel abre sozinho num momento calmo (sem inimigo por perto, sem viagem em curso).
+- **Contratos** (`game/sistemas/contratos.ts`): sempre 3 (abater, saquear, visitar, trazer, fabricar, sobreviver), por seed; paga no abrigo (item vai ao baú) + XP. Aparece no HUD (linha ◆ sob o OBJ) e no Diário (abas Objetivos / Contratos / Habilidades / Conquistas).
+- **Eventos**: `game/dados/eventos.ts` (9 encontros de estrada com decisão, 45% por viagem; `emboscada` persegue na chegada) e `game/sistemas/diretor.ts` (**lançamento de suprimentos** com fumaça + seta no HUD + guardas; **invasão ao abrigo** à noite a partir do dia 2, com aviso de rádio e alarme; **saque do baú** se ficar > 1 dia fora; a **muralha** reduz tudo isso).
+- **Melhorias do abrigo** (bancada, muralha, horta, tanque, cama) na bancada → "Melhorias do abrigo"; a bancada nível 2/3 libera receitas (kit médico, antirradiação, bateria, facão, pistola e escopeta artesanais).
+- **Mundo**: 4 locais temáticos no mapa (Posto Km 40, Hospital São Judas, Torre de Rádio, Posto Militar 14) = bioma-base + `TEMAS` (mesmo gerador).
+- **Conquistas** (24, persistem entre vidas em `cinzas.meta`), **dificuldade** (Calmo/Normal/Brutal no menu), **introdução** na primeira vez, **Como jogar**, dicas na tela de carga, sons novos (nível, conquista, alarme, sinal).
+
+### Correções pedidas pelo Uwlo
+- **Interação através de parede**: `Cena.alcancavel(it)` exige caminho livre (sem parede, janela, cerca, porta fechada ou peça sólida; a própria peça do objeto não conta). Vale para destaque, botão, toque no objeto e execução. Cada interativo tem `pegada` (casas da própria peça).
+- **Pixelado demais**: `criarJogo` usa um número **inteiro de pixels do aparelho** por pixel de arte (padrão **Ultra** ≈ 1 px CSS; opções Alta 1,5 · Média 2 · Leve 3 em Config. → "Densidade de pixels"). Névoa e clima têm resolução própria (`fz`/`cz`), o chão carrega em raio maior (`fluxoChunks`) e o toque no objeto usa ~44 px CSS. A config antiga é migrada (`v: 3`).
+
+### Ganchos de teste (não usar em jogo)
+`cena().devXp(n)`, `cena().devForcar = 'raid' | 'airdrop'`, `cena().devEv = '<id do evento>'`, `cena().devIrPara(interativo)`, `window.__semEventos = true` (desliga o sorteio de eventos de viagem).
+
+### Pendências / ideias
+- Testar em celular real (Ultra gasta mais GPU; Alta/Média são a alternativa) e ajustar o equilíbrio (XP, preço das melhorias, tamanho das invasões).
+- Comerciante, armadilhas no abrigo, mais eventos, arte em 2× de resolução (sprites supersampled) se quiser ainda mais detalhe.
 

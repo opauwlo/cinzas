@@ -12,6 +12,7 @@ import { useJogo } from '../store';
 import { sfx } from '../audio';
 import { T, idx, dentro, W, H } from '../zona';
 import { mostrarCadaver } from './acoes';
+import { registrar, ganharXp, pk, DIF, dif } from './progresso';
 
 export type Ent = {
   id: number; sid: number | null; arq: Arq; rec: Record<string, unknown> & { falta?: string[]; arma?: string }; x: number; y: number; z: number; ang: number; hp: number; maxHp: number;
@@ -35,7 +36,7 @@ const ehRanged = (e: Ent) => e.arq.ia === 'ranged' && ['pistola', 'escopeta', 'r
 
 // ---------------------------------------------------------------- dano
 export function machucarJogador(c: Cena, dano: number, sangra: number, de?: { x: number; y: number }) {
-  if (c.morto) return; const st = useJogo.getState(), colete = st.inv.colete ? 0.75 : 1; dano *= colete; c.s.hp -= dano; c.jog.dano = 0.22;
+  if (c.morto) return; const st = useJogo.getState(), colete = st.inv.colete ? 0.75 : 1; dano *= colete * (pk(c.s, 'pele') ? 0.85 : 1) * DIF.dano[dif(c.s)]; c.s.hp -= dano; c.jog.dano = 0.22;
   if (Math.random() < sangra && !c.s.sangra) { c.s.sangra = true; st.toast('Você está sangrando', '#c9561f'); }
   c.texto(c.jog.x, c.jog.y - 0.3, '-' + Math.round(dano), '#d9472b'); c.cameras.main.shake(140, 0.006); sfx.dano(); useJogo.setState({ danoTs: Date.now() });
   if (st.cfg.gore) { const [px, py] = proj(c.jog.x, c.jog.y, 18), dx = de ? c.jog.x - de.x : 0, dy = de ? c.jog.y - de.y : 0, m = Math.hypot(dx, dy) || 1; c.part.sangue(px, py, 18, dx / m, dy / m, 5); }
@@ -50,12 +51,13 @@ export function ferir(c: Cena, e: Ent, dano: number, de: number, corta = false) 
   e.lvl = -3; c.time.delayedCall(90, () => { e.lvl = -1; });
   // desmembramento (lâminas) em humanoides
   if (corta && e.arq.modelo === 'humano' && st.cfg.gore && e.arq.id !== 'colosso' && Math.random() < Math.min(0.3, 0.08 + dano / 140)) {
-    const falta = (e.rec.falta ?? []).slice(), livres = LIMBS.filter(l => !falta.includes(l)); if (livres.length) { const l = livres[Math.floor(Math.random() * livres.length)]; falta.push(l); e.rec = { ...e.rec, falta }; e.mult = multVelocidade(e.arq, e.rec); const [px, py] = proj(e.x, e.y, 14); c.part.sangue(px, py, 14, Math.cos(de), Math.sin(de), 14); st.toast(l.startsWith('braco') ? 'Braço decepado' : 'Perna decepada', '#c9561f'); }
+    const falta = (e.rec.falta ?? []).slice(), livres = LIMBS.filter(l => !falta.includes(l)); if (livres.length) { const l = livres[Math.floor(Math.random() * livres.length)]; falta.push(l); e.rec = { ...e.rec, falta }; e.mult = multVelocidade(e.arq, e.rec); const [px, py] = proj(e.x, e.y, 14); c.part.sangue(px, py, 14, Math.cos(de), Math.sin(de), 14); st.toast(l.startsWith('braco') ? 'Braço decepado' : 'Perna decepada', '#c9561f'); registrar(c, 'membros'); }
   }
   if (e.hp <= 0) matar(c, e);
 }
 function matar(c: Cena, e: Ent) {
   e.vivo = false; e.estado = 'morto'; e.morrT = 0; e.atk = 0; c.s.abates++; if (e.sid !== null) c.ze.abatidos.push(e.sid);
+  registrar(c, 'abate', 1, { arq: e.arq.id }); if (e.arq.id === 'colosso') registrar(c, 'colossos'); if (['saqueador', 'filho', 'miliciano'].includes(e.arq.id)) registrar(c, 'gangue'); ganharXp(c, e.arq.xp, false);
   e.som.setAlpha(0); sfx.voz(e.arq.voz, 0, 0, 0.5); c.cadaveres.push(e); if (c.cadaveres.length > 40) { const o = c.cadaveres.shift()!; o.remover = true; o.spr.destroy(); o.som.destroy(); }
   if (e.arq.drops.length || e.arq.ia === 'passivo') mostrarCadaver(c, e);
 }
@@ -69,17 +71,17 @@ export function atacarJogador(c: Cena) {
     const mun = arma.municao!; if ((c.s.balas[mun] ?? 0) <= 0) { if (performance.now() - (J as unknown as { av?: number }).av! > 900 || (J as unknown as { av?: number }).av === undefined) { (J as unknown as { av?: number }).av = performance.now(); sfx.seco(); useJogo.getState().toast('Sem munição', '#d9a02b'); } c.cdAtaque = 0.3; return; }
     c.s.balas[mun]--; c.cdAtaque = arma.cd; J.atk = J.atkDur = 0.2; const n = arma.pelotas ?? 1;
     for (let p = 0; p < n; p++) {
-      const a = J.ang + (Math.random() - 0.5) * (n > 1 ? 0.3 : 0.07), lim = c.obstaculoAte(J.x, J.y, a, arma.alcance); let alvo: Ent | null = null, melhor = lim;
+      const a = J.ang + (Math.random() - 0.5) * (n > 1 ? 0.3 : 0.07) * (pk(c.s, 'mira') ? 0.6 : 1), lim = c.obstaculoAte(J.x, J.y, a, arma.alcance); let alvo: Ent | null = null, melhor = lim;
       for (const e of c.ents) { if (!e.vivo) continue; const dx = e.x - J.x, dy = e.y - J.y, pr = dx * Math.cos(a) + dy * Math.sin(a); if (pr < 0 || pr > melhor) continue; const pe = Math.abs(-Math.sin(a) * dx + Math.cos(a) * dy); if (pe < e.arq.raio + 0.14) { alvo = e; melhor = pr; } }
       const fim = alvo ? melhor : lim, [x0, y0] = proj(J.x + Math.cos(a) * 0.8, J.y + Math.sin(a) * 0.8, 18), [x1, y1] = proj(J.x + Math.cos(a) * fim, J.y + Math.sin(a) * fim, 18); c.tracers.push({ x0, y0, x1, y1, t: 0, cor: 0xffe0a0 });
-      if (alvo) { ferir(c, alvo, arma.dano, a); sfx.acerto(); c.hitstop = 0.04; }
+      if (alvo) { ferir(c, alvo, arma.dano * (pk(c.s, 'mira') ? 1.25 : 1), a); sfx.acerto(); c.hitstop = 0.04; }
     }
     c.flash = 0.14; const [fx, fy] = proj(J.x + Math.cos(J.ang) * 0.9, J.y + Math.sin(J.ang) * 0.9, 18); c.clarao.setPosition(Math.round(fx), Math.round(fy)).setVisible(true); const [px, py] = proj(J.x, J.y, 18); c.part.faisca(fx, fy, 14, 5); void px; void py;
     sfx.tiro(arma.id); c.ruido(J.x, J.y, arma.ruido); c.cameras.main.shake(90, arma.id === 'escopeta' ? 0.007 : 0.004);
   } else {
     if (c.s.stamina < arma.custo + 1) { c.cdAtaque = 0.6; return; } c.s.stamina -= arma.custo; c.cdAtaque = arma.cd; J.atk = J.atkDur = Math.min(0.34, arma.cd * 0.85); sfx.swing(); c.ruido(J.x, J.y, arma.ruido);
     const a0 = J.ang; c.time.delayedCall(J.atkDur * 0.45 * 1000, () => {
-      let bateu = false; for (const e of c.ents) { if (!e.vivo || e.arq.ia === 'voo') continue; const dx = e.x - J.x, dy = e.y - J.y, d = Math.hypot(dx, dy); if (d < arma.alcance + e.arq.raio && Math.abs(ang(Math.atan2(dy, dx) - a0)) < 1.0 && c.temLOS(J.x, J.y, e.x, e.y)) { ferir(c, e, arma.dano * (0.85 + Math.random() * 0.3), a0, !!arma.corta); bateu = true; } }
+      let bateu = false; for (const e of c.ents) { if (!e.vivo || e.arq.ia === 'voo') continue; const dx = e.x - J.x, dy = e.y - J.y, d = Math.hypot(dx, dy); if (d < arma.alcance + e.arq.raio && Math.abs(ang(Math.atan2(dy, dx) - a0)) < 1.0 && c.temLOS(J.x, J.y, e.x, e.y)) { ferir(c, e, arma.dano * (0.85 + Math.random() * 0.3) * (pk(c.s, 'forte') ? 1.25 : 1), a0, !!arma.corta); bateu = true; } }
       if (bateu) { sfx.acerto(); c.hitstop = 0.055; c.cameras.main.shake(100, 0.005); }
     });
   }

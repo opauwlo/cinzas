@@ -3,6 +3,8 @@ import { useJogo, horaStr, OBJETIVOS, pesoInv, pesoMax } from '../game/store';
 import { ponte } from '../game/ponte';
 import { ITENS, armaDe } from '../game/dados/itens';
 import { NOME_CLIMA } from '../game/sistemas/clima';
+import { xpNivel } from '../game/sistemas/progresso';
+import { pronto, progresso } from '../game/sistemas/contratos';
 import Ico, { ic } from './Ico';
 
 const press = (fn: () => void) => ({ onPointerDown: (e: React.PointerEvent) => { e.stopPropagation(); fn(); } });
@@ -34,7 +36,7 @@ export function Hud() {
   if (s.stamina < 25) moodles.push({ k: 'stam', icone: ic('lorc', 'sprint'), n: 1 });
   if (s.furtivo) moodles.push({ k: 'furt', icone: ic('skoll', 'footsteps'), n: 1 });
   const q = (id: string) => s.inv[id] ?? 0, comida = q('carne_cozida') + q('enlatado') + q('pao') + q('legume') + q('carne_crua'), agua = q('agua') + q('agua_suja'), cura = q('bandagem') + q('kit'), arma = s.arma ? ITENS[s.arma] : null, am = armaDe(s.arma);
-  const peso = pesoInv(s.inv), pm = pesoMax(s.inv);
+  const peso = pesoInv(s.inv), pm = pesoMax(s.inv), ctPronto = s.contratos.find(pronto), ct = ctPronto ?? s.contratos[0];
   const slots = [
     { k: 'arma', ico: arma ? arma.icone : ic('lorc', 'bowie-knife'), n: am.alvo === 'tiro' ? (s.balas[am.municao ?? 'municao'] ?? 0) : -1, fn: () => ponte.cmd?.trocarArma(), cor: arma ? '#cfc7ae' : '#565c64', on: false, t: 'Q' },
     { k: 'lanterna', ico: ic('delapouite', 'flashlight'), n: s.lanterna.tem ? Math.round(s.lanterna.bat) : -1, fn: () => ponte.cmd?.lanterna(), cor: s.lanterna.ligada ? '#8fe36a' : s.lanterna.tem ? '#cfc7ae' : '#565c64', on: s.lanterna.ligada, t: 'F' },
@@ -50,15 +52,18 @@ export function Hud() {
       <div className="vitais vidro degrau">
         <Row k="vida" ico={ic('delapouite', 'heart-beats')} v={s.hp} num={String(Math.max(0, Math.ceil(s.hp)))} /><Row k="fome" ico={ic('delapouite', 'stomach')} v={s.fome} /><Row k="sede" ico={ic('sbed', 'water-drop')} v={s.sede} /><Row k="stam" ico={ic('lorc', 'sprint')} v={s.stamina} />
         {(s.rad > 1 || s.cpm > 60) && <Row k="rad" ico={ic('lorc', 'radioactive')} v={s.rad} num={String(Math.round(s.rad))} />}
+        <div className={`xpl ${s.pontos > 0 ? 'pts' : ''}`}><b>NV{s.nivel}</b><div className="seg" style={{ ['--p' as string]: pct((s.xp / xpNivel(s.nivel)) * 100) }}><i /></div>{s.pontos > 0 && <b>★{s.pontos}</b>}</div>
       </div>
-      <div className="moodles" style={{ top: `calc(${(s.rad > 1 || s.cpm > 60 ? 92 : 78) * s.cfg.ui}px + var(--st))` }}>{moodles.map(m => <div key={m.k} className={`moodle n${m.n} ${m.rad ? 'rad' : ''}`}><Ico src={m.icone} n={18} cor={m.n === 2 ? '#ff8a70' : m.rad ? '#8fe36a' : '#d99a2b'} /></div>)}</div>
+      <div className="moodles" style={{ top: `calc(${(s.rad > 1 || s.cpm > 60 ? 104 : 90) * s.cfg.ui}px + var(--st))` }}>{moodles.map(m => <div key={m.k} className={`moodle n${m.n} ${m.rad ? 'rad' : ''}`}><Ico src={m.icone} n={18} cor={m.n === 2 ? '#ff8a70' : m.rad ? '#8fe36a' : '#d99a2b'} /></div>)}</div>
       <div className="relogio vidro degrau"><div className="h">{horaStr(s.minutos)}</div><div className="s"><span>DIA {dia}</span><IcoClima tipo={s.clima.tipo} noite={noite} /><span>{NOME_CLIMA[s.clima.tipo]}</span></div></div>
-      <div className="obj vidro degrau"><b><em>OBJ</em> {obj.titulo}</b><div className="seg" style={{ ['--p' as string]: pct(s.objProg * 100) }}><i /></div></div>
+      <div className="obj vidro degrau"><b><em>OBJ</em> {obj.titulo}</b><div className="seg" style={{ ['--p' as string]: pct(s.objProg * 100) }}><i /></div>{ct && <b className={`ct ${ctPronto ? 'ok' : ''}`}>◆ {ctPronto ? 'Contrato pronto: receba no abrigo' : `${ct.titulo} ${progresso(ct)}/${ct.qtd}`}</b>}</div>
       <div className="topo-dir">
+        {s.pontos > 0 && <button className="btn qbtn pisca" aria-label="Habilidades" {...press(() => useJogo.setState({ painel: 'perk' }))}><b style={{ font: "700 13px var(--f-ui)", color: 'var(--fosf)' }}>★{s.pontos}</b></button>}
         <button className="btn qbtn" aria-label="Mapa da zona" {...press(() => useJogo.setState({ painel: 'mapaZona' }))}><Ico src={ic('lorc', 'radar-sweep')} n={22} /></button>
         <button className="btn qbtn" aria-label="Mochila" {...press(() => useJogo.setState({ painel: 'inv' }))}><Ico src={ic('delapouite', 'backpack')} n={22} /><small style={{ color: peso > pm * 0.9 ? '#e0553f' : undefined }}>{Math.round(peso)}</small></button>
         <button className="btn qbtn" aria-label="Pausa" {...press(() => useJogo.setState({ painel: 'pausa' }))}><svg width="14" height="14" viewBox="0 0 8 8" shapeRendering="crispEdges"><rect x="1" y="0" width="2" height="8" fill="#cfc7ae" /><rect x="5" y="0" width="2" height="8" fill="#cfc7ae" /></svg></button>
       </div>
+      {s.seta && s.painel === null && <Seta dx={s.seta.dx} dy={s.seta.dy} d={s.seta.d} />}
       <div className="toasts">{s.toasts.map(t => <div key={t.id} className="toast" style={{ color: t.cor }}>{t.texto}</div>)}</div>
       {s.acao && <div className="acao"><div className="r">{s.acao.rotulo}</div><div className="seg" style={{ ['--p' as string]: pct(s.acao.p * 100) }}><i /></div></div>}
       {s.dica && <div className="dica">{s.dica}</div>}
@@ -71,6 +76,14 @@ export function Hud() {
       {s.cfg.fps && <div className="fpsc">{s.fps} fps</div>}
     </div>
   );
+}
+
+/** seta na borda da tela apontando para o lançamento de suprimentos (some quando o alvo está à vista) */
+function Seta({ dx, dy, d }: { dx: number; dy: number; d: number }) {
+  const vw = typeof window === 'undefined' ? 400 : window.innerWidth, vh = typeof window === 'undefined' ? 800 : window.innerHeight, ex = vw / 2 - 40, ey = vh / 2 - 150;
+  const k = Math.min(ex / Math.max(1e-6, Math.abs(dx)), ey / Math.max(1e-6, Math.abs(dy))); if (k >= 1) return null;
+  const x = vw / 2 + dx * k, y = vh / 2 + dy * k, a = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+  return <div className="seta" style={{ left: x - 17, top: y - 17 }}><i style={{ transform: `rotate(${a}deg)` }} /><b>{d} m</b></div>;
 }
 
 export function Sobreposicoes() {

@@ -8,6 +8,7 @@ export type Cmd = {
   tocarMundo(x: number, y: number): boolean;
   craft(id: string): void; cozinhar(id: string): void; dormir(horas: number): void; bauMover(id: string, qtd: number, paraBau: boolean): void;
   viajar(dest: string): void; salvar(): void; atacarBotao(): void;
+  eventoEscolher(i: number): void; eventoFim(): void; escolherPerk(id: string): void; receberContrato(id: number): void; melhorar(id: string): void;
 };
 export const ponte: { entrada: Entrada; cmd: Cmd | null; ref: unknown } = {
   entrada: { mx: 0, my: 0, ax: 0, ay: 0, mira: false, atacar: false, correr: false, furtivo: false, tap: 0 },

@@ -20,6 +20,7 @@ pg.on('pageerror', e => erros.push('PAGEERR ' + String(e.stack ?? e).slice(0, 40
 pg.on('console', m => { if (m.type() === 'error') erros.push('CONERR ' + m.text().slice(0, 300)); });
 
 const espera = ms => new Promise(r => setTimeout(r, ms));
+await pg.evaluateOnNewDocument(() => { window.__semEventos = true; }); // viagens sem sorteio de evento (os eventos são testados à parte, de forma forçada)
 const resultados = [];
 const ok = (nome, cond, detalhe = '') => { resultados.push({ nome, ok: !!cond }); console.log(`${cond ? 'OK  ' : 'FALHA'}  ${nome}${detalhe ? '  — ' + detalhe : ''}`); };
 const foto = async nome => { if (capturas) { await mkdir(capturas, { recursive: true }); await pg.screenshot({ path: join(capturas, nome + '.png') }); } };
@@ -28,6 +29,7 @@ const ate = async (fn, ms = 20000, ...a) => { try { await pg.waitForFunction(fn,
 const toque = rx => ev(s => { const b = [...document.querySelectorAll('button')].find(x => new RegExp(s, 'i').test(x.textContent)); if (!b) return false; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.click(); return true; }, rx);
 const jogoPronto = (ms = 90000) => ate(() => window.__cinzas && window.__cinzas.store.getState().carga >= 1, ms);
 const cena = fn => ev(fn);
+const limpaPaineis = async () => { for (let i = 0; i < 8; i++) { const p = await ev(() => window.__cinzas.store.getState().painel); if (!p) return; if (p === 'perk') await toque('^Escolher'); else await ev(() => window.__cinzas.store.setState({ painel: null })); await espera(250); } };
 const estado = () => ev(() => { const s = window.__cinzas.store.getState(); return { zonaId: s.zonaId, tela: s.tela, painel: s.painel, hp: s.hp, abates: s.abates, combustivel: s.combustivel, carga: s.carga, minutos: s.minutos }; });
 
 let codigo = 0;
@@ -40,12 +42,17 @@ try {
   const pwa = await pg.evaluate(async u => { const r = await fetch(u + 'manifest.webmanifest').catch(() => null); return r && r.ok ? (await r.json()).name : null; }, url);
   ok('manifesto PWA publicado', !!pwa, String(pwa));
   await foto('1-menu');
+  ok('"Como jogar" abre e fecha', await toque('Como jogar') && await ate(() => /como jogar/i.test(document.body.innerText), 4000) && await toque('^Fechar') && await ate(() => /sobreviver|nova run/i.test(document.body.innerText), 4000));
+  ok('"Config." abre e fecha', await toque('^Config') && await ate(() => /configura/i.test(document.body.innerText), 4000) && await toque('^Fechar') && await ate(() => /sobreviver|nova run/i.test(document.body.innerText), 4000));
 
   // 2. nova run
   ok('toque em "Sobreviver"', await toque('Sobreviver|Nova run'));
   const t0 = Date.now(); ok('mundo da base carregou', await jogoPronto(), `${Date.now() - t0} ms`);
+  ok('a introdução aparece na primeira vez', await ate(() => window.__cinzas.store.getState().painel === 'intro', 8000)); await foto('2a-intro');
+  ok('dá para pular a introdução', await toque('pular introdução') && await ate(() => window.__cinzas.store.getState().painel === null, 4000));
   let s = await estado(); ok('começa na base', s.zonaId === 'base', JSON.stringify(s));
   await espera(1500); await foto('2-base');
+  ok('o canvas usa pixels inteiros do aparelho (grade uniforme)', await ev(() => { const c = document.querySelector('canvas'), r = (parseFloat(c.style.width) * devicePixelRatio) / c.width; return Math.abs(r - Math.round(r)) < 0.01 && r >= 2; }));
 
   // 3. movimento (joystick virtual)
   const p0 = await cena(() => { const j = window.__cinzas.cena().jog; return [j.x, j.y]; });
@@ -57,12 +64,22 @@ try {
   for (const [rx, painel] of [['bancada', 'craft'], ['baú do abrigo', 'bau'], ['jipe', 'mapa'], ['^dormir', 'dormir'], ['fogão', 'cozinha']]) {
     const achou = await ev(rx => {
       const k = window.__cinzas.cena(), it = k.interativos.find(i => new RegExp(rx, 'i').test(i.rot)); if (!it) return false;
-      k.jog.x = it.x; k.jog.y = it.y + 0.6; k.alvoInter = it; window.__cinzas.store.setState({ painel: null }); window.__cinzas.ponte.cmd.interagir(); return true;
+      k.devIrPara(it); k.alvoInter = it; window.__cinzas.store.setState({ painel: null }); window.__cinzas.ponte.cmd.interagir(); return true;
     }, rx);
     const abriu = achou && await ate(p => window.__cinzas.store.getState().painel === p, 4000, painel);
     ok(`estação "${painel}" abre o painel`, abriu, achou ? '' : 'interativo não encontrado');
     await ev(() => window.__cinzas.store.setState({ painel: null }));
   }
+
+  // 4a. interação não atravessa parede: o baú está dentro da casa
+  const paredes = await ev(() => {
+    const k = window.__cinzas.cena(), it = k.interativos.find(i => /baú do abrigo/i.test(i.rot)); if (!it) return null; const r0 = it.r; it.r = 8; const out = {};
+    k.jog.x = it.x; k.jog.y = 57.4; out.fora = k.alcancavel(it); out.alvoFora = k.alvoProx()?.rot ?? null;          // do lado de fora da parede norte
+    k.jog.x = it.x; k.jog.y = 62.8; out.dentro = k.alcancavel(it);                                                    // dentro da casa
+    k.jog.x = 38.5; k.jog.y = 62.4; out.perto = k.alcancavel(it); it.r = r0; k.devIrPara(it); return out;
+  });
+  ok('de fora da parede NÃO dá para alcançar o baú', paredes && paredes.fora === false && paredes.alvoFora !== 'Abrir baú do abrigo', JSON.stringify(paredes));
+  ok('dentro da casa o baú é alcançável', paredes && paredes.dentro === true && paredes.perto === true, JSON.stringify(paredes));
 
   // 4b. economia da base: fabricar, cozinhar, baú, uso rápido e sono
   const inv = () => ev(() => ({ ...window.__cinzas.store.getState().inv }));
@@ -82,6 +99,29 @@ try {
   ok('dormir faz o tempo passar', (await estado()).minutos >= m0 + 50, `${Math.round(m0)} → ${Math.round((await estado()).minutos)} min`);
   await ev(() => window.__cinzas.store.setState({ painel: null }));
 
+  // 4c. melhorias do abrigo e receitas de bancada avançada
+  await ev(() => { const st = window.__cinzas.store, i = st.getState().inv; st.setState({ inv: { ...i, sucata: 14, madeira: 8, garrafa: 3, tecido: 4, alcool: 2, bandagem: 3 } }); });
+  await ev(() => window.__cinzas.ponte.cmd.melhorar('tanque')); await espera(300);
+  ok('melhorar o tanque gasta materiais e sobe de nível', (await ev(() => window.__cinzas.store.getState().mel.tanque)) === 1);
+  const antesBancada = await ev(() => window.__cinzas.store.getState().inv.kit ?? 0); await ev(() => window.__cinzas.ponte.cmd.craft('r_kit')); await espera(200);
+  ok('receita avançada só funciona depois da melhoria da bancada', (await ev(() => window.__cinzas.store.getState().inv.kit ?? 0)) === antesBancada);
+  await ev(() => window.__cinzas.ponte.cmd.melhorar('bancada')); await espera(300);
+  await ev(() => window.__cinzas.ponte.cmd.craft('r_kit')); await espera(200);
+  ok('bancada nível 2 fabrica kit médico', (await ev(() => window.__cinzas.store.getState().inv.kit ?? 0)) === antesBancada + 1);
+
+  // 4d. XP, nível e escolha de habilidade
+  const xp0 = await ev(() => window.__cinzas.store.getState().xp);
+  await ev(() => window.__cinzas.cena().devXp(500)); await espera(500);
+  s = await ev(() => { const t = window.__cinzas.store.getState(); return { nivel: t.nivel, pontos: t.pontos }; });
+  ok('XP sobe o nível e dá pontos de habilidade', s.nivel >= 5 && s.pontos >= 4, JSON.stringify(s));
+  ok('a escolha de habilidade abre sozinha num momento calmo', await ate(() => window.__cinzas.store.getState().painel === 'perk', 6000));
+  await foto('2b-perk');
+  for (let i = 0; i < 4; i++) { await toque('^Escolher'); await espera(350); }
+  s = await ev(() => { const t = window.__cinzas.store.getState(); return { perks: t.perks.length, pontos: t.pontos, painel: t.painel }; });
+  ok('escolher 4 habilidades as aplica e fecha o painel', s.perks === 4 && s.pontos === 0 && s.painel === null, JSON.stringify(s));
+  ok('a conquista "Veterano" (nível 5) é desbloqueada', (await ev(() => window.__cinzas.store.getState().conquistas)).includes('veterano'));
+  void xp0;
+
   // 5. combate corpo a corpo
   await ev(() => { const k = window.__cinzas.cena(); k.jog.x = 40; k.jog.y = 40; });
   await espera(600);
@@ -99,6 +139,7 @@ try {
   ok('todos os climas renderizam', erros.length === 0, erros[0] ?? '');
 
   // 7. viagem de ida e volta (gasta combustível e troca de zona)
+  await limpaPaineis();
   const comb0 = (await estado()).combustivel;
   await ev(() => window.__cinzas.ponte.cmd.viajar('ermo'));
   ok('viaja para o Ermo', await ate(() => { const s = window.__cinzas.store.getState(); return s.zonaId === 'ermo' && s.carga >= 1; }, 60000), JSON.stringify(await estado()));
@@ -107,27 +148,84 @@ try {
   const z = await ev(() => { const k = window.__cinzas.cena(); return { ents: k.ents.length, flora: k.floras.length, props: k.props.length }; });
   ok('o Ermo tem criaturas, flora e objetos', z.ents > 0 && z.flora > 20 && z.props > 5, JSON.stringify(z));
 
+  await limpaPaineis(); // um nível ganho na viagem abre a escolha de habilidade num momento calmo: resolve antes do saque
   // 7b. saque de um contêiner no Ermo
   const vas0 = await ev(() => window.__cinzas.store.getState().vasculhados);
   const alvoSaque = await ev(() => {
     const k = window.__cinzas.cena(), it = k.interativos.filter(i => /vasculhar/i.test(i.rot) && i.ok()).sort((x, y) => Math.hypot(x.x - k.jog.x, x.y - k.jog.y) - Math.hypot(y.x - k.jog.x, y.y - k.jog.y))[0]; if (!it) return null;
-    k.s.hp = 100; k.jog.x = it.x; k.jog.y = it.y + 0.8; k.alvoInter = it; window.__cinzas.ponte.cmd.interagir(); return it.rot;
+    if (!k.devIrPara(it)) return null; for (const e of k.ents) if (e.arq.hostil && Math.hypot(e.x - it.x, e.y - it.y) < 18) { e.vivo = false; e.estado = 'morto'; } k.s.hp = 100; k.alvoInter = it; window.__cinzas.ponte.cmd.interagir(); return it.rot;
   });
   ok('há contêiner para vasculhar no Ermo', !!alvoSaque, String(alvoSaque));
-  ok('vasculhar conclui e conta o saque', alvoSaque && await ate(v => window.__cinzas.store.getState().vasculhados > v, 12000, vas0));
+  const saqueOk = alvoSaque && await ate(v => window.__cinzas.store.getState().vasculhados > v, 12000, vas0);
+  ok('vasculhar conclui e conta o saque', saqueOk, saqueOk ? '' : JSON.stringify(await ev(() => { const k = window.__cinzas.cena(), t = window.__cinzas.store.getState(); return { acao: k.acao ? k.acao.rotulo + ' ' + k.acao.t.toFixed(1) + '/' + k.acao.dur.toFixed(1) : null, vas: t.vasculhados, painel: t.painel, pausado: k.sys.isPaused(), hp: Math.round(k.s.hp), tela: t.tela, trava: k.trava }; })));
+
+  // 7c. contratos do rádio aparecem depois do primeiro saque
+  ok('o rádio passa 3 contratos', await ate(() => window.__cinzas.store.getState().contratos.length === 3, 6000), JSON.stringify(await ev(() => window.__cinzas.store.getState().contratos.map(c => c.titulo))));
+  await ev(() => { const k = window.__cinzas.cena(), c = k.s.contratos[0]; if (c.tipo === 'trazer') { const st = window.__cinzas.store, i = st.getState().inv; st.setState({ inv: { ...i, [c.alvo]: (i[c.alvo] ?? 0) + c.qtd } }); } else c.prog = c.qtd; window.__cinzas.store.setState({ contratos: [...k.s.contratos] }); });
+  ok('um contrato fica pronto', await ev(() => { const k = window.__cinzas.cena(), c = k.s.contratos[0]; return c.tipo === 'trazer' ? true : c.prog >= c.qtd; }));
+  const idContrato = await ev(() => window.__cinzas.cena().s.contratos[0].id);
+
+  await limpaPaineis();
+  // 7d. evento de viagem com decisão (forçado): Frente de poeira → esperar → seguir viagem
+  const min0 = (await estado()).minutos; await ev(() => { window.__cinzas.cena().devEv = 'poeira'; window.__cinzas.ponte.cmd.viajar('base'); });
+  ok('a estrada traz um evento com decisão', await ate(() => window.__cinzas.store.getState().painel === 'evento', 8000)); await foto('4b-evento');
+  ok('o evento mostra o título e as opções', /frente de poeira/i.test(await ev(() => document.body.innerText)) && await toque('Esperar passar'));
+  ok('a escolha mostra o resultado', await ate(() => /duas horas parado/i.test(document.body.innerText), 4000));
+  ok('"Seguir viagem" conclui a viagem de volta ao abrigo', await toque('Seguir viagem') && await ate(() => { const t = window.__cinzas.store.getState(); return t.zonaId === 'base' && t.carga >= 1; }, 60000));
+  ok('a decisão custou tempo (+2 h)', (await estado()).minutos >= min0 + 120, `${Math.round(min0)} → ${Math.round((await estado()).minutos)}`);
+  await espera(1500);
+
+  // 7e. receber o pagamento do contrato no abrigo
+  const xpAntes = await ev(() => window.__cinzas.store.getState().xp + window.__cinzas.store.getState().nivel * 1000);
+  await ev(id => window.__cinzas.ponte.cmd.receberContrato(id), idContrato); await espera(600);
+  s = await ev(id => { const t = window.__cinzas.store.getState(); return { n: t.contratos.length, ainda: t.contratos.some(c => c.id === id), xp: t.xp + t.nivel * 1000 }; }, idContrato);
+  ok('receber o pagamento troca o contrato e dá XP', s.n === 3 && !s.ainda && s.xp > xpAntes, JSON.stringify(s));
+  await ev(() => window.__cinzas.store.setState({ painel: null }));
+
+  // 7f. invasão ao abrigo (forçada): aparece, é repelida e vira conquista
+  await ev(() => { const k = window.__cinzas.cena(); k.s.hp = 100; k.devForcar = 'raid'; });
+  ok('a invasão chega ao abrigo', await ate(() => { const k = window.__cinzas.cena(); return !!k.raid && k.ents.some(e => e.vivo && e.grupo === k.raid.grupo); }, 20000));
+  await foto('4c-raid');
+  await ev(() => { const k = window.__cinzas.cena(); for (const e of k.ents) if (k.raid && e.grupo === k.raid.grupo) { e.vivo = false; e.estado = 'morto'; } });
+  ok('repelir a invasão conta como conquista', await ate(() => window.__cinzas.store.getState().conquistas.includes('defensor'), 8000));
+
+  await limpaPaineis();
+  // 7g. lançamento de suprimentos (forçado) no Ermo: fumaça, seta no HUD e saque
+  await ev(() => { const k = window.__cinzas.cena(); k.s.combustivel = 30; window.__cinzas.store.setState({ combustivel: 30 }); k.devForcar = 'airdrop'; window.__cinzas.ponte.cmd.viajar('ermo'); });
+  ok('viaja ao Ermo para o lançamento', await ate(() => { const t = window.__cinzas.store.getState(); return t.zonaId === 'ermo' && t.carga >= 1; }, 60000)); await espera(1500);
+  ok('o lançamento de suprimentos aparece com seta no HUD', await ate(() => { const k = window.__cinzas.cena(); return !!k.airdrop && !!window.__cinzas.store.getState().seta; }, 6000));
+  await foto('4d-airdrop');
+  const abriu = await ev(() => {
+    const k = window.__cinzas.cena(); for (const e of k.ents) if (e.grupo >= 9000 && e.grupo < 9100) { e.vivo = false; e.estado = 'morto'; }
+    const it = k.interativos.find(i => /suprimentos/i.test(i.rot)); if (!it || !k.devIrPara(it)) return false; for (const e of k.ents) if (e.arq.hostil && Math.hypot(e.x - it.x, e.y - it.y) < 18) { e.vivo = false; e.estado = 'morto'; } k.s.hp = 100; k.alvoInter = it; window.__cinzas.ponte.cmd.interagir(); return true;
+  });
+  ok('abrir os suprimentos conclui e vira conquista', abriu && await ate(() => window.__cinzas.store.getState().conquistas.includes('chuvaouro'), 12000));
+
+  // 7h. locais temáticos carregam (hospital e posto militar)
+  for (const [id, rx] of [['hospital', /hospital/i], ['militar', /militar/i]]) {
+    await limpaPaineis();
+    await ev(id => { const k = window.__cinzas.cena(); k.s.hp = 100; window.__cinzas.ponte.cmd.viajar(id); }, id);
+    const veio = await ate(i => { const t = window.__cinzas.store.getState(); return t.zonaId === i && t.carga >= 1; }, 60000, id); await espera(1500);
+    const info = await ev(() => { const k = window.__cinzas.cena(); return { props: k.props.length, ents: k.ents.length, nome: k.zona.nome }; });
+    ok(`o local temático "${id}" carrega com conteúdo`, veio && info.props > 5 && rx.test(info.nome), JSON.stringify(info));
+    if (id === 'hospital') await foto('4e-hospital');
+  }
 
   // 8. salvar, recarregar a página e continuar
   await ev(() => window.__cinzas.ponte.cmd.salvar()); await espera(300);
   await pg.goto(url, { waitUntil: 'networkidle0' });
   ok('menu oferece "Continuar" após recarregar', await ev(() => [...document.querySelectorAll('button')].some(b => /^continuar/i.test(b.textContent.trim()))));
   await toque('^continuar'); ok('continua o jogo salvo', await jogoPronto());
-  s = await estado(); ok('retoma na zona salva', s.zonaId === 'ermo', JSON.stringify(s));
+  s = await estado(); ok('retoma na zona salva', s.zonaId === 'militar', JSON.stringify(s));
+  s = await ev(() => { const t = window.__cinzas.store.getState(); return { nivel: t.nivel, perks: t.perks.length, tanque: t.mel.tanque }; });
+  ok('nível, habilidades e melhorias sobrevivem ao salvar', s.nivel >= 5 && s.perks >= 4 && s.tanque === 1, JSON.stringify(s));
 
   // 9. morte e tela final
   await ev(() => { const k = window.__cinzas.cena(); k.s.hp = 1; k.dev('corredor', 0.7, 0.1); k.dev('corredor', -0.7, 0.1); });
   ok('a morte leva à tela final', await ate(() => window.__cinzas.store.getState().tela === 'morte', 25000));
   await espera(800); await foto('5-morte');
   ok('a tela final mostra o resumo da run', /sobreviveu|resumo|dia|abates/i.test(await ev(() => document.body.innerText)));
+  ok('a tela final mostra nível e conquistas', /n[ií]vel/i.test(await ev(() => document.body.innerText)));
 
   // 10. Modo Estudo (reportagem) abre sem quebrar
   await pg.goto(url + '?estudo=1', { waitUntil: 'networkidle0' }); await espera(600);

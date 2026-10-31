@@ -6,6 +6,7 @@ import { gerarFlora, type RecFlora, type TipoFlora } from './lib/flora';
 import { dimProp, type RecProp } from './lib/props';
 import { sortearLoot, type Container } from './dados/itens';
 import { BIOMAS } from './dados/biomas';
+import { biomaDe, TEMAS } from './dados/meta';
 import { ARQS, GRUPO, FACCOES } from './dados/criaturas';
 
 export const W = 96, H = 96;
@@ -46,8 +47,8 @@ const MOBILIA: Record<string, string[]> = {
   posto: ['balcao', 'geladeira', 'prateleira', 'caixa', 'lixeira'],
 };
 
-export function gerarZona(id: string, biomaId: string, seed: string, nome?: string): Zona {
-  const B = BIOMAS[biomaId], rng = new Rng(`${seed}|${id}`), ruido = createNoise2D(Alea(`${seed}|${id}|n`)), ruido2 = createNoise2D(Alea(`${seed}|${id}|m`));
+export function gerarZona(id: string, biomaId: string, seed: string, nome?: string, tema?: string): Zona {
+  const B = biomaDe(biomaId, tema), TEMA = tema ? TEMAS[tema] : undefined, rng = new Rng(`${seed}|${id}`), ruido = createNoise2D(Alea(`${seed}|${id}|n`)), ruido2 = createNoise2D(Alea(`${seed}|${id}|m`));
   const tipos = new Uint8Array(W * H), rad = new Float32Array(W * H), solido = new Uint8Array(W * H), opaco = new Uint8Array(W * H), estilo = new Uint8Array(W * H), ocupado = new Uint8Array(W * H), interior = new Uint8Array(W * H);
   const props: Prop[] = [], flora: FloraObj[] = [], spawns: Spawn[] = [], predios: Predio[] = [], pois: Poi[] = []; let pid = 1, fid = 1, sid = 1, gid = 1;
   const baseTile = { terra: T.TERRA, grama: T.GRAMA, areia: T.AREIA, floresta: T.FLORESTA, lama: T.LAMA, metal: T.METAL }[B.tile];
@@ -91,7 +92,7 @@ export function gerarZona(id: string, biomaId: string, seed: string, nome?: stri
     const [w, h] = dimProp(n, o); for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (!dentro(i, j) || ocupado[idx(i, j)] || solido[idx(i, j)] || tipos[idx(i, j)] === T.PORTA) return null;
     const rec: RecProp = { tipo: 'prop', n, v: op.v ?? ri(0, 5), d: op.d ?? rng.f(), o, sem: ri(1, 99999) }, sol = op.solido ?? true, p: Prop = { id: pid++, rec, x, y, w, h, solido: sol, inters: [] };
     for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) { ocupado[idx(i, j)] = 1; if (sol) solido[idx(i, j)] = 1; }
-    const tp = CONT[n]; if (tp && !op.semLoot) { p.loot = sortearLoot(tp, () => rng.f()); p.aberto = false; p.inters.push({ k: 'saque', rot: 'Vasculhar ' + ROTULO[n], dur: DUR[n] ?? 2, ruido: 3 }); }
+    const tp = CONT[n]; if (tp && !op.semLoot) { p.loot = sortearLoot(tp, () => rng.f(), TEMA && n !== 'lixeira' && rng.chance(TEMA.chance) ? [rng.pick(TEMA.extra)] : []); p.aberto = false; p.inters.push({ k: 'saque', rot: 'Vasculhar ' + ROTULO[n], dur: DUR[n] ?? 2, ruido: 3 }); }
     if (n === 'cama' || n === 'sofa') p.inters.push({ k: 'rasgar', rot: 'Rasgar ' + (n === 'cama' ? 'colchão' : 'sofá'), dur: 1.8, ruido: 3 });
     props.push(p); return p;
   };

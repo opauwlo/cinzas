@@ -39,7 +39,7 @@ const NR = 64; const RUIDO = (() => { const r = new Rng('nevoa'), g = new Float3
 export class Clima {
   tipo: ClimaId = 'limpo'; chuva = 0; vento = 0.1; neblina = 0; poeira = 0; nuvem = 0.1; tempestade = 0; acida = false; dentro = 0;
   private alvo: Alvo = { ...ALVOS.limpo }; private proxima = 0; private rng: Rng; fase = 0; private raioT = 8; flash = 0; trovoes: number[] = []; aoRaio?: (atraso: number) => void;
-  private gotas: Float32Array; private splash: { x: number; y: number; t: number }[] = []; private nGotas = 360;
+  private gotas: Float32Array; private splash: { x: number; y: number; t: number }[] = []; private nGotas = 1000;
   constructor(seed: string, public bioma: Bioma, minutos: number, tipoInicial?: ClimaId) {
     this.rng = new Rng(seed + '|clima'); this.gotas = new Float32Array(this.nGotas * 4);
     for (let i = 0; i < this.nGotas; i++) { this.gotas[i * 4] = this.rng.f(); this.gotas[i * 4 + 1] = this.rng.f(); this.gotas[i * 4 + 2] = 0.8 + this.rng.f() * 0.5; this.gotas[i * 4 + 3] = this.rng.f(); }
@@ -65,13 +65,13 @@ export class Clima {
   ativo() { return (this.chuva > 0.03 && this.dentro < 0.95) || this.neblina > 0.04 || this.poeira > 0.04; }
 
   /** desenha a camada de clima (pixels RGBA). Devolve true se desenhou algo. */
-  desenhar(d: Uint8ClampedArray, w: number, h: number, scrollX: number, scrollY: number, dt: number): boolean {
-    d.fill(0); let algo = false; const vis = 1 - this.dentro, ch = this.chuva * vis, vx = -(0.15 + this.rajada * 0.9) * 40;
+  desenhar(d: Uint8ClampedArray, w: number, h: number, scrollX: number, scrollY: number, dt: number, z = 1): boolean {
+    d.fill(0); let algo = false; const vis = 1 - this.dentro, ch = this.chuva * vis, vx = -(0.15 + this.rajada * 0.9) * 40 / z;
     const px = (x: number, y: number, r: number, g: number, b: number, a: number) => { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= w || y >= h) return; const o = (y * w + x) * 4; d[o] = r; d[o + 1] = g; d[o + 2] = b; d[o + 3] = a; };
     if (ch > 0.03) {
-      algo = true; const n = Math.floor(this.nGotas * Math.min(1, ch) * (w * h) / (206 * 440)), cor = this.acida ? [150, 235, 110] : [176, 196, 214], len = 3 + Math.round(ch * 2);
+      algo = true; const n = Math.min(this.nGotas, Math.floor(360 * Math.min(1, ch) * (w * z * h * z) / (206 * 440))), cor = this.acida ? [150, 235, 110] : [176, 196, 214], len = 3 + Math.round(ch * 2);
       for (let i = 0; i < n; i++) {
-        const o = i * 4; let x = this.gotas[o] * w, y = this.gotas[o + 1] * h; const sp = this.gotas[o + 2] * (150 + ch * 90);
+        const o = i * 4; let x = this.gotas[o] * w, y = this.gotas[o + 1] * h; const sp = this.gotas[o + 2] * (150 + ch * 90) / z;
         x += vx * dt; y += sp * dt; if (y >= h) { if (this.rng.chance(0.25) && this.splash.length < 40) this.splash.push({ x, y: this.rng.range(h * 0.1, h * 0.95), t: 0 }); y -= h; this.gotas[o + 3] = this.rng.f(); } if (x < 0) x += w; this.gotas[o] = x / w; this.gotas[o + 1] = y / h;
         const tail = vx / sp; for (let k = 0; k < len; k++) px(x - tail * k * 2, y - k, cor[0], cor[1], cor[2], 190 - k * 28);
       }

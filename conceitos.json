@@ -84,6 +84,36 @@
       "id": 17,
       "nome": "Controles de toque com mira automática e toque-no-objeto",
       "nota": "Joystick duplo próprio: tocar ataca com auto-mira, arrastar mira, tocar num objeto interage."
+    },
+    {
+      "id": 18,
+      "nome": "Contratos procedurais pagos no abrigo",
+      "nota": "Sempre 3 contratos (abater, saquear, visitar, trazer, fabricar, sobreviver) gerados por seed; cumpre na rua, recebe no abrigo: cria o laço de retorno."
+    },
+    {
+      "id": 19,
+      "nome": "Eventos de viagem com decisão e diretor determinístico",
+      "nota": "Encontros na estrada com risco x recompensa e emboscada na chegada; lançamentos de suprimentos com fumaça e seta, invasões noturnas ao abrigo e saque do baú quando você some."
+    },
+    {
+      "id": 20,
+      "nome": "Habilidades por nível (1 de 3) com efeito real no sistema",
+      "nota": "12 habilidades que mudam dano, ruído, fome/sede, radiação, combustível, saque e visão noturna; a escolha abre sozinha num momento calmo."
+    },
+    {
+      "id": 21,
+      "nome": "Interação com alcance real",
+      "nota": "Só dá para usar/vasculhar o que está ao alcance e com caminho livre: parede, janela, cerca, porta fechada e outras peças bloqueiam."
+    },
+    {
+      "id": 22,
+      "nome": "Densidade de pixels pixel-perfect por pixel do aparelho",
+      "nota": "Cada pixel de arte ocupa um número inteiro de pixels da tela; névoa e clima desenhados em resolução própria, chão carregado em raio maior."
+    },
+    {
+      "id": 23,
+      "nome": "Locais temáticos pelo mesmo gerador",
+      "nota": "Hospital, posto de combustível, torre de rádio e posto militar = bioma-base + tema (predios, inimigos e saque próprios) sem código novo de geração."
     }
   ],
   "adaptados": [
@@ -146,6 +176,14 @@
     {
       "nome": "Publicação",
       "origem": "GitHub Pages via actions oficiais (upload-pages-artifact, deploy-pages)"
+    },
+    {
+      "nome": "Conquistas persistentes e níveis",
+      "origem": "padrão de jogos de progressão; implementação própria"
+    },
+    {
+      "nome": "Eventos de estrada com escolhas",
+      "origem": "referência: livros-jogo e roguelikes de estrada (FTL, Oregon Trail); texto e regras próprios"
     }
   ]
 }

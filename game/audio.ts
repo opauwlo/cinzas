@@ -35,6 +35,7 @@ const PRE: Record<string, number[]> = {
   zumbi: [0.5, 0.35, 70, 0.04, 0.2, 0.4, 3, 2, -1, 0, 0, 0, 0, 1.5, 12], corredor: [0.55, 0.3, 140, 0.02, 0.12, 0.25, 3, 2, 3, 0, 0, 0, 0, 1.5, 20], colosso: [1.2, 0.2, 40, 0.06, 0.4, 0.9, 3, 3, -1, 0, 0, 0, 0, 2.5, 25],
   cao: [0.55, 0.25, 360, 0.01, 0.06, 0.14, 2, 1.5, -12, 0, 0, 0, 0, 0.5], javali: [0.6, 0.2, 110, 0.02, 0.1, 0.2, 3, 2, -2, 0, 0, 0, 0, 1], cervo: [0.4, 0.2, 520, 0.02, 0.08, 0.3, 0, 1, -3], rato: [0.35, 0.3, 1600, 0.005, 0.03, 0.08, 2, 1, -5], inseto: [0.35, 0.4, 900, 0.005, 0.02, 0.07, 4, 1, 0, 0, 0, 0, 0, 6], corvo: [0.4, 0.25, 700, 0.01, 0.06, 0.18, 2, 1, -6, 0, 0, 0, 0, 0.5, 18], humano: [0.5, 0.25, 160, 0.02, 0.1, 0.25, 3, 1.5, -2, 0, 0, 0, 0, 0.8, 8],
   grilo: [0.1, 0, 4400, 0.001, 0.012, 0.03, 0, 1], passaro: [0.14, 0.2, 2400, 0.005, 0.03, 0.08, 0, 1, 18, 0, 0, 0, 0, 0],
+  nota: [0.5, 0, 440, 0.005, 0.08, 0.35, 0, 1], alarme: [0.55, 0, 700, 0.01, 0.2, 0.12, 2, 1, 0, 0, -190, 0.1], sinal: [0.35, 0, 1300, 0.004, 0.05, 0.12, 0, 1, 0, 0, 420, 0.05, 0, 0.3],
   geiger: [0.5, 0.6, 2700, 0, 0, 0.004, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.3], bat1: [0.9, 0, 58, 0.01, 0.05, 0.14, 0, 1, -2, 0, 0, 0, 0, 0, 0, 0, 0, 0.6, 0.04], bat2: [0.7, 0, 52, 0.01, 0.04, 0.12, 0, 1, -2],
 };
 export type Som = keyof typeof PRE;
@@ -108,6 +109,10 @@ export const sfx = {
   comer: () => tocar('comer'), beber: () => tocar('beber'), curar: () => tocar('curar'), porta: () => tocar('porta'), morte: () => { tocar('morte'); vibra([200, 80, 300]); },
   vitoria: () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => { if (!ctx) return; const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime; o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.9); o.connect(g).connect(bSfx); o.start(t); o.stop(t + 1); }, i * 130)); vibra([40, 40, 40, 40, 120]); },
   ui: (k: 'clique' | 'ok' | 'erro' | 'abrir' = 'clique') => tocar(k),
+  nivel: () => { [0, 4, 7, 12].forEach((s, i) => setTimeout(() => tocar('nota', { rate: 2 ** (s / 12) }), i * 85)); vibra([40, 30, 90]); },
+  conquista: () => { tocar('raro1'); setTimeout(() => tocar('raro2'), 130); setTimeout(() => tocar('nota', { rate: 2 }), 280); vibra([30, 40, 30, 40, 90]); },
+  alarme: () => { for (let i = 0; i < 4; i++) setTimeout(() => tocar('alarme'), i * 430); vibra([180, 90, 180, 90, 180]); },
+  sinal: () => { tocar('sinal'); setTimeout(() => tocar('sinal', { rate: 1.25 }), 160); },
   passo: (sup: string, correr: boolean, v = 1) => tocar(('passo_' + sup) as Som in PRE ? ('passo_' + sup) as Som : 'passo_terra', { vol: (correr ? 1 : 0.6) * v, rate: correr ? 1.12 : 0.95 }),
   voz: (tipo: string, d: number, pan: number, v = 1) => tocar((tipo in PRE ? tipo : 'zumbi') as Som, { vol: aDist(d) * v, pan }),
 };

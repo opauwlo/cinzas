@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type * as Phaser from 'phaser';
-import { useJogo, hoje, registrarDia, novoRun, aplicarRun, lerCfg } from '../game/store';
+import { useJogo, hoje, registrarDia, novoRun, aplicarRun, lerCfg, lerMeta } from '../game/store';
+import { DICAS_CARGA } from '../game/dados/meta';
 import { ponte } from '../game/ponte';
 import { iniciarAudio, aplicarVolumes } from '../game/audio';
 import { lerRun, temRun, type Run } from '../game/sistemas/salvar';
@@ -21,7 +22,7 @@ export default function Jogo() {
   const iniciar = async (nova: boolean) => {
     void iniciarAudio();
     try { await Promise.all(['700 16px Silkscreen', '400 18px VT323'].map(f => document.fonts.load(f))); } catch { /* segue */ }
-    const meta = registrarDia(); let run = nova ? null : lerRun(); if (!run) run = novoRun(hoje(), meta.sequencia >= 3);
+    const meta = registrarDia(); let run = nova ? null : lerRun(); if (!run) run = novoRun(hoje(), meta.sequencia >= 3, lerMeta().dif ?? 1);
     runRef.current = run; aplicarRun(run); set({ tela: 'jogo', painel: null, carga: 0 }); setCorrida(c => c + 1);
   };
   useEffect(() => {
@@ -34,19 +35,22 @@ export default function Jogo() {
     return () => { vivo = false; document.removeEventListener('visibilitychange', vis); ponte.cmd = null; ponte.ref = null; game?.destroy(true); window.__cinzas = undefined; void wake?.release(); };
   }, [corrida, jogando]);
   useEffect(() => { ponte.cmd?.pausar(painel !== null || tela !== 'jogo'); }, [painel, tela]);
+  const introMostrada = useRef(false), dicaCarga = useMemo(() => DICAS_CARGA[Math.floor(Math.random() * DICAS_CARGA.length)], [corrida]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tela === 'jogo' && carga >= 1 && !introMostrada.current && !lerMeta().intro) { introMostrada.current = true; set({ painel: 'intro' }); } }, [tela, carga, set]);
 
-  if (tela === 'menu' && painel !== 'config') return <Menu onJogar={iniciar} />;
+  const emMenu = tela === 'menu', painelMenu = painel === 'config' || painel === 'ajuda';
+  if (emMenu && !painelMenu) return <Menu onJogar={iniciar} />;
   if (tela === 'creditos') return <Creditos />;
   if (tela === 'loja') return <Loja />;
   if (tela === 'revelacao') return <Revelacao />;
-  if (tela === 'menu' && painel === 'config') return <div className="jogo"><Paineis /></div>;
+  if (emMenu && painelMenu) return <div className="jogo"><Paineis /></div>;
   return (
     <div className="jogo" style={{ ['--u' as string]: cfg.ui }}>
       <div className="mundo" ref={mundoRef} />
       <Sobreposicoes />
       <Controles />
       <Hud />
-      {carga < 1 && <div className="carga"><div className="carga-t">GERANDO O ERMO</div><div className="carga-s">{zonaNome}</div><div className="carga-b"><i style={{ width: `${Math.round(carga * 100)}%` }} /></div></div>}
+      {carga < 1 && <div className="carga"><div className="carga-t">GERANDO O ERMO</div><div className="carga-s">{zonaNome}</div><div className="carga-b"><i style={{ width: `${Math.round(carga * 100)}%` }} /></div><div className="carga-d">{dicaCarga}</div></div>}
       <Paineis />
       {tela === 'morte' && useJogo.getState().resumo && <Fim vitoria={false} />}
       {tela === 'vitoria' && useJogo.getState().resumo && <Fim vitoria />}

@@ -8,20 +8,9 @@ import { ponte } from '../game/ponte';
 import { aplicarVolumes, sfx } from '../game/audio';
 import { W, H, T } from '../game/zona';
 import Ico, { ic } from './Ico';
+import { Cartao, fechar, p } from './Cartao';
+import { Diario, PerkPainel, Melhorias, EventoPainel, Ajuda, Intro } from './PaineisMeta';
 
-const fechar = () => { sfx.ui('clique'); useJogo.setState({ painel: null }); };
-const p = (fn: () => void) => ({ onPointerDown: (e: React.PointerEvent) => { e.stopPropagation(); fn(); } });
-
-function Cartao({ titulo, children, rodape, larg }: { titulo: string; children: React.ReactNode; rodape?: React.ReactNode; larg?: number }) {
-  return (
-    <div className="ov" onPointerDown={e => e.stopPropagation()}>
-      <div className="cartao aco degrau" style={larg ? { width: `min(100%, ${larg}px)` } : undefined}>
-        <h2><span>{titulo}</span><button className="btn peq" {...p(fechar)}>Fechar</button></h2>
-        <div className="corpo">{children}</div>{rodape ?? <span />}
-      </div>
-    </div>
-  );
-}
 function Linha({ id, qtd, acoes }: { id: string; qtd: number; acoes: React.ReactNode }) {
   const it = ITENS[id], cor = COR_RARIDADE[it.raridade];
   return <div className="linha-item" style={{ ['--rc' as string]: cor }}><div className="im"><Ico src={it.icone} n={28} cor={it.tom ?? cor} /></div><div><b>{it.nome}{qtd > 1 ? ` ×${qtd}` : ''}</b><small>{it.desc}</small></div><div className="bt2">{acoes}</div></div>;
@@ -43,11 +32,11 @@ function Mochila() {
   );
 }
 function Crafting() {
-  const s = useJogo();
+  const s = useJogo(), nb = s.mel.bancada ?? 0;
   return (
-    <Cartao titulo="Bancada" rodape={<div className="mini">Materiais vêm das viagens: madeira (árvores), sucata (carros), tecido (colchões e sofás).</div>}>
-      {RECEITAS.map(r => { const ok = r.entra.every(([i, n]) => (s.inv[i] ?? 0) >= n), it = ITENS[r.sai[0]];
-        return <div key={r.id} className="linha-item" style={{ ['--rc' as string]: COR_RARIDADE[it.raridade] }}><div className="im"><Ico src={it.icone} n={28} cor={it.tom ?? COR_RARIDADE[it.raridade]} /></div><div><b>{r.nome}</b><div className="chips">{r.entra.map(([i, n]) => <span key={i} className={`chip ${(s.inv[i] ?? 0) >= n ? 'ok' : 'falta'}`}>{ITENS[i].nome} {(s.inv[i] ?? 0)}/{n}</span>)}</div></div><button className={`btn peq ${ok ? 'aviso' : ''}`} disabled={!ok} {...p(() => ponte.cmd?.craft(r.id))}>Fabricar</button></div>; })}
+    <Cartao titulo={`Bancada${nb ? ' nv ' + (nb + 1) : ''}`} rodape={<div style={{ display: 'grid', gap: 6 }}><button className="btn aviso" {...p(() => useJogo.setState({ painel: 'melhorias' }))}>Melhorias do abrigo</button><div className="mini">Materiais vêm das viagens: madeira (árvores), sucata (carros), tecido (colchões e sofás).</div></div>}>
+      {RECEITAS.map(r => { const trava = (r.nivel ?? 0) > nb, ok = !trava && r.entra.every(([i, n]) => (s.inv[i] ?? 0) >= n), it = ITENS[r.sai[0]];
+        return <div key={r.id} className="linha-item" style={{ ['--rc' as string]: trava ? '#3a3d42' : COR_RARIDADE[it.raridade], opacity: trava ? 0.6 : 1 }}><div className="im"><Ico src={it.icone} n={28} cor={trava ? '#565c64' : it.tom ?? COR_RARIDADE[it.raridade]} /></div><div><b>{r.nome}</b>{trava ? <div className="mini">Requer bancada nível {(r.nivel ?? 0) + 1} (Melhorias)</div> : <div className="chips">{r.entra.map(([i, n]) => <span key={i} className={`chip ${(s.inv[i] ?? 0) >= n ? 'ok' : 'falta'}`}>{ITENS[i].nome} {(s.inv[i] ?? 0)}/{n}</span>)}</div>}</div><button className={`btn peq ${ok ? 'aviso' : ''}`} disabled={!ok} {...p(() => ponte.cmd?.craft(r.id))}>{trava ? 'Travado' : 'Fabricar'}</button></div>; })}
     </Cartao>
   );
 }
@@ -97,7 +86,7 @@ function Mapa() {
     g.putImageData(img, 0, 0); g.fillStyle = '#6a604c';
     const base = LOCAIS[0]; for (const l of LOCAIS.slice(1)) { const n = Math.ceil(Math.hypot(l.x - base.x, l.y - base.y)); for (let i = 0; i < n; i += 2) g.fillRect(Math.round(base.x + (l.x - base.x) * i / n), Math.round(base.y + (l.y - base.y) * i / n), 1, 1); }
   }, []);
-  const dest = localPorId(sel), custo = custoViagem(s.zonaId, sel), travado = !!dest.requer && !(s.inv[dest.requer] ?? 0), sem = s.combustivel < custo.combustivel, aqui = sel === s.zonaId;
+  const dest = localPorId(sel), custo = custoViagem(s.zonaId, sel, s.perks.includes('mecanico')), travado = !!dest.requer && !(s.inv[dest.requer] ?? 0), sem = s.combustivel < custo.combustivel, aqui = sel === s.zonaId;
   return (
     <Cartao titulo="Mapa" larg={560} rodape={
       <div className="card aco degrau" style={{ display: 'grid', gap: 6 }}>
@@ -135,16 +124,6 @@ function MapaZona() {
     </Cartao>
   );
 }
-function Diario() {
-  const s = useJogo(), dia = Math.floor(s.minutos / 1440) + 1;
-  return (
-    <Cartao titulo="Diário">
-      <div className="card aco"><h3>Objetivos</h3>{OBJETIVOS.map((o, i) => <div key={o.titulo} className="mini" style={{ color: i < s.objIdx ? 'var(--fosf)' : i === s.objIdx ? 'var(--osso)' : 'var(--a4)' }}>{i < s.objIdx ? '[x]' : i === s.objIdx ? '[>]' : '[ ]'} {o.titulo}{i === s.objIdx ? ` — ${o.dica}` : ''}</div>)}</div>
-      <div className="grade"><div className="stat"><b>{dia}</b><span>dia</span></div><div className="stat"><b>{s.abates}</b><span>abates</span></div><div className="stat"><b>{s.vasculhados}</b><span>saques</span></div><div className="stat"><b>{s.combustivel}</b><span>combustível</span></div></div>
-      <div className="card aco mini">Locais conhecidos: <b>{s.descobertos.map(d => localPorId(d).nome).join(', ')}</b></div>
-    </Cartao>
-  );
-}
 function Config() {
   const s = useJogo(), c = s.cfg, set = (k: keyof Configs, v: number | boolean) => { const n = { ...c, [k]: v } as Configs; useJogo.setState({ cfg: n }); gravarCfg(n); aplicarVolumes({ mestre: n.mestre, sfx: n.sfx, amb: n.amb, mus: n.mus, vibra: n.vibra }); };
   const sl = (k: 'mestre' | 'sfx' | 'amb' | 'mus', nome: string) => <label className="slider">{nome}<input type="range" min={0} max={1} step={0.05} value={c[k]} onChange={e => set(k, +e.target.value)} /><output>{Math.round(c[k] * 100)}</output></label>;
@@ -154,7 +133,7 @@ function Config() {
       <div className="card aco">{sl('mestre', 'Geral')}{sl('sfx', 'Efeitos')}{sl('amb', 'Ambiente')}{sl('mus', 'Música')}</div>
       <div className="card aco">{tg('vibra', 'Vibração')}{tg('autoMira', 'Mira automática')}{tg('gore', 'Sangue e membros')}{tg('canhoto', 'Modo canhoto')}{tg('fps', 'Mostrar FPS')}
         <div className="troca"><span>Tamanho da interface</span><div style={{ display: 'flex', gap: 5 }}>{[0.85, 1, 1.2].map(v => <button key={v} className={`btn peq ${c.ui === v ? 'aviso' : ''}`} {...p(() => set('ui', v))}>{v === 0.85 ? 'P' : v === 1 ? 'M' : 'G'}</button>)}</div></div>
-        <div className="troca"><span>Resolução (reinicia a run)</span><div style={{ display: 'flex', gap: 5 }}>{([2, 3] as const).map(v => <button key={v} className={`btn peq ${c.escala === v ? 'aviso' : ''}`} {...p(() => set('escala', v))}>{v === 2 ? 'Nítida' : 'Leve'}</button>)}</div></div>
+        <div className="troca"><span>Densidade de pixels (reinicia a run)</span><div style={{ display: 'flex', gap: 5 }}>{([[1, 'Ultra'], [1.5, 'Alta'], [2, 'Média'], [3, 'Leve']] as const).map(([v, n]) => <button key={v} className={`btn peq ${c.escala === v ? 'aviso' : ''}`} {...p(() => set('escala', v))}>{n}</button>)}</div></div>
         <div className="troca"><span>Tela cheia</span><button className="btn peq" {...p(() => { try { void document.documentElement.requestFullscreen?.(); } catch { /* */ } })}>Ativar</button></div>
       </div>
     </Cartao>
@@ -179,6 +158,7 @@ export default function Paineis() {
   switch (painel) {
     case 'inv': return <Mochila />; case 'craft': return <Crafting />; case 'bau': return <Bau />; case 'cozinha': return <Cozinha />; case 'dormir': return <Dormir />;
     case 'mapa': return <Mapa />; case 'mapaZona': return <MapaZona />; case 'diario': return <Diario />; case 'config': return <Config />; case 'pausa': return <Pausa />;
+    case 'perk': return <PerkPainel />; case 'melhorias': return <Melhorias />; case 'evento': return <EventoPainel />; case 'ajuda': return <Ajuda />; case 'intro': return <Intro />;
     default: return null;
   }
 }
