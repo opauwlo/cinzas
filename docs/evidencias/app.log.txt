@@ -1,0 +1,33 @@
+OK menu 320×568 sem corte horizontal
+OK iniciar visível por rolagem 320
+OK menu 412×915 sem corte horizontal
+OK iniciar visível por rolagem 412
+OK menu 915×412 sem corte horizontal
+OK iniciar visível por rolagem 915
+OK menu 1440×900 sem corte horizontal
+OK iniciar visível por rolagem 1440
+OK painel com nome e foco acessível
+OK Escape fecha o painel
+OK encostar para rolar não muda o controle
+OK precache completo sinalizado antes de jogar
+OK menu reabre sem rede
+OK primeira partida carrega offline, incluindo Phaser e fontes
+OK HUD sem sobreposição 320 / escala 0.85
+OK HUD sem sobreposição 320 / escala 1
+OK HUD sem sobreposição 320 / escala 1.2
+OK HUD sem sobreposição 412 / escala 0.85
+OK HUD sem sobreposição 412 / escala 1
+OK HUD sem sobreposição 412 / escala 1.2
+OK as 8 colunas da mochila cabem na tela
+OK save válido gravado
+OK cena encerrada não recria um save
+OK cancelar importação preserva save
+OK backup válido restaurado
+OK nova jornada exige decisão explícita
+OK cancelar nova jornada mantém progresso
+OK save danificado não quebra o menu
+OK a rota final chega à vitória
+OK a vitória encerra o save definitivamente
+OK o final permite voltar ao menu
+OK nenhuma exceção de JavaScript
+32/32 verificações passaram.

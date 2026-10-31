@@ -89,6 +89,6 @@ export function novoRun(seed: string, bonus = false, dif = 1): Run {
 export function aplicarRun(r: Run) {
   useJogo.setState({ seed: r.seed, zonaId: r.zonaId, minutos: r.minutos, hp: r.hp, maxHp: r.maxHp, fome: r.fome, sede: r.sede, stamina: r.stamina, rad: r.rad, sangra: r.sangra, inv: { ...r.inv }, bau: { ...r.bau }, arma: r.arma, balas: { ...r.balas }, mascara: r.mascara, combustivel: r.combustivel, lanterna: { ...r.lanterna },
     objIdx: r.objIdx, objVal: 0, banner: null, vasculhados: r.vasculhados, abates: r.abates, radMax: r.radMax, sabeAbrigo: r.sabeAbrigo, descobertos: [...r.descobertos], tanque: r.tanque, toasts: [], acao: null, alvo: null, painel: null, dica: null, resumo: null,
-    grade: [...(r.grade ?? [])], xp: r.xp ?? 0, nivel: r.nivel ?? 1, pontos: r.pontos ?? 0, perks: [...(r.perks ?? [])], contratos: [...(r.contratos ?? [])], mel: { ...(r.mel ?? {}) }, conquistas: lerMeta().conquistas, evento: null, seta: null, dif: r.dif ?? 1 });
+    viagem: null, interior: false, grade: [...(r.grade ?? [])], xp: r.xp ?? 0, nivel: r.nivel ?? 1, pontos: r.pontos ?? 0, perks: [...(r.perks ?? [])], contratos: [...(r.contratos ?? [])], mel: { ...(r.mel ?? {}) }, conquistas: lerMeta().conquistas, evento: null, seta: null, dif: r.dif ?? 1 });
 }
 export { ITENS };

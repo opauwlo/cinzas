@@ -1,6 +1,6 @@
 {
   "name": "cinzas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,11 @@
     "teste": "node tools/testes.mjs",
     "smoke": "node tools/smoke.mjs",
     "empacotar": "node tools/empacotar.mjs",
-    "icones": "node tools/icones.mjs"
+    "icones": "node tools/icones.mjs",
+    "postbuild": "node tools/offline.mjs",
+    "typecheck": "tsc --noEmit",
+    "qa:app": "node tools/qa-app.mjs",
+    "qa:arte": "node tools/qa-arte.mjs"
   },
   "dependencies": {
     "@fontsource/pixelify-sans": "^5.3.0",

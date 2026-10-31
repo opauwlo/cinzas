@@ -119,7 +119,7 @@ export function Ajuda() {
     ['Abrigo e jipe', 'Do abrigo você viaja de jipe (gasta combustível e horas). Volte para guardar, fabricar, dormir e melhorar a base.'],
     ['Subir de nível', 'Abater, vasculhar e explorar dão XP. A cada nível, escolha 1 entre 3 habilidades.'],
     ['Contratos', 'O rádio passa tarefas curtas com pagamento. Cumpra na rua e receba no abrigo.'],
-    ['Invasões', 'A partir do dia 2, à noite, gente pode atacar o abrigo. Muralha forte protege o baú, inclusive quando você viaja.'],
+    ['Invasões', 'A partir do dia 3, à noite, gente pode atacar o abrigo. Muralha forte protege o baú, inclusive quando você viaja.'],
   ];
   return (
     <Cartao titulo="Como jogar" larg={560}>
