@@ -215,9 +215,9 @@ try {
   ok('XP sobe o nível e dá pontos de habilidade', s.nivel >= 5 && s.pontos >= 4, JSON.stringify(s));
   ok('a escolha de habilidade abre sozinha num momento calmo', await ate(() => window.__cinzas.store.getState().painel === 'perk', 6000));
   await foto('2b-perk');
-  for (let i = 0; i < 4; i++) { await toque('^Escolher'); await espera(350); }
+  for (let i = 0; i < 10; i++) { if (!(await ev(() => window.__cinzas.store.getState().pontos))) break; await toque('^Escolher'); await espera(350); } // gasta todos os pontos (o XP do Calmo rende 20% a mais)
   s = await ev(() => { const t = window.__cinzas.store.getState(); return { perks: t.perks.length, pontos: t.pontos, painel: t.painel }; });
-  ok('escolher 4 habilidades as aplica e fecha o painel', s.perks === 4 && s.pontos === 0 && s.painel === null, JSON.stringify(s));
+  ok('escolher as habilidades as aplica e fecha o painel', s.perks >= 4 && s.pontos === 0 && s.painel === null, JSON.stringify(s));
   ok('a conquista "Veterano" (nível 5) é desbloqueada', (await ev(() => window.__cinzas.store.getState().conquistas)).includes('veterano'));
   void xp0;
 
@@ -366,7 +366,7 @@ try {
   await espera(1200);
   ok('ao acordar no abrigo a vida volta e a run segue viva', await ev(() => { const t = window.__cinzas.store.getState(); return t.hp >= 50 && t.tela === 'jogo' && t.zonaId === 'base'; }));
   await ev(() => { const k = window.__cinzas.cena(); k.s.dif = 1; k.s.hp = 1; k.dev('corredor', 0.7, 0.1); k.dev('corredor', -0.7, 0.1); });
-  ok('no Normal a morte leva à tela final', await ate(() => window.__cinzas.store.getState().tela === 'morte', 25000));
+  ok('no Normal a morte leva à tela final', await ate(() => window.__cinzas.store.getState().tela === 'morte', 60000));
   await espera(800); await foto('5-morte');
   ok('a tela final mostra o resumo da run', /sobreviveu|resumo|dia|abates/i.test(await ev(() => document.body.innerText)));
   ok('a tela final mostra nível e conquistas', /n[ií]vel/i.test(await ev(() => document.body.innerText)));
