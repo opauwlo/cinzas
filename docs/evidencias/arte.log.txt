@@ -1,0 +1,8 @@
+Prancha renderizada: humanos
+Prancha renderizada: animais
+Prancha renderizada: flora
+Prancha renderizada: props
+Prancha renderizada: estruturas
+Prancha renderizada: clipes
+Prancha renderizada: colosso
+7/7 pranchas renderizadas sem exceções. Revisão visual pendente de inspeção.

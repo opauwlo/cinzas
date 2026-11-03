@@ -1,0 +1,57 @@
+
+> cinzas@0.2.0 teste
+> node tools/testes.mjs
+
+  ok   um irradiado sozinho custa 4–15% da vida com o pé de cabra (Normal)
+  ok   3 irradiados ao mesmo tempo são perigosos mas sobrevivíveis (25–60%) e no Calmo quase não matam (≤ 40%)
+  ok   matilhas e javalis do começo não matam no corpo a corpo
+  ok   o Colosso é chefe: letal de perto com arma branca (≥ 80%) e ≥ 40% com arma de fogo, mas cai em ≤ 24 golpes/tiros
+  ok   armas melhores têm ao menos 1,3x o DPS do pé de cabra (progressão que dá gosto)
+  ok   qualquer hostil básico leva ≥ 6 s para matar o jogador sozinho (Normal)
+  ok   a dificuldade ordena a perda de vida: Calmo < Normal < Brutal
+  ok   sede 100→0 em 19–26 min reais (Normal) e fome em 28–40 min; água é mais urgente que comida
+  ok   Calmo dá ≥ 15% mais tempo que Normal; Brutal ≤ 90% do Normal
+  ok   curva de XP: crescente e com ritmo razoável (nível 5 ≈ 440, nível 10 ≈ 1.9 mil)
+  ok   tamanho da invasão: só a partir do dia 3, cresce com os dias, cai com a muralha, respeita a dificuldade e os limites
+  ok   noite fator: 1 de madrugada, 0 ao meio-dia, rampa suave no fim da tarde e no amanhecer
+  ok   alvo de hostis: 0 no abrigo; noite ≥ dia; Calmo ≤ Normal ≤ Brutal; interior < exterior; limite 9
+  ok   alvo de hostis no nível 1 (Normal): ≤ 3 de dia e ≤ 5 de noite em qualquer bioma; cresce com o nível sem estourar
+  ok   intervalo de reposição: mais curto à noite e em dificuldade alta; sempre entre 20 e 90 s
+  ok   escolha de arquétipo: sem gangues no nível 1, com gangues na cidade no nível 5, sempre válido e determinístico
+  ok   tamanho do grupo: ≥ 1, ≤ 2 antes do nível 3, nunca passa da meta e Colosso é sempre 1
+  ok   quando segurar: tensão alta, meta cumprida, intervalo não passou ou população cheia
+  ok   tensão: um golpe forte segura a reposição e o alívio chega em ≤ 25 s
+  ok   ponto de reposição: dentro do anel, só em terreno válido, 60% atrás de quem olha, nulo se nada serve
+  ok   a ameaça das zonas cresce com o perigo (≥ 5% por degrau)
+  ok   nenhum hostil nasce a menos de 22 tiles de onde o jogador chega; população ≤ 110 hostis
+  ok   o Colosso é raro (≤ 30% das zonas), exceto na Refinaria (perigo 4, ≤ 70%)
+  ok   economia: toda zona tem ≥ 1 dia de água e de comida (soltos, saque e reservatórios); Ermo e Floresta ≥ 1,5 dia de água
+  ok   a geração é determinística (mesma seed, mesma população)
+  ok   início acolhedor: o kit inicial cobre a primeira meia hora, a vida volta sozinha em poucos minutos e cresce com o nível
+  ok   viagens: o combustível inicial dá para ir e voltar ao Ermo e à Floresta sem precisar achar combustível
+  ok   campanha linear: passos únicos, em ordem de atos, com meta, dica e XP; o último é a vitória e nenhum nasce cumprido
+  ok   o mapa abre por nível, crescente com o perigo, e o XP da campanha libera cada local a tempo
+  ok   receitas por nível: básicas no começo, armas fortes só no fim, e o machado da campanha já está liberado quando o passo chega
+  ok   nenhum lugar do mapa fica longe de algo para fazer: pior lacuna ≤ 18 tiles e 95% das células a ≤ 10 tiles
+  ok   os pontos de interesse têm de tudo um pouco: água, bilhetes, ferro-velho, saque e plantas colhíveis; e a geração segue determinística
+  ok   as peças do cenário nunca se sobrepõem e quase tudo o que há para fazer é alcançável a pé a partir da chegada
+  ok   colheita: toda linha rende um item que existe, com chances válidas; arbustos vivos, cogumelos, flores e juncos rendem; arbusto seco não
+  ok   bilhetes: pelo menos 12, únicos, com texto legível e brindes que existem
+  ok   sons equalizados: cada som atinge o nível da sua categoria, sem estourar o teto de pico, e a hierarquia tiro > impacto > voz > coleta > passo > ambiente faz sentido
+  ok   perfis de equalização: valores seguros; celular corta graves, fone os realça, noturno comprime mais; ducking só para tiro, Colosso, pancada e alarme
+  ok   NPCs: planejamento determinístico, no máximo 3 por zona e sem NPC onde não faz sentido
+  ok   o mascate visita o abrigo a cada 3 dias (e só ele)
+  ok   o mundo é vivo: ≥ 80% das visitas a zonas comuns têm algum NPC; mascate ~35%, acampado ~55%, viajante ~45%
+  ok   falas: sempre não vazias e curtas, para todo tipo, objetivo, clima e hora; o acampado dá a dica do objetivo; traidor perde o comércio
+  ok   estoque do mascate: 8 ofertas únicas e válidas, básicos sempre, combustível ≤ 1, determinístico
+  ok   troca honesta: comprar sempre custa mais que vender o mesmo item (sem lucro infinito) e preços sensatos
+  ok   viagem: todo local tem seu marco (sprite da cidade) próprio, dentro do quadro de 128×112, de dia e de noite
+  ok   viagem: a cena pinta o quadro inteiro, só com inteiros, cores e transparências válidas, em todo par de locais, hora e clima
+  ok   viagem: a cena se mexe (estrada, jipe e paisagem mudam quando o jipe anda) e fica parada quando o jipe para; é determinística
+  ok   viagem: céu e texto de placa — cores válidas em todas as horas; fonte 3×5 sem acento e sem quebrar com caracteres estranhos
+  ok   viagem: a física da rota chega ao fim em todo passo de tempo, para diante do evento UMA vez (sem pular), fica parada enquanto o jogador decide e retoma
+  ok   decalques do chão: determinísticos, só tocam pixels de chão, cobrem 0,3–4% do terreno e dão variedade em todo local
+  ok   decalques do chão: nunca em parede, porta, madeira nem água funda; marcas ao redor dos objetos (cinza da fogueira) aparecem
+  ok   vida no ar: taxas finitas, sem passar do teto, vagalumes só à noite e sem chuva, cinza cai menos na chuva, cada bioma com sua cara
+
+51/51 testes passaram em 11.1 s.

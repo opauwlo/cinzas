@@ -1,0 +1,145 @@
+OK    menu mostra o título CINZAS
+OK    menu tem o botão de começar
+OK    manifesto PWA publicado  — CINZAS — sobrevivência pós-nuclear
+OK    as fontes de texto carregaram (Pixelify Sans + Silkscreen)
+OK    "Como jogar" abre e fecha
+OK    "Config." abre e fecha
+OK    toque em "Sobreviver"
+OK    mundo da base carregou  — 4789 ms
+OK    a introdução aparece na primeira vez
+OK    dá para pular a introdução
+OK    começa na base  — {"zonaId":"base","tela":"jogo","painel":null,"hp":100,"abates":0,"combustivel":8,"carga":1,"minutos":480}
+OK    o canvas usa pixels inteiros do aparelho (grade uniforme)
+OK    o jogador anda  — deslocou 3.81 tiles
+OK    manche: empurrão leve = furtivo  — {"f":true,"c":false}
+OK    manche: empurrão médio = andar  — {"f":false,"c":false}
+OK    manche: até a borda = correr  — {"f":false,"c":true,"d":"correr"}
+OK    manche: fica fixo embaixo, à esquerda, e soltar zera tudo  — {"suave":{"f":true,"c":false},"medio":{"f":false,"c":false},"forte":{"f":false,"c":true,"d":"correr"},"fixo":true,"longe":true,"solto":{"f":false,"c":false,"mx":0,"m":"parado"},"canto":true}
+OK    não existem botões de correr/furtivo na tela
+OK    o botão de ataque é fixo, embaixo à direita, grande o bastante para o polegar  — {"atkDir":true,"tam":96}
+OK    manche, ataque e atalhos não se sobrepõem  — {"st":{"l":17,"t":768.40625,"r":140.59375,"b":892},"at":{"l":302,"t":797,"r":398,"b":893},"ho":{"l":147.03125,"t":800.3125,"r":295.5625,"b":901}}
+OK    modo canhoto espelha: manche à direita e ataque à esquerda
+OK    estação "craft" abre o painel
+OK    estação "bau" abre o painel
+OK    estação "mapa" abre o painel
+OK    estação "dormir" abre o painel
+OK    estação "cozinha" abre o painel
+OK    o rastreador mostra o objetivo atual (o primeiro passo da campanha)  — {"idx":0,"hud":"OBJ Colete 6 de madeira 0/6"}
+OK    o Diário mostra a campanha em atos
+OK    o rótulo da árvore diz o que falta (machado)  — {"sem":"Cortar árvore — precisa de machado","com":"Cortar árvore (madeira ×3–5)"}
+OK    com machado o rótulo mostra o rendimento  — {"sem":"Cortar árvore — precisa de machado","com":"Cortar árvore (madeira ×3–5)"}
+OK    o NPC aparece com o rótulo "Falar com"
+OK    conversar abre o diálogo com o NPC
+OK    a fala é contextual e não vazia  — Ei, tudo bem? Ouvi falar de suprimentos caindo do céu, de vez em quando. Siga a fumaça vermelha.
+OK    "Trocar suprimentos" abre a troca com 8 ofertas
+OK    comprar troca fichas pelo item, pelo preço exato  — {"antesC":{"item":"agua","preco":6,"fichas":30,"q":3},"depoisC":{"fichas":24,"q":4}}
+OK    vender troca o item por fichas, pelo preço exato  — {"antesV":{"item":"agua","preco":2,"fichas":24,"q":4},"depoisV":{"fichas":26,"q":3}}
+OK    "Despedir" fecha a conversa
+OK    a grade continua coerente depois da troca
+OK    atacar o NPC o faz fugir e queima a reputação
+OK    NPC ferido não pode mais ser abordado
+OK    depois de atacar alguém, o mascate se recusa a negociar
+OK    de fora da parede NÃO dá para alcançar o baú  — {"fora":false,"alvoFora":null,"dentro":true,"perto":true}
+OK    dentro da casa o baú é alcançável  — {"fora":false,"alvoFora":null,"dentro":true,"perto":true}
+OK    fabricar: bandagem gasta tecido e cria o item  — tecido 4→2, bandagem 4→5
+OK    cozinhar: carne crua vira carne cozida
+OK    baú guarda item da mochila
+OK    baú devolve o item
+OK    beber água repõe a sede
+OK    dormir faz o tempo passar  — 516 → 578 min
+OK    a mochila é uma grade de peças e bate com o inventário
+OK    o que não cabe na grade vai para o baú (nada some)  — {"grade":0,"inv":0,"bau":6}
+OK    a grade volta a bater depois de tirar itens
+OK    a mochila não mostra peso em kg
+OK    arrastar uma peça a muda de lugar na grade  — {"de":[2,0],"para":[7,3],"alvo":[7,3]}
+OK    tocar numa peça comprida e girar
+OK    "Organizar" reempacota sem perder itens
+OK    a bancada mostra cartões e filtra por "Prontas"  — 17 → 1
+OK    melhorar o tanque gasta materiais e sobe de nível
+OK    receita avançada só funciona depois da melhoria da bancada
+OK    a receita também pede o nível do jogador (kit médico: nível 4)
+OK    bancada nível 2 e jogador nível 4 fabricam kit médico
+OK    XP sobe o nível e dá pontos de habilidade  — {"nivel":6,"pontos":6}
+OK    a escolha de habilidade abre sozinha num momento calmo
+OK    escolher as habilidades as aplica e fecha o painel  — {"perks":6,"pontos":0,"painel":null}
+OK    a conquista "Veterano" (nível 5) é desbloqueada
+OK    o jogador mata um irradiado com a arma branca
+OK    o abate é contado  — {"antes":0,"depois":1}
+OK    ataque automático: sem inimigo por perto não há alvo
+OK    ataque automático olha em volta (360°); a mira comum só olha à frente  — {"id":4,"frente":false,"volta":true}
+OK    segurar o botão de ataque liga o modo automático
+OK    o ataque automático derruba o inimigo que está atrás, sem mais toques  — {"vivo":false,"hpE":-20,"d":1.91,"cd":0.45,"st":95,"acao":false,"painel":null,"auto":true,"mira":false,"pausada":false}
+OK    soltar o botão desliga o automático
+OK    o ataque automático nunca mira nem fere NPCs  — {"ferido":false,"hp":61.857969246106215,"antes":61.857969246106215,"alvoNpc":null}
+OK    no modo uma mão não há manche nem botão de ataque na tela
+OK    tocar no chão calcula o caminho e o jogador anda até lá sozinho  — {"chao":{"tx":46.5,"ty":40.5,"z":0},"rotaOk":true,"chegou":true}
+OK    toque duplo manda correr
+OK    tocar num objeto distante manda o jogador até ele e interage ao chegar (abre a bancada)  — {"tx":40.5,"ty":60.5,"z":17}
+OK    tocar num inimigo faz o jogador ir atrás e o ataque automático derrubar  — {"perseguiu":true,"caiu":true}
+OK    depois do abate o jogador pára de perseguir
+OK    o botão do HUD alterna uma mão ↔ duas mãos (aparece/some o manche)  — {"duas":{"cfg":"manche","stick":true,"atk":true},"uma":{"cfg":"toque","stick":false}}
+OK    todos os climas renderizam
+OK    viaja para o Ermo  — {"zonaId":"ermo","tela":"jogo","painel":null,"hp":135,"abates":3,"combustivel":6,"carga":1,"minutos":863.9852971428585}
+OK    a viagem gastou combustível  — 8 → 6
+OK    o ar tem vida: cinza, poeira e fumaça soltas no Ermo  — {"n":34,"interior":false,"hora":14.449754952380976}
+OK    o Ermo tem criaturas, flora e objetos  — {"ents":18,"flora":521,"props":198}
+OK    o objetivo da viagem é cumprido ao chegar  — {"idxJipe":3,"agora":4}
+OK    o Ermo tem itens soltos no chão  — {"id":500000,"item":"sucata","n0":34,"q0":3}
+OK    passar por cima de um item solto o coleta
+OK    cumprir o objetivo mostra o banner e avança
+OK    ler um bilhete abre a história e paga XP  — {"inv0":0}
+OK    o bilhete mostra o texto e o que estava junto  — {"painel":"nota","nota":true,"ov":1,"len":303,"txt":"AUTO\n135\nNV7\n★1\n14:31\nDIA 1\nTempestade de poeira\nOBJ Sobreviva a uma noite\n◆ Abata 5 rastejadores 0/"}
+OK    guardar o bilhete fecha o painel e a erva vai para a mochila
+OK    garimpar o ferro-velho rende sucata  — {"s0":4,"id":800199}
+OK    o ferro-velho gasta um dos 3 usos  — {"f":2,"ids":["800199"]}
+OK    o poço mata a sede ou enche a garrafa
+OK    o diretor repõe inimigos de noite (vários grupos)  — {"vistos":["irradiado","corredor","rastejador"],"dmin":14.241137595009747,"grupos":40,"segurou":true,"alvo":0}
+OK    a reposição traz variedade de inimigos  — irradiado,corredor,rastejador
+OK    os inimigos repostos nascem longe do jogador (≥ 13 tiles)  — 14.241137595009747
+OK    com tensão alta (acabou de apanhar) nada novo aparece
+OK    há contêiner para vasculhar no Ermo  — Vasculhar porta-malas
+OK    vasculhar conclui e conta o saque
+OK    o rádio passa 3 contratos  — ["Abata 5 rastejadores","Chegue a Refinaria 9","Entregue 2× eletrônicos no abrigo"]
+OK    um contrato fica pronto
+OK    a viagem abre a tela de estrada com origem e destino  — VIAGEM DE JIPE
+Ermo Cinzento ››› Abrigo
+4 H · COMBUSTÍVEL −2
+Combustível sobra em carros velhos, postos e contratos.
+OK    a estrada é pixel art animada (muitas cores, quadros diferentes)  — {"q1":{"h":-53261848,"cores":141,"w":190,"alt":143},"q2":{"h":1196454411,"cores":160,"w":190,"alt":143}}
+OK    o jipe avança: a barra de progresso cresce  — 11% → 18%
+OK    a estrada traz um evento com decisão
+OK    diante do evento o jipe fica parado na estrada  — 48% → 48%
+OK    o evento mostra o título e as opções
+OK    a escolha mostra o resultado
+OK    "Seguir viagem" conclui a viagem de volta ao abrigo
+OK    a tela de viagem some quando o destino está pronto  — null
+OK    a decisão custou tempo (+2 h)  — 2824 → 3186
+OK    receber o pagamento troca o contrato e dá XP  — {"n":3,"ainda":false,"xp":5120}
+OK    a invasão chega ao abrigo
+OK    repelir a invasão conta como conquista
+OK    viaja ao Ermo para o lançamento
+OK    o lançamento de suprimentos aparece com seta no HUD
+OK    abrir os suprimentos conclui e vira conquista
+OK    o mapa abre por nível: Posto Militar 14 (nível 8) não abre no nível 1  — {"antes":"ermo","depois":"ermo","trava":false}
+OK    o mapa de viagem mostra o sprite pixel art de cada local  — {"n":10,"vazios":0}
+OK    a Floresta tem dezenas de plantas para colher  — {"n":293,"rot":"Colher ervas","antes":6}
+OK    colher uma planta rende comida, erva ou fibra
+OK    a planta colhida vira tufo e não rende de novo
+OK    o local temático "hospital" carrega com conteúdo  — {"props":240,"ents":32,"nome":"Hospital São Judas"}
+OK    o local temático "militar" carrega com conteúdo  — {"props":290,"ents":49,"nome":"Posto Militar 14"}
+OK    o local temático "torre" carrega com conteúdo  — {"props":203,"ents":24,"nome":"Torre de Rádio"}
+OK    a Torre de Rádio guarda o rádio de campanha
+OK    menu oferece "Continuar" após recarregar
+OK    continua o jogo salvo
+OK    retoma na zona salva  — {"zonaId":"torre","tela":"jogo","painel":null,"hp":98.81334399999986,"abates":3,"combustivel":20,"carga":1,"minutos":4411.991331428591}
+OK    nível, habilidades e melhorias sobrevivem ao salvar  — {"nivel":19,"perks":6,"tanque":1}
+OK    no Calmo morrer não é o fim: desmaia e acorda no abrigo  — {"zona":"torre","itens":62}
+OK    ao acordar no abrigo a vida volta e a run segue viva
+OK    no Normal a morte leva à tela final
+OK    a tela final mostra o resumo da run
+OK    a tela final mostra nível e conquistas
+OK    salvar após a morte não ressuscita a partida
+OK    Modo Estudo carrega
+OK    nenhum erro de console/exceção em todo o teste
+
+140/140 verificações passaram.

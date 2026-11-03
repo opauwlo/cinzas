@@ -450,3 +450,15 @@ Som equalizado, mundo mais cheio e a viagem de carro animada foram feitos (ver �
 
 ### Pendências
 Mais animação de cenário (luzes que piscam na torre de rádio, bandeiras, goteiras); tudo foi validado em Chrome headless e por modelo numérico, nada num celular real.
+
+## 22. Refatoração de app e revisão de design (31/out/2026)
+
+- `components/Menu.tsx`: menu com jornada, objetivo, ritmo de dificuldade, controles reais, instalação e estado offline. Confirmação explícita para substituir uma partida.
+- `EstadoApp.tsx` e `RegistrarSW.tsx`: convite PWA, precache completo, status real e atualização solicitada no menu; `tools/offline.mjs` roda no postbuild e gera versão pelo conteúdo. Publicar `out/` inteiro.
+- `Cartao.tsx`: ativação por click (rolagem não dispara ações), foco de diálogo, Tab contido, Escape para painéis dispensáveis. HUD mantém gestos imediatos de combate.
+- HUD: relógio e ações em faixas distintas; habilidade passa pelo nível. Grade da mochila respeita a largura do celular. Finais e créditos revisados.
+- Persistência: cena não salva antes de pronta ou depois de encerrada; falha de armazenamento informa. `salvar.ts` valida saves e cópias; `ProgressoLocal.tsx` exporta/importa JSON com confirmação e sem alterar o save ao cancelar.
+- Caderno `/arte/`: sete categorias, pixels em tamanho real, variações de carro corretas e objetos antes ausentes.
+- `docs/REVISAO.md` e `docs/VALIDACAO.md`: critérios, limites, 223 verificações aprovadas e sete pranchas inspecionadas; capturas e logs guardados no repo. Não houve validação humana independente nem em aparelho físico.
+- `npm run qa:app` e `npm run qa:arte`; CI deixa de ignorar falha no smoke e inclui offline/backups. Sem dependências novas.
+- `.openai/hosting.json`: versão de revisão no Sites. A Vercel original continua no GitHub. Clone público funcionou, mas o push para `opauwlo/cinzas` não foi autorizado por falta de credencial de escrita neste ambiente.

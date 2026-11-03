@@ -44,13 +44,19 @@ export default function Arte() {
       for (const f of ['arbusto', 'arbusto', 'capim', 'capim', 'cacto', 'cogumelo', 'cogumelo', 'tronco', 'toco', 'pedra', 'pedra', 'ossos', 'flor', 'junco'] as const) est(gerarFlora(rng, f, f === 'arbusto' && rng.chance(0.5) ? 'seco' : ''), 3);
     }
     if (grupo === 'props') {
-      const nomes = ['geladeira', 'armario', 'caixa', 'ferramentas', 'barril', 'tambor_toxico', 'cama', 'mesa', 'cadeira', 'sofa', 'estante', 'prateleira', 'fogao', 'pia', 'vaso', 'tv', 'guarda_roupa', 'mala', 'lixeira', 'balcao', 'bancada', 'pneus', 'poste', 'placa', 'cerca', 'hidrante', 'banco', 'carrinho', 'caixote_militar', 'saco_areia', 'barricada', 'bomba', 'entulho', 'bau', 'fogueira', 'saco_dormir', 'bandeira', 'totem', 'tanque_agua', 'gerador', 'antena', 'horta', 'lixo'];
+      const nomes = ['geladeira', 'armario', 'caixa', 'ferramentas', 'barril', 'tambor_toxico', 'cama', 'mesa', 'cadeira', 'sofa', 'estante', 'prateleira', 'fogao', 'pia', 'vaso', 'tv', 'guarda_roupa', 'mala', 'lixeira', 'balcao', 'bancada', 'pneus', 'poste', 'placa', 'cerca', 'hidrante', 'banco', 'carrinho', 'caixote_militar', 'saco_areia', 'barricada', 'bomba', 'entulho', 'bau', 'fogueira', 'saco_dormir', 'bandeira', 'totem', 'tanque_agua', 'gerador', 'antena', 'horta', 'lixo', 'ponte_radio', 'poco', 'sucata_pilha', 'cruz'];
       for (const n of nomes) est({ tipo: 'prop', n, v: 1, d: 0.2, o: 0, sem: 7 }, 2);
       cx = 6; cy += alt + 6; alt = 0;
-      for (const n of ['carro', 'carro', 'carro', 'carro', 'carro', 'caminhao', 'container', 'barraca', 'tanque', 'helicoptero']) est({ tipo: 'prop', n, v: n === 'carro' ? [0, 1, 2, 3, 4][cy % 5 + (cx % 5)] ?? 0 : 1, d: 0.3, o: 0, sem: cx }, 1.5);
+      for (const [i, n] of ['carro', 'carro', 'carro', 'carro', 'carro', 'caminhao', 'container', 'barraca', 'tanque', 'helicoptero'].entries()) est({ tipo: 'prop', n, v: n === 'carro' ? i * 9 : 1, d: 0.3, o: 0, sem: i }, 1.5);
       void PROP_DIM;
+    }
+    if (grupo === 'estruturas') {
+      for (let estilo = 0; estilo < 4; estilo++) {
+        for (const n of ['parede', 'janela', 'porta', 'portaA', 'ruina'] as const) for (const alto of ['a', 'b'] as const) est({ tipo: 'estr', n, estilo, alto, sem: 1 }, 2);
+        cx = 6; cy += alt + 6; alt = 0;
+      }
     }
     document.title = `arte ${Math.round(performance.now() - t0)}ms ${fab.total}q`;
   }, []);
-  return <canvas ref={ref} width={1000} height={1100} style={{ imageRendering: 'pixelated', width: '100%' }} />;
+  return <main className="catalogo-arte"><header><a href={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/`}>← CINZAS</a><h1>Caderno de arte</h1><p>Personagens, criaturas, cenário e movimento. Arraste a prancha para inspecionar os pixels em tamanho real.</p><nav aria-label="Categorias de arte">{[['humanos', 'Personagens'], ['animais', 'Fauna'], ['flora', 'Flora'], ['props', 'Objetos'], ['estruturas', 'Estruturas'], ['clipes', 'Animações'], ['colosso', 'Colosso']].map(([g, n]) => <a key={g} href={`?g=${g}`}>{n}</a>)}</nav></header><div className="prancha-arte"><canvas ref={ref} width={1000} height={1100} aria-label="Prancha de sprites procedurais do CINZAS" style={{ imageRendering: 'pixelated', width: 1000, maxWidth: 'none' }} /></div></main>;
 }

@@ -270,7 +270,7 @@ export class Cena extends Phaser.Scene {
   tingir(r: Rastreado, noite: number) { const a = this.lmA[r.i], l = Math.round(a * 12); if (l === r.lvl) return; r.lvl = l; r.spr.setTint(this.tom(l / 12, noite)); }
   hora() { return (this.s.minutos % 1440) / 60; }
   superficie(t: number) { return t === T.MADEIRA || t === T.PORTA ? 'madeira' : t === T.AZULEJO ? 'azulejo' : t === T.METAL ? 'metal' : [T.ESTRADA, T.LINHA_H, T.LINHA_V, T.CALCADA, T.CONCRETO].includes(t as 1) ? 'concreto' : t === T.AREIA ? 'areia' : t === T.AGUA_RASA || t === T.LAMA ? 'agua' : 'terra'; }
-  salvar() { const st = useJogo.getState(); this.s.inv = { ...st.inv }; this.s.bau = { ...st.bau }; this.s.grade = st.grade.map(g => ({ ...g })); const copia: Run = { ...this.s, px: this.jog?.x, py: this.jog?.y }; salvarRun(copia); useJogo.setState({ temSave: true }); }
+  salvar() { if (!this.pronto || this.morto || this.vitoria) return; const st = useJogo.getState(); this.s.inv = { ...st.inv }; this.s.bau = { ...st.bau }; this.s.grade = st.grade.map(g => ({ ...g })); const copia: Run = { ...this.s, px: this.jog?.x, py: this.jog?.y }; const ok = salvarRun(copia); useJogo.setState({ temSave: ok }); if (!ok) useJogo.getState().toast('Não foi possível salvar. Libere espaço ou exporte uma cópia em Configurações.', '#e38d6b'); }
   dentroPredio(x: number, y: number) { return this.zona.predios.some(p => x > p.x && x < p.x + p.w - 1 && y > p.y && y < p.y + p.h - 1); }
 
   // ------------------------------------------------------------------ luz: cone de visão (rot.js) + pontilhado no chão + tingimento dos objetos

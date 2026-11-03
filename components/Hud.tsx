@@ -43,11 +43,11 @@ function useRecente(chave: string, ms = 9000) {
   return on;
 }
 /** linha de vital: discreta quando está tudo bem; acende ao mudar (3 s) ou ficar crítica */
-function VRow({ k, ico, v, num }: { k: string; ico: string; v: number; num?: string }) {
+function VRow({ k, ico, v, num, max = 100 }: { k: string; ico: string; v: number; num?: string; max?: number }) {
   const [mudou, setMudou] = useState(false), ant = useRef(v);
   useEffect(() => { if (Math.abs(v - ant.current) >= 1.5) { ant.current = v; setMudou(true); const t = setTimeout(() => setMudou(false), 3500); return () => clearTimeout(t); } ant.current = v; }, [v]);
   const crit = baixa(k, v), calma = !crit && !mudou && (k === 'rad' ? v < 10 : v >= 70);
-  return <div className={`vrow ${k} ${crit ? 'baixa' : ''} ${calma ? 'calma' : ''}`}><Ico src={ico} n={14} cor={k === 'vida' ? '#e0553f' : k === 'rad' ? '#8fe36a' : k === 'fome' ? '#d99a2b' : k === 'sede' ? '#6fa6d6' : '#b9c76a'} /><div className="seg" style={{ ['--p' as string]: pct(v) }}><i /></div><b>{num ?? ''}</b></div>;
+  return <div role="meter" aria-label={({ vida: 'Vida', fome: 'Saciedade', sede: 'Hidratação', stam: 'Fôlego', rad: 'Radiação' } as Record<string, string>)[k]} aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.round(v)} className={`vrow ${k} ${crit ? 'baixa' : ''} ${calma ? 'calma' : ''}`}><Ico src={ico} n={14} cor={k === 'vida' ? '#e0553f' : k === 'rad' ? '#8fe36a' : k === 'fome' ? '#d99a2b' : k === 'sede' ? '#6fa6d6' : '#b9c76a'} /><div className="seg" style={{ ['--p' as string]: pct(v / max * 100) }}><i /></div><b>{num ?? ''}</b></div>;
 }
 const icoAcao = (rot: string | null) => (!rot ? ic('delapouite', 'crafting') : /vasculh|abrir|revist|suprimentos/i.test(rot) ? ic('delapouite', 'cardboard-box') : /cort|desmont|esfol|rasg/i.test(rot) ? ic('lorc', 'machete') : /[aá]gua/i.test(rot) ? ic('sbed', 'water-drop') : /dorm/i.test(rot) ? ic('lorc', 'bandage-roll') : /jipe|viaj/i.test(rot) ? ic('delapouite', 'car-door') : ic('delapouite', 'crafting'));
 
@@ -75,15 +75,14 @@ export function Hud() {
   return (
     <div className="hud" style={{ ['--u' as string]: s.cfg.ui }}>
       <div className="vitais vidro degrau">
-        <VRow k="vida" ico={ic('delapouite', 'heart-beats')} v={s.hp} num={String(Math.max(0, Math.ceil(s.hp)))} /><VRow k="fome" ico={ic('delapouite', 'stomach')} v={s.fome} /><VRow k="sede" ico={ic('sbed', 'water-drop')} v={s.sede} /><VRow k="stam" ico={ic('lorc', 'sprint')} v={s.stamina} />
+        <VRow k="vida" ico={ic('delapouite', 'heart-beats')} v={s.hp} max={s.maxHp} num={String(Math.max(0, Math.ceil(s.hp)))} /><VRow k="fome" ico={ic('delapouite', 'stomach')} v={s.fome} /><VRow k="sede" ico={ic('sbed', 'water-drop')} v={s.sede} /><VRow k="stam" ico={ic('lorc', 'sprint')} v={s.stamina} />
         {(s.rad > 1 || s.cpm > 60) && <VRow k="rad" ico={ic('lorc', 'radioactive')} v={s.rad} num={String(Math.round(s.rad))} />}
-        <div className={`xpl ${s.pontos > 0 ? 'pts' : ''}`}><b>NV{s.nivel}</b><div className="seg" style={{ ['--p' as string]: pct((s.xp / xpNivel(s.nivel)) * 100) }}><i /></div>{s.pontos > 0 && <b>★{s.pontos}</b>}</div>
+        <button className={`xpl ${s.pontos > 0 ? 'pts' : ''}`} aria-label="Nível e habilidades" {...press(() => useJogo.setState({ painel: s.pontos > 0 ? 'perk' : 'diario' }))}><b>NV{s.nivel}</b><div className="seg" style={{ ['--p' as string]: pct((s.xp / xpNivel(s.nivel)) * 100) }}><i /></div>{s.pontos > 0 && <b>★{s.pontos}</b>}</button>
       </div>
       <div className="moodles" style={{ top: `calc(${(s.rad > 1 || s.cpm > 60 ? 104 : 90) * s.cfg.ui}px + var(--st))` }}>{moodles.map(m => <div key={m.k} className={`moodle n${m.n} ${m.rad ? 'rad' : ''}`}><Ico src={m.icone} n={18} cor={m.n === 2 ? '#ff8a70' : m.rad ? '#8fe36a' : '#d99a2b'} /></div>)}</div>
       <div className="relogio vidro degrau"><div className="h">{horaStr(s.minutos)}</div><div className="s"><span>DIA {dia}</span><IcoClima tipo={s.clima.tipo} noite={noite} /><span>{NOME_CLIMA[s.clima.tipo]}</span></div></div>
       <div className={`obj vidro degrau ${trackerAberto ? '' : 'min'}`} onPointerDown={e => { e.stopPropagation(); useJogo.setState({ painel: 'diario' }); }}><b><em>OBJ</em> {obj.titulo}{obj.meta > 1 && <span className="cnt"> {Math.min(s.objVal, obj.meta)}/{obj.meta}</span>}</b><div className="seg" style={{ ['--p' as string]: pct(obj.meta > 1 ? (s.objVal / obj.meta) * 100 : s.objVal >= obj.meta ? 100 : 5) }}><i /></div>{ct && <b className={`ct ${ctPronto ? 'ok' : ''}`}>◆ {ctPronto ? 'Contrato pronto: receba no abrigo' : `${ct.titulo} ${progresso(ct)}/${ct.qtd}`}</b>}</div>
       <div className="topo-dir">
-        {s.pontos > 0 && <button className="btn qbtn pisca" aria-label="Habilidades" {...press(() => useJogo.setState({ painel: 'perk' }))}><b style={{ font: "700 13px var(--f-ui)", color: 'var(--fosf)' }}>★{s.pontos}</b></button>}
         <button className="btn qbtn" aria-label={s.cfg.controle === 'toque' ? 'Controle: uma mão (toque). Toque para usar o manche.' : 'Controle: duas mãos (manche). Toque para jogar com uma mão.'} {...press(trocaControle)}><IcoModo uma={s.cfg.controle === 'toque'} /><small>{s.cfg.controle === 'toque' ? '1' : '2'}</small></button>
         <button className="btn qbtn" aria-label="Mapa da zona" {...press(() => useJogo.setState({ painel: 'mapaZona' }))}><Ico src={ic('lorc', 'radar-sweep')} n={22} /></button>
         <button className="btn qbtn" aria-label="Mochila" {...press(() => useJogo.setState({ painel: 'inv' }))}><Ico src={ic('delapouite', 'backpack')} n={22} /><small style={{ color: lv <= 3 ? '#e0553f' : undefined }}>{lv}</small></button>
@@ -91,7 +90,7 @@ export function Hud() {
       </div>
       {s.seta && s.painel === null && <Seta dx={s.seta.dx} dy={s.seta.dy} d={s.seta.d} />}
       {s.banner && <div key={s.banner.id} className="banner"><b>{s.banner.titulo.toUpperCase()}</b><strong>{s.banner.sub}</strong>{s.banner.extra && <small>{s.banner.extra}</small>}</div>}
-      <div className="toasts">{s.toasts.map(t => <div key={t.id} className="toast" style={{ color: t.cor }}>{t.texto}</div>)}</div>
+      <div className="toasts" role="status" aria-live="polite">{s.toasts.map(t => <div key={t.id} className="toast" style={{ color: t.cor }}>{t.texto}</div>)}</div>
       {s.acao && <div className={`acao ${s.cfg.controle === 'toque' ? 'um' : ''}`}><div className="r">{s.acao.rotulo}</div><div className="seg" style={{ ['--p' as string]: pct(s.acao.p * 100) }}><i /></div></div>}
       {s.dica && <div className="dica">{s.dica}</div>}
       <div className={`dir-bot ${s.cfg.canhoto ? 'esq' : ''} ${s.cfg.controle === 'toque' ? 'um' : ''}`}>

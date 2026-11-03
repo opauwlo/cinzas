@@ -27,9 +27,11 @@ jobs:
         run: npx tsc --noEmit
       - name: Build estático
         run: npm run build
-      # O smoke usa Chrome com GL por software, que em runner lento pode estourar tempo: não trava o resto enquanto é endurecido.
       - name: Smoke test (Chrome headless)
         run: node tools/smoke.mjs
-        continue-on-error: true
+        env:
+          CHROME: /usr/bin/google-chrome
+      - name: App offline, interface e backups
+        run: npm run qa:app
         env:
           CHROME: /usr/bin/google-chrome

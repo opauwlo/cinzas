@@ -473,6 +473,10 @@ try {
   ok('a tela final mostra o resumo da run', /sobreviveu|resumo|dia|abates/i.test(await ev(() => document.body.innerText)));
   ok('a tela final mostra nível e conquistas', /n[ií]vel/i.test(await ev(() => document.body.innerText)));
 
+  // Regressão: minimizar ou sair depois da morte nunca recria uma partida encerrada.
+  await ev(() => window.__cinzas.ponte.cmd.salvar());
+  ok('salvar após a morte não ressuscita a partida', await ev(() => localStorage.getItem('cinzas.save.v2') === null && !window.__cinzas.store.getState().temSave));
+
   // 10. Modo Estudo (reportagem) abre sem quebrar
   await pg.goto(url + '?estudo=1', { waitUntil: 'networkidle0' }); await espera(600);
   ok('Modo Estudo carrega', /estudo|b[oô]nus|sequ[eê]ncia/i.test(await ev(() => document.body.innerText)));

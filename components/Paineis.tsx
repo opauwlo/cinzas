@@ -14,6 +14,7 @@ import { Diario, PerkPainel, Melhorias, EventoPainel, Ajuda, Intro } from './Pai
 import { Mochila } from './Mochila';
 import { Bancada } from './Bancada';
 import IconeLocal from './IconeLocal';
+import ProgressoLocal from './ProgressoLocal';
 import { PainelNpc, PainelNota } from './PaineisNpc';
 import { linhasDe, livres } from '../game/sistemas/grade';
 
@@ -116,11 +117,12 @@ function Config() {
   const tg = (k: 'vibra' | 'autoMira' | 'gore' | 'canhoto' | 'fps', nome: string) => <div className="troca"><span>{nome}</span><button className={`btn peq ${c[k] ? 'aviso' : ''}`} {...p(() => set(k, !c[k]))}>{c[k] ? 'Ligado' : 'Desligado'}</button></div>;
   return (
     <Cartao titulo="Configurações">
+      <ProgressoLocal />
       <div className="card aco">{sl('mestre', 'Geral')}{sl('sfx', 'Efeitos')}{sl('amb', 'Ambiente')}{sl('mus', 'Música')}</div>
       <div className="card aco"><h3>Equalizador</h3><div className="troca"><span>Perfil de som</span><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{PERFIS_ORDEM.map(k => <button key={k} className={`btn peq ${c.perfil === k ? 'aviso' : ''}`} {...p(() => { set('perfil', k); sfx.teste(); })}>{PERFIS[k].nome}</button>)}</div></div><div className="mini">{PERFIS[c.perfil]?.desc}</div>{eq('graves', 'Graves (dB)')}{eq('agudos', 'Agudos (dB)')}<div className="troca"><span>Ouvir o resultado</span><button className="btn peq" {...p(() => sfx.teste())}>Testar som</button></div></div>
       <div className="card aco"><div className="troca"><span>Controle</span><div style={{ display: 'flex', gap: 5 }}>{([['toque', 'Uma mão'], ['manche', 'Duas mãos']] as const).map(([v, n]) => <button key={v} className={`btn peq ${c.controle === v ? 'aviso' : ''}`} {...p(() => set('controle', v))}>{n}</button>)}</div></div>{tg('vibra', 'Vibração')}{tg('autoMira', 'Mira automática')}{tg('gore', 'Sangue e membros')}{tg('canhoto', 'Modo canhoto')}{tg('fps', 'Mostrar FPS')}
         <div className="troca"><span>Tamanho da interface</span><div style={{ display: 'flex', gap: 5 }}>{[0.85, 1, 1.2].map(v => <button key={v} className={`btn peq ${c.ui === v ? 'aviso' : ''}`} {...p(() => set('ui', v))}>{v === 0.85 ? 'P' : v === 1 ? 'M' : 'G'}</button>)}</div></div>
-        <div className="troca"><span>Densidade de pixels (reinicia a run)</span><div style={{ display: 'flex', gap: 5 }}>{([[1, 'Ultra'], [1.5, 'Alta'], [2, 'Média'], [3, 'Leve']] as const).map(([v, n]) => <button key={v} className={`btn peq ${c.escala === v ? 'aviso' : ''}`} {...p(() => set('escala', v))}>{n}</button>)}</div></div>
+        <div className="troca"><span>Densidade de pixels (aplica ao reabrir)</span><div style={{ display: 'flex', gap: 5 }}>{([[1, 'Ultra'], [1.5, 'Alta'], [2, 'Média'], [3, 'Leve']] as const).map(([v, n]) => <button key={v} className={`btn peq ${c.escala === v ? 'aviso' : ''}`} {...p(() => set('escala', v))}>{n}</button>)}</div></div>
         <div className="troca"><span>Tela cheia</span><button className="btn peq" {...p(() => { try { void document.documentElement.requestFullscreen?.(); } catch { /* */ } })}>Ativar</button></div>
       </div>
     </Cartao>
