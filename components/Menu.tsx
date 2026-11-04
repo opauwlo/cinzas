@@ -9,6 +9,7 @@ import { estudoAtivo, registrarSequencia, fmtMs } from '../game/estudo';
 import { p, Cartao } from './Cartao';
 import ArteMenu from './ArteMenu';
 import { EstadoApp } from './EstadoApp';
+import { iniciarMenu } from '../game/audio';
 import Ico, { ic } from './Ico';
 
 export default function Menu({ onJogar }: { onJogar: (nova: boolean) => void | Promise<void> }) {
@@ -28,7 +29,7 @@ export default function Menu({ onJogar }: { onJogar: (nova: boolean) => void | P
     setToques(toques + 1); if (toques < 6) return; setToques(0);
     try { if (estudo) localStorage.removeItem('cinzas.estudo'); else localStorage.setItem('cinzas.estudo', '1'); setEstudo(!estudo); } catch { setErro('O armazenamento está indisponível neste navegador.'); }
   };
-  return <main className="tela menu-app">
+  return <main className="tela menu-app" onPointerDown={() => void iniciarMenu()}>
     <div className="menu-topo"><span className="marca-sinal"><i /> TRANSMISSÃO 07</span><span>SOBREVIVÊNCIA SOLO</span></div>
     <header className="menu-hero">
       <ArteMenu />

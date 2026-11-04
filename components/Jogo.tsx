@@ -11,6 +11,8 @@ import { Hud, Sobreposicoes } from './Hud';
 import Controles from './Controles';
 import Viagem from './Viagem';
 import Paineis from './Paineis';
+import { ligarProducaoNoNavegador } from '../game/lib/producao/navegador';
+import { escuta } from '../game/lib/escuta';
 import { Menu, Fim, Loja, Revelacao, Creditos } from './Telas';
 
 declare global { interface Window { __cinzas?: unknown } }
@@ -21,7 +23,12 @@ export default function Jogo() {
   const [erro, setErro] = useState(''), [demorou, setDemorou] = useState(false);
   const jogando = tela === 'jogo' || tela === 'morte' || tela === 'vitoria';
 
-  useEffect(() => { const c = lerCfg(); set({ cfg: c, temSave: temRun() }); aplicarVolumes({ mestre: c.mestre, sfx: c.sfx, amb: c.amb, mus: c.mus, vibra: c.vibra, perfil: c.perfil, graves: c.graves, agudos: c.agudos }); }, [set]);
+  useEffect(() => ligarProducaoNoNavegador(), []);
+  useEffect(() => { // memória do Caderno entre vidas (fora do save da run), antes de qualquer partida
+    try { escuta.carregarMeta(JSON.parse(localStorage.getItem('cinzas.escuta') ?? 'null')); } catch { /* sem storage */ }
+    escuta.aoGravarMeta(m => { try { localStorage.setItem('cinzas.escuta', JSON.stringify(m)); } catch { /* sem storage */ } });
+  }, []);
+  useEffect(() => { const c = lerCfg(); set({ cfg: c, temSave: temRun() }); aplicarVolumes({ mestre: c.mestre, sfx: c.sfx, amb: c.amb, mus: c.mus, vibra: c.vibra, perfil: c.perfil, graves: c.graves, agudos: c.agudos, mono: c.mono }); }, [set]);
   const iniciar = async (nova: boolean) => {
     setErro(''); setDemorou(false);
     void iniciarAudio();
