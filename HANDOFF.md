@@ -482,3 +482,14 @@ Mais animação de cenário (luzes que piscam na torre de rádio, bandeiras, got
 ### Pendências da onda 1
 - Alto contraste, remapeamento de controles, leitor de tela nos painéis (fechariam o pacote "Innovation in Accessibility").
 - Validar as legendas visuais num celular real (posição em telas estreitas com o rastreador aberto).
+
+## 24. Plano mestre GOTY com agentes por área (4/nov/2026)
+
+**Pedido do Uwlo:** planejar minuciosamente como obter o GOTY, coordenando game design, direção de arte e roteiro com agentes por área.
+
+- **Plano mestre** (doc no celular, com tabela de decisões e status): https://claude.ai/artifact/78iip5uAYLwYKBHcbMV3vW. Planos completos das 5 áreas em `docs/plano-goty/` (ver o `README.md` de lá).
+- **Visão:** nome recomendado **FAROL** (CINZAS vira o nome do mundo); tagline "O Geiger não mente. O rádio, sim."; a interface nunca mente, os personagens sim; tela final **O QUE FOI DITO** no formato da Revelação do Modo Estudo.
+- **Datas:** fatia v0 até 10/jan/2027 → BIG Festival (15/jan, grátis); G1 até 28/fev → Tribeca (4/mar); Steam Next Fest de junho (registro até 25/abr); **GO/NO-GO 28/jun/2027**; **1.0 em 30/set/2027** (Steam, Google Play, web demo); TGA 2027 com corte ~19/nov.
+- **Regra de IA:** o Indie Game Awards retirou prêmios do Clair Obscur (dez/2025) por IA generativa; o Steam exige declaração. Texto, música e voz finais precisam ser humanos; arte procedural é código determinístico; declarar em público o uso de agentes na programação. Os textos-amostra de `docs/plano-goty/roteiro.md` são prova de tom, não texto final.
+- **Correções desta rodada:** áudio suspende com o app em segundo plano (`audio.ts`, e nada dispara com o contexto suspenso); ligaduras da Pixelify desligadas em todo elemento (`globals.css`, "ConAgurações").
+- **Antes de implementar as ondas:** esperar as decisões de 30/nov do Uwlo (Sinal e Ruído, escopo sem P2P, cor da radiação, dificuldade "Jornada"). A primeira coisa a fazer, decidido ou não: testar no celular real e com 5 estranhos.
