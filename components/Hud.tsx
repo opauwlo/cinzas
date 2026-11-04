@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useJogo, horaStr, OBJETIVOS, gravarCfg, type Configs } from '../game/store';
 import { sfx, setAvisoVisual } from '../game/audio';
+import { setaPan } from '../game/lib/radiacao/geiger';
 import { linhasDe, livres } from '../game/sistemas/grade';
 import { ponte } from '../game/ponte';
 import { ITENS, armaDe } from '../game/dados/itens';
@@ -55,7 +56,7 @@ const LEGENDA: Record<string, [string, string]> = {
   colosso: ['COLOSSO', '#ff8a70'], tiro_inimigo: ['tiro', '#ff8a70'], dano: ['você foi atingido', '#ff8a70'], porta: ['porta', '#cfc7ae'], trovao: ['trovão', '#6fa6d6'], alarme: ['ALARME', '#ff8a70'], sinal: ['rádio', '#8fe36a'], freio: ['freio', '#cfc7ae'],
 };
 type AvisoUI = { id: number; rot: string; cor: string; lado: number };
-function SonsVisuais({ cpm, hp }: { cpm: number; hp: number }) {
+function SonsVisuais({ cpm, hp, pan }: { cpm: number; hp: number; pan: number }) {
   const [avisos, setAvisos] = useState<AvisoUI[]>([]), ult = useRef<Record<string, number>>({});
   useEffect(() => {
     let id = 1;
@@ -71,7 +72,7 @@ function SonsVisuais({ cpm, hp }: { cpm: number; hp: number }) {
   const g = cpm > 400 ? 3 : cpm > 180 ? 2 : cpm > 60 ? 1 : 0;
   return (
     <div className="sons-visuais" role="status" aria-live="polite">
-      {g > 0 && <div className="sv" style={{ color: '#8fe36a', animationDuration: `${[1.2, 0.7, 0.35][g - 1]}s` }}><Ico src={ic('lorc', 'radioactive')} n={13} cor="#8fe36a" /> Geiger {['fraco', 'médio', 'FORTE'][g - 1]}</div>}
+      {g > 0 && <div className="sv" style={{ color: '#8fe36a', animationDuration: `${[1.2, 0.7, 0.35][g - 1]}s` }}><Ico src={ic('lorc', 'radioactive')} n={13} cor="#8fe36a" /> {setaPan(pan) === '◀' ? '◀ ' : ''}Geiger {['fraco', 'médio', 'FORTE'][g - 1]}{setaPan(pan) === '▶' ? ' ▶' : ''}</div>}
       {hp < 30 && <div className="sv" style={{ color: '#e0553f', animationDuration: '0.9s' }}><Ico src={ic('delapouite', 'heart-beats')} n={13} cor="#e0553f" /> coração acelerado</div>}
       {avisos.map(a => <div key={a.id} className="sv pontual" style={{ color: a.cor }}>{a.lado < 0 ? '◀ ' : ''}{a.rot}{a.lado > 0 ? ' ▶' : ''}</div>)}
     </div>
@@ -117,7 +118,7 @@ export function Hud() {
         <button className="btn qbtn" aria-label="Mochila" {...press(() => useJogo.setState({ painel: 'inv' }))}><Ico src={ic('delapouite', 'backpack')} n={22} /><small style={{ color: lv <= 3 ? '#e0553f' : undefined }}>{lv}</small></button>
         <button className="btn qbtn" aria-label="Pausa" {...press(() => useJogo.setState({ painel: 'pausa' }))}><svg width="14" height="14" viewBox="0 0 8 8" shapeRendering="crispEdges"><rect x="1" y="0" width="2" height="8" fill="#cfc7ae" /><rect x="5" y="0" width="2" height="8" fill="#cfc7ae" /></svg></button>
       </div>
-      {s.cfg.sonsVisuais && <SonsVisuais cpm={s.cpm} hp={s.hp} />}
+      {s.cfg.sonsVisuais && <SonsVisuais cpm={s.cpm} hp={s.hp} pan={s.geigerPan} />}
       {s.seta && s.painel === null && <Seta dx={s.seta.dx} dy={s.seta.dy} d={s.seta.d} />}
       {s.banner && <div key={s.banner.id} className="banner"><b>{s.banner.titulo.toUpperCase()}</b><strong>{s.banner.sub}</strong>{s.banner.extra && <small>{s.banner.extra}</small>}</div>}
       <div className="toasts" role="status" aria-live="polite">{s.toasts.map(t => <div key={t.id} className="toast" style={{ color: t.cor }}>{t.texto}</div>)}</div>

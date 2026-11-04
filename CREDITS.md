@@ -28,3 +28,7 @@ Phaser (MIT), Box2D v3 (MIT), walloc (MIT), Trystero (MIT), @noble/secp256k1 (MI
 ## Ícones próprios
 
 `public/icons/cinzas/` (bagas, cogumelo, erva, bilhete): desenhados para este projeto em pixel art, sem terceiros (domínio público / CC0).
+
+## Algoritmos publicados e libs do sprint 1
+
+- Campo de radiação (`game/lib/radiacao/`): advecção semi-lagrangiana segundo Jos Stam, "Stable Fluids" (SIGGRAPH 1999). O algoritmo é publicado e a implementação é própria. Usa simplex-noise (MIT) e alea (MIT), que já estão no projeto.

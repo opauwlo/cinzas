@@ -35,6 +35,7 @@ import { alvoHostis, escolherArq, tamanhoGrupo, intervaloSpawn, podeSpawnar, pon
 import { toqueNovo, passoToque, cancelarToque, desenharToque, toqueAtivo } from './sistemas/toque';
 import { clarear } from './sistemas/efeitos';
 import { Nucleo, novoMundo, ventoDir, barramento } from './nucleo';
+import { radiacao } from './lib/radiacao';
 import { OBJETIVOS as OBJS_ATO } from './dados/objetivos';
 
 export { MIN_POR_SEG };
@@ -169,7 +170,7 @@ export class Cena extends Phaser.Scene {
     const m = this.mundo, s = this.s, z = this.zona, cl = this.clima, J = this.jog;
     m.seed = s.seed; m.minutos = s.minutos; m.dia = Math.floor(s.minutos / 1440) + 1; m.hora = this.hora();
     m.zona.id = z.id; m.zona.bioma = z.bioma; m.zona.w = W; m.zona.h = H; m.zona.tipos = z.tipos; m.zona.solido = z.solido; m.zona.opaco = z.opaco; m.zona.rad = z.rad;
-    if (J) { m.jogador.x = J.x; m.jogador.y = J.y; m.jogador.ang = J.ang; } m.jogador.hp = s.hp; m.jogador.maxHp = s.maxHp; m.jogador.furtivo = ponte.entrada.furtivo; m.jogador.mascara = s.mascara;
+    if (J) { m.jogador.x = J.x; m.jogador.y = J.y; m.jogador.ang = J.ang; } m.jogador.hp = s.hp; m.jogador.maxHp = s.maxHp; m.jogador.furtivo = ponte.entrada.furtivo; m.jogador.mascara = s.mascara && !!useJogo.getState().inv.mascara;
     m.clima.tipo = cl.tipo; m.clima.chuva = cl.chuva; m.clima.vento = cl.vento; m.clima.ventoDir = ventoDir(s.seed, s.minutos); m.clima.neblina = cl.neblina; m.clima.poeira = cl.poeira; m.clima.acida = cl.acida;
     m.interior = this.interior; m.perigo = Math.min(1, this.ents.filter(e => e.vivo && e.arq.hostil && e.estado === 'persegue').length / 4);
     m.ato = OBJS_ATO[Math.min(s.objIdx, OBJS_ATO.length - 1)]?.ato ?? 1; m.dif = s.dif ?? 1;
@@ -343,7 +344,7 @@ export class Cena extends Phaser.Scene {
     this.tPortas += dt; if (this.tPortas > 0.5) { this.tPortas = 0; for (const [i, d] of this.portas) if (d.aberta) { d.t += 0.5; const x = i % W, y = Math.floor(i / W); if (d.t > 4 && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) > 6 && !this.ents.some(e => e.vivo && Math.hypot(e.x - x - 0.5, e.y - y - 0.5) < 1.2)) this.fecharPorta(i); } }
     this.tSync += dt; if (this.tSync > 0.1) { this.tSync = 0; this.sincronizar(); }
     this.tSave += dt; if (this.tSave > 30 && !this.morto) { this.tSave = 0; this.salvar(); }
-    if (!this.morto) { this.preencherMundo(); this.nucleo.tick(dt, this.mundo); const mi = Math.floor(s.minutos); if (mi !== this.minutoUlt) { this.minutoUlt = mi; barramento.emit({ t: 'minuto', minutos: mi }); } }
+    if (!this.morto) { this.preencherMundo(); radiacao.imune = pk(s, 'imune'); radiacao.dosimetro.contaminacao = s.rad; this.nucleo.tick(dt, this.mundo); s.rad = radiacao.dosimetro.contaminacao; s.radMax = Math.max(s.radMax, s.rad); const mi = Math.floor(s.minutos); if (mi !== this.minutoUlt) { this.minutoUlt = mi; barramento.emit({ t: 'minuto', minutos: mi }); } }
     this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); avancarObjetivos(this); tickNpcs(this); atualizarDiretor(this, 1); sincGrade(); }
   }
   separar() {
@@ -423,15 +424,14 @@ export class Cena extends Phaser.Scene {
   necessidades(dt: number) {
     const s = this.s, J = this.jog, dmin = dt * MIN_POR_SEG, st = useJogo.getState(), cl = this.clima, mask = s.mascara && st.inv.mascara ? 0.35 : 1;
     const fm = DIF.fome[dif(s)] * (pk(s, 'estomago') ? 0.7 : 1); s.fome = Math.max(0, s.fome - dmin * FOME_POR_MIN * fm); s.sede = Math.max(0, s.sede - dmin * SEDE_POR_MIN * fm);
-    const rad = this.zona.rad[idx(Math.floor(J.x), Math.floor(J.y))] ?? 0; this.radSuave += (rad - this.radSuave) * Math.min(1, dt * 4);
-    let ganho = rad > 0.05 ? Math.pow(rad, 1.2) * 2.4 * mask : 0; if (cl.acida && !this.interior) ganho += cl.chuva * 1.1 * mask;
-    if (pk(s, 'imune')) ganho *= 0.6; s.rad = Math.min(100, Math.max(0, s.rad + (ganho > 0 ? ganho * dt : -0.03 * dt))); s.radMax = Math.max(s.radMax, s.rad);
-    s.maxHp = 100 + VIDA_POR_NIVEL * Math.min(10, (s.nivel ?? 1) - 1) + (pk(s, 'pele') ? 15 : 0) - s.rad * 0.5; if (s.hp > s.maxHp) s.hp = s.maxHp;
+    this.radSuave = radiacao.taxaJogador(); /* o ganho de contaminação acontece no tick do módulo de radiação (game/lib/radiacao) */ void J;
+    const ef = radiacao.efeitoDose(); s.sede = Math.max(0, s.sede - dmin * SEDE_POR_MIN * fm * (ef.sede - 1));
+    s.maxHp = 100 + VIDA_POR_NIVEL * Math.min(10, (s.nivel ?? 1) - 1) + (pk(s, 'pele') ? 15 : 0) - s.rad * 0.5 + ef.hpMax; if (s.hp > s.maxHp) s.hp = s.maxHp;
     let dreno = 0; if (s.sangra) dreno += 0.7; if (s.fome <= 0) dreno += 0.4; if (s.sede <= 0) dreno += 0.8; if (s.rad >= 100) dreno += 2; if (cl.poeira > 0.4 && !this.interior && mask > 0.9) dreno += 0.12 * cl.poeira;
     if (dreno) { s.hp -= dreno * dt; if (s.hp <= 0) this.morrer(s.sede <= 0 ? 'Morreu de sede' : s.fome <= 0 ? 'Morreu de fome' : s.sangra ? 'Sangrou até a morte' : 'Envenenado pela radiação'); }
     else if (s.fome > 40 && s.sede > 40 && s.rad < 70) s.hp = Math.min(s.maxHp, s.hp + REGEN_VIDA * dt);
     if (s.lanterna.ligada) { s.lanterna.bat = Math.max(0, s.lanterna.bat - 0.33 * dt); if (s.lanterna.bat <= 0) { s.lanterna.ligada = false; st.toast('A bateria acabou', '#d9a02b'); } }
-    const alvoCpm = 18 + this.radSuave * 900 + (cl.acida && !this.interior ? cl.chuva * 120 : 0); st.cpm = st.cpm; this.cpm += (alvoCpm - this.cpm) * Math.min(1, dt * 3); setGeiger(this.cpm); setBatimento(s.hp < 30 && !this.morto);
+    this.cpm = radiacao.cpm(); setGeiger(this.cpm); setBatimento(s.hp < 30 && !this.morto);
     if (cl.chuva > 0.2 && this.zona.id === 'base') { const tn = melNivel(s, 'tanque'); s.tanque = Math.min([5, 8, 12][tn], s.tanque + dmin * 0.01 * cl.chuva * [1, 1.5, 2][tn]); }
     const h = this.hora(), noite = h < 6 || h >= 20.5; if (this.noiteAnterior && !noite && h >= 6) { s.noites++; useJogo.getState().toast('Você sobreviveu à noite', '#8fe36a'); registrar(this, 'noites'); ganharXp(this, 30); } this.noiteAnterior = noite;
   }
@@ -542,7 +542,7 @@ export class Cena extends Phaser.Scene {
   sincronizar() {
     const s = this.s, J = this.jog, st = useJogo.getState(), cl = this.clima; let prog = 0, h = this.hora();
     
-    useJogo.setState({ minutos: s.minutos, hp: s.hp, maxHp: s.maxHp, fome: s.fome, sede: s.sede, stamina: s.stamina, rad: s.rad, sangra: s.sangra, balas: { ...s.balas }, arma: s.arma, mascara: s.mascara, combustivel: s.combustivel, lanterna: { ...s.lanterna, tem: !!st.inv.lanterna }, cpm: Math.round(this.cpm), objIdx: s.objIdx, objVal: objetivoAtual(s.objIdx).valor(s, st.inv), vasculhados: s.vasculhados, abates: s.abates, radMax: s.radMax, sabeAbrigo: s.sabeAbrigo, furtivo: ponte.entrada.furtivo, interior: this.interior, tanque: s.tanque, descobertos: [...s.descobertos], clima: { tipo: cl.tipo, chuva: cl.chuva, vento: cl.vento, neblina: cl.neblina, poeira: cl.poeira, nuvem: cl.nuvem }, seta: setaAirdrop(this), fps: Math.round(this.game.loop.actualFps) });
+    useJogo.setState({ minutos: s.minutos, hp: s.hp, maxHp: s.maxHp, fome: s.fome, sede: s.sede, stamina: s.stamina, rad: s.rad, sangra: s.sangra, balas: { ...s.balas }, arma: s.arma, mascara: s.mascara, combustivel: s.combustivel, lanterna: { ...s.lanterna, tem: !!st.inv.lanterna }, cpm: Math.round(this.cpm), geigerPan: radiacao.leitura().pan, objIdx: s.objIdx, objVal: objetivoAtual(s.objIdx).valor(s, st.inv), vasculhados: s.vasculhados, abates: s.abates, radMax: s.radMax, sabeAbrigo: s.sabeAbrigo, furtivo: ponte.entrada.furtivo, interior: this.interior, tanque: s.tanque, descobertos: [...s.descobertos], clima: { tipo: cl.tipo, chuva: cl.chuva, vento: cl.vento, neblina: cl.neblina, poeira: cl.poeira, nuvem: cl.nuvem }, seta: setaAirdrop(this), fps: Math.round(this.game.loop.actualFps) });
     h = 0; void J; void horaStr; void OBJETIVOS;
   }
   morrer(causa: string) { executarMorte(this, causa); }

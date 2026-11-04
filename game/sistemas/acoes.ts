@@ -15,6 +15,7 @@ import { Rng } from '../lib/rng';
 import { cabeNaMochila, sincGrade, adicionar, remover, linhasDe, emGrade } from './grade';
 import { tremer, clarear } from './efeitos';
 import { barramento } from '../nucleo/barramento';
+import { radiacao } from '../lib/radiacao';
 import { EVENTOS_VIAGEM, type Ajuda, type EventoViagem } from '../dados/eventos';
 import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado, dif } from './progresso';
 import { tocarToque } from './toque';
@@ -126,6 +127,7 @@ function beberFonte(c: Cena, p: Prop, dur: number) {
   const n = usosFonte(c, p); if (n <= 0) return; const enche = tem('garrafa'), rad = Math.max(0, (c.bioma.rad - 0.9) * 6);
   iniciarAcao(c, enche ? 'Enchendo garrafa' : 'Bebendo', dur, () => {
     c.ze.fontes[p.id] = n - 1; if (enche) { if (tirar('garrafa')) dar(c, 'agua', 1); } else { c.s.sede = Math.min(100, c.s.sede + 28); sfx.beber(); }
+    if (radiacao.poNaRoupa() > 0) { radiacao.lavar(c.jog.x, c.jog.y); toast('A água leva o pó azul.', '#5ce1ff'); }
     if (rad > 0) { c.s.rad = Math.min(100, c.s.rad + rad); toast('A água tem gosto de ferrugem.', '#d9a02b'); }
   }, undefined, 'agua');
 }
@@ -241,7 +243,7 @@ function desmaiar(c: Cena, causa: string) {
     const s = c.s, inv = { ...st().inv }, rng = new Rng(`${s.seed}|desmaio|${Math.floor(s.minutos)}`);
     for (const id of Object.keys(inv)) { if (id === 'radio' || id === s.arma || (ITENS[id]?.tipo === 'equip')) continue; const perde = Math.min(inv[id], Math.floor(inv[id] * 0.4) + (rng.chance(0.4) ? 1 : 0)); if (perde > 0) { inv[id] -= perde; if (inv[id] <= 0) delete inv[id]; } }
     useJogo.setState({ inv }); sincGrade(); s.inv = { ...st().inv }; s.bau = { ...st().bau };
-    s.hp = Math.max(s.hp, s.maxHp * 0.6); s.fome = Math.max(s.fome, 40); s.sede = Math.max(s.sede, 40); s.sangra = false; s.rad = Math.max(0, s.rad - 30); s.minutos += 360; s.st = s.st ?? {}; s.st.desmaios = (s.st.desmaios ?? 0) + 1;
+    radiacao.somarDose(40); s.hp = Math.max(s.hp, s.maxHp * 0.6); s.fome = Math.max(s.fome, 40); s.sede = Math.max(s.sede, 40); s.sangra = false; s.rad = Math.max(0, s.rad - 30); s.minutos += 360; s.st = s.st ?? {}; s.st.desmaios = (s.st.desmaios ?? 0) + 1;
     s.px = undefined; s.py = undefined; s.nucleo = c.nucleo.salvar(); c.salvar(); toast(`Você desmaiou (${causa.toLowerCase()}) e acordou no abrigo. Perdeu parte da mochila.`, '#d9a02b');
     c.scene.restart({ run: c.s, zonaId: 'base', esc: c.esc });
   });

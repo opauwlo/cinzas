@@ -32,7 +32,7 @@ export type Estado = {
   hp: number; maxHp: number; fome: number; sede: number; stamina: number; rad: number; sangra: boolean;
   inv: Record<string, number>; bau: Record<string, number>; arma: string | null; balas: Record<string, number>; mascara: boolean; combustivel: number;
   lanterna: { tem: boolean; ligada: boolean; bat: number };
-  cpm: number; objIdx: number; objVal: number; banner: { id: number; titulo: string; sub: string; extra: string } | null; vasculhados: number; abates: number; radMax: number; sabeAbrigo: boolean;
+  cpm: number; /** −1..1: de que lado o Geiger sobe (lib de radiação) */ geigerPan: number; objIdx: number; objVal: number; banner: { id: number; titulo: string; sub: string; extra: string } | null; vasculhados: number; abates: number; radMax: number; sabeAbrigo: boolean;
   clima: ClimaHud; interior: boolean; tanque: number;
   toasts: Toast[]; acao: { rotulo: string; p: number } | null; alvo: string | null; furtivo: boolean;
   danoTs: number; resumo: Resumo | null; gemas: number; carga: number; descobertos: string[]; dica: string | null; cfg: Configs; temSave: boolean; fps: number;
@@ -53,7 +53,7 @@ export const estadoInicial = (seed: string) => ({
   seed, zonaId: 'base', zonaNome: 'Abrigo', biomaId: 'base', minutos: 8 * 60, hp: 100, maxHp: 100, fome: 78, sede: 70, stamina: 100, rad: 0, sangra: false,
   inv: { agua: 3, bandagem: 4, pe_de_cabra: 1, enlatado: 3, faca: 1 } as Record<string, number>, bau: { tecido: 3, madeira: 4, sucata: 4, enlatado: 2, alcool: 1, garrafa: 2, semente: 2, ficha: 6 } as Record<string, number>,
   arma: 'pe_de_cabra' as string | null, balas: { municao: 0, cartucho: 0 } as Record<string, number>, mascara: false, combustivel: 8, lanterna: { tem: false, ligada: false, bat: 100 },
-  cpm: 18, objIdx: 0, objVal: 0, banner: null, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
+  cpm: 18, geigerPan: 0, objIdx: 0, objVal: 0, banner: null, vasculhados: 0, abates: 0, radMax: 0, sabeAbrigo: false,
   clima: { tipo: 'limpo', chuva: 0, vento: 0.1, neblina: 0, poeira: 0, nuvem: 0.1 } as ClimaHud, interior: false, tanque: 0,
   toasts: [] as Toast[], acao: null, alvo: null, furtivo: false, danoTs: 0, resumo: null, descobertos: ['base'] as string[], dica: null,
   viagem: null as ViagemUI | null, dialogo: null, nota: null as { titulo: string; texto: string; extra: string } | null, grade: [] as Peca[], xp: 0, nivel: 1, pontos: 0, perks: [] as string[], contratos: [] as Contrato[], mel: {} as Record<string, number>, conquistas: [] as string[], evento: null, seta: null, dif: 1,
