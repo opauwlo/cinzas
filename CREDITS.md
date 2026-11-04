@@ -36,3 +36,4 @@ Phaser (MIT), Box2D v3 (MIT), walloc (MIT), Trystero (MIT), @noble/secp256k1 (MI
 - Telemetria (`game/lib/producao/`): fila local própria, desligada por padrão; se um dia houver servidor, será Umami (MIT) auto-hospedado, sem o script de rastreio dele.
 - Escuta (`game/lib/escuta/`): sem terceiros novos (usa alea, MIT, e as fontes VT323 e Pixelify Sans, OFL).
 - Texto (rascunho): lib de Narrativa (`game/lib/narrativa/`), sprint 1 — rascunho de IA, aguardando revisão e assinatura humana (ver `game/lib/narrativa/PEDIDO.md`). i18n próprio sobre `Intl.PluralRules` (nativo).
+- Trilha adaptativa (`game/lib/musica/`): motor e síntese próprios sobre Web Audio; semente via alea (MIT). Viola por Karplus-Strong (algoritmo de 1983, domínio público) e passa-tudo fracionário de Jaffe & Smith (1983). Partitura provisória da direção de áudio, a ser substituída pela obra do(a) compositor(a) contratado(a). Nenhuma IA generativa de som.

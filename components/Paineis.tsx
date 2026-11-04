@@ -113,7 +113,7 @@ function MapaZona() {
   );
 }
 function Config() {
-  const s = useJogo(), c = s.cfg, set = (k: keyof Configs, v: number | boolean | string) => { const n = { ...c, [k]: v } as Configs; useJogo.setState({ cfg: n }); gravarCfg(n); aplicarVolumes({ mestre: n.mestre, sfx: n.sfx, amb: n.amb, mus: n.mus, vibra: n.vibra, perfil: n.perfil, graves: n.graves, agudos: n.agudos }); };
+  const s = useJogo(), c = s.cfg, set = (k: keyof Configs, v: number | boolean | string) => { const n = { ...c, [k]: v } as Configs; useJogo.setState({ cfg: n }); gravarCfg(n); aplicarVolumes({ mestre: n.mestre, sfx: n.sfx, amb: n.amb, mus: n.mus, vibra: n.vibra, perfil: n.perfil, graves: n.graves, agudos: n.agudos, mono: n.mono }); };
   const eq = (k: 'graves' | 'agudos', nome: string) => <label className="slider">{nome}<input type="range" min={-6} max={6} step={1} value={c[k]} onChange={e => set(k, +e.target.value)} /><output>{c[k] > 0 ? '+' : ''}{c[k]}</output></label>;
   const sl = (k: 'mestre' | 'sfx' | 'amb' | 'mus', nome: string) => <label className="slider">{nome}<input type="range" min={0} max={1} step={0.05} value={c[k]} onChange={e => set(k, +e.target.value)} /><output>{Math.round(c[k] * 100)}</output></label>;
   const tg = (k: 'vibra' | 'autoMira' | 'gore' | 'canhoto' | 'fps' | 'sonsVisuais' | 'menosEfeitos', nome: string) => <div className="troca"><span>{nome}</span><button className={`btn peq ${c[k] ? 'aviso' : ''}`} {...p(() => set(k, !c[k]))}>{c[k] ? 'Ligado' : 'Desligado'}</button></div>;
@@ -129,6 +129,8 @@ function Config() {
         <div className="troca"><span>Tela cheia</span><button className="btn peq" {...p(() => { try { void document.documentElement.requestFullscreen?.(); } catch { /* */ } })}>Ativar</button></div>
       </div>
       <div className="card aco"><h3>Acessibilidade</h3>
+        <div className="troca"><span>Som mono</span><button className={`btn peq ${c.mono ?? c.perfil === 'celular' ? 'aviso' : ''}`} {...p(() => set('mono', !(c.mono ?? c.perfil === 'celular')))}>{(c.mono ?? c.perfil === 'celular') ? 'Ligado' : 'Desligado'}</button></div>
+        <div className="mini">Junta esquerda e direita: para fone de um lado só ou alto-falante único.</div>
         {tg('sonsVisuais', 'Sons no visor')}
         <div className="mini">Mostra em texto o que soou e de que lado: Geiger, coração, rosnados, tiros, alarme. Para quem não ouve ou joga sem som.</div>
         {tg('menosEfeitos', 'Menos clarões e tremores')}

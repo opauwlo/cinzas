@@ -28,7 +28,7 @@ export default function Jogo() {
     try { escuta.carregarMeta(JSON.parse(localStorage.getItem('cinzas.escuta') ?? 'null')); } catch { /* sem storage */ }
     escuta.aoGravarMeta(m => { try { localStorage.setItem('cinzas.escuta', JSON.stringify(m)); } catch { /* sem storage */ } });
   }, []);
-  useEffect(() => { const c = lerCfg(); set({ cfg: c, temSave: temRun() }); aplicarVolumes({ mestre: c.mestre, sfx: c.sfx, amb: c.amb, mus: c.mus, vibra: c.vibra, perfil: c.perfil, graves: c.graves, agudos: c.agudos }); }, [set]);
+  useEffect(() => { const c = lerCfg(); set({ cfg: c, temSave: temRun() }); aplicarVolumes({ mestre: c.mestre, sfx: c.sfx, amb: c.amb, mus: c.mus, vibra: c.vibra, perfil: c.perfil, graves: c.graves, agudos: c.agudos, mono: c.mono }); }, [set]);
   const iniciar = async (nova: boolean) => {
     setErro(''); setDemorou(false);
     void iniciarAudio();

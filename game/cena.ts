@@ -36,6 +36,7 @@ import { toqueNovo, passoToque, cancelarToque, desenharToque, toqueAtivo } from 
 import { clarear } from './sistemas/efeitos';
 import { Nucleo, novoMundo, ventoDir, barramento } from './nucleo';
 import { radiacao } from './lib/radiacao';
+import { musica } from './lib/musica';
 import { OBJETIVOS as OBJS_ATO } from './dados/objetivos';
 
 export { MIN_POR_SEG };
@@ -345,7 +346,7 @@ export class Cena extends Phaser.Scene {
     this.tSync += dt; if (this.tSync > 0.1) { this.tSync = 0; this.sincronizar(); }
     this.tSave += dt; if (this.tSave > 30 && !this.morto) { this.tSave = 0; this.salvar(); }
     if (!this.morto) { this.preencherMundo(); radiacao.imune = pk(s, 'imune'); radiacao.dosimetro.contaminacao = s.rad; this.nucleo.tick(dt, this.mundo); s.rad = radiacao.dosimetro.contaminacao; s.radMax = Math.max(s.radMax, s.rad); const mi = Math.floor(s.minutos); if (mi !== this.minutoUlt) { this.minutoUlt = mi; barramento.emit({ t: 'minuto', minutos: mi }); } }
-    this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); avancarObjetivos(this); tickNpcs(this); atualizarDiretor(this, 1); sincGrade(); }
+    this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; if (this.ents.some(e => e.vivo && e.arq.ia === 'colosso' && Math.hypot(e.x - this.jog.x, e.y - this.jog.y) < 20)) musica.colossoPerto(); this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); avancarObjetivos(this); tickNpcs(this); atualizarDiretor(this, 1); sincGrade(); }
   }
   separar() {
     const at = this.ents.filter(e => e.vivo && e.arq.hostil && Math.abs(e.x - this.jog.x) < 20 && Math.abs(e.y - this.jog.y) < 20);
