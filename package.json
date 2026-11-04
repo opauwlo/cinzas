@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:demo": "NEXT_PUBLIC_DEMO=1 next build",
     "conceitos": "node tools/conceitos.mjs",
     "teste": "node tools/testes.mjs",
     "smoke": "node tools/smoke.mjs",
@@ -26,6 +27,7 @@
     "react-dom": "^19.3.1",
     "rot-js": "^2.2.1",
     "simplex-noise": "^4.0.3",
+    "web-vitals": "^6.2.3",
     "zustand": "^5.0.16",
     "zzfx": "^1.4.0"
   },

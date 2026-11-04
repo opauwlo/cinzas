@@ -32,3 +32,6 @@ Phaser (MIT), Box2D v3 (MIT), walloc (MIT), Trystero (MIT), @noble/secp256k1 (MI
 ## Algoritmos publicados e libs do sprint 1
 
 - Campo de radiação (`game/lib/radiacao/`): advecção semi-lagrangiana segundo Jos Stam, "Stable Fluids" (SIGGRAPH 1999). O algoritmo é publicado e a implementação é própria. Usa simplex-noise (MIT) e alea (MIT), que já estão no projeto.
+- web-vitals 6.2.3 (Apache-2.0, Google Chrome team): medição de INP (latência de toque) no diagnóstico `?diag=1`. Carregado só quando o Diag abre.
+- Telemetria (`game/lib/producao/`): fila local própria, desligada por padrão; se um dia houver servidor, será Umami (MIT) auto-hospedado, sem o script de rastreio dele.
+- Escuta (`game/lib/escuta/`): sem terceiros novos (usa alea, MIT, e as fontes VT323 e Pixelify Sans, OFL).

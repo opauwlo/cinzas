@@ -16,6 +16,7 @@ import { cabeNaMochila, sincGrade, adicionar, remover, linhasDe, emGrade } from 
 import { tremer, clarear } from './efeitos';
 import { barramento } from '../nucleo/barramento';
 import { radiacao } from '../lib/radiacao';
+import { modoDemo, motivoBloqueio } from '../lib/producao';
 import { EVENTOS_VIAGEM, type Ajuda, type EventoViagem } from '../dados/eventos';
 import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado, dif } from './progresso';
 import { tocarToque } from './toque';
@@ -189,7 +190,7 @@ function ajuda(c: Cena): Ajuda {
 }
 export function viajar(c: Cena, dest: string) {
   const loc = localPorId(dest), cur = c.s.zonaId; if (dest === cur || c.trava) return;
-  const bloq = bloqueioLocal(loc, c.s.nivel ?? 1, st().inv); if (bloq) { toast(`${loc.nome}: ${bloq.toLowerCase()}.`, '#d9a02b'); sfx.ui('erro'); return; }
+  const bloq = bloqueioLocal(loc, c.s.nivel ?? 1, st().inv) ?? motivoBloqueio(modoDemo, dest); if (bloq) { toast(`${loc.nome}: ${bloq.toLowerCase()}.`, '#d9a02b'); sfx.ui('erro'); return; }
   const custo = custoViagem(cur, dest, pk(c.s, 'mecanico')); if (c.s.combustivel < custo.combustivel) { toast(`Combustível insuficiente (${custo.combustivel} necessário).`, '#c9561f'); sfx.ui('erro'); return; }
   c.trava = true; useJogo.setState({ painel: null });
   const rng = new Rng(`${c.s.seed}|ev|${Math.floor(c.s.minutos)}|${dest}`), dia = Math.floor(c.s.minutos / 1440) + 1;
@@ -278,6 +279,7 @@ export function instalarComandos(c: Cena) {
     },
     cozinhar: id => { const r = COZINHA.find(q => q.id === id); if (!r) return; if (!tirar(r.de)) { toast('Falta ' + ITENS[r.de].nome.toLowerCase() + '.', '#d9a02b'); sfx.ui('erro'); return; } dar(c, r.para, 1); c.avancar(15, 1); sfx.comer(); registrar(c, 'cozinhados'); ganharXp(c, 2, false); },
     dormir: h => dormir(c, h),
+    passarTempo: min => { c.avancar(min, 1); c.sincronizar(); },
     bauMover: (id, qtd, paraBau) => {
       const inv = { ...st().inv }, bau = { ...st().bau }; let grade = st().grade;
       if (paraBau) { const n = Math.min(qtd, inv[id] ?? 0); if (!n) return; inv[id] -= n; if (inv[id] <= 0) delete inv[id]; bau[id] = (bau[id] ?? 0) + n; if (emGrade(id)) grade = remover(grade, id, n); }

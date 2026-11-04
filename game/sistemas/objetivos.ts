@@ -6,6 +6,8 @@ import { ITENS } from '../dados/itens';
 import { sfx } from '../audio';
 import { ganharXp, registrar } from './progresso';
 import { dar } from './acoes';
+import { barramento } from '../nucleo/barramento';
+import { modoDemo, encerraDemo } from '../lib/producao';
 
 let bid = 1;
 /** faixa grande no centro por 3 s (objetivo cumprido, descoberta…) */
@@ -29,6 +31,8 @@ export function avancarObjetivos(c: Cena) {
   while (s.objIdx < OBJETIVOS.length - 1) { const o = OBJETIVOS[s.objIdx]; if (o.valor(s, inv) < o.meta) break; cumpridos.push(o); s.objIdx++; }
   s.objVer = OBJ_VER;
   if (cumpridos.length && !silencioso) {
+    for (const o of cumpridos) barramento.emit({ t: 'telemetria', nome: 'objetivo', dados: { id: o.id, ato: o.ato } });
+    if (cumpridos.some(o => encerraDemo(modoDemo, o.id))) useJogo.setState({ painel: 'nota', nota: { titulo: 'Fim da demonstração', texto: modoDemo.mensagemFim, extra: '' } });
     let xp = 0; const itens: string[] = [];
     for (const o of cumpridos) { xp += o.xp; ganharXp(c, o.xp, false); for (const [i, q] of o.premio ?? []) { darOuBau(c, i, q); itens.push(`${q}× ${ITENS[i]?.nome ?? i}`); } }
     const ult = cumpridos[cumpridos.length - 1], prox = objetivoAtual(s.objIdx);

@@ -15,6 +15,8 @@ import { Mochila } from './Mochila';
 import { Bancada } from './Bancada';
 import IconeLocal from './IconeLocal';
 import ProgressoLocal from './ProgressoLocal';
+import { OQueMedimos } from './Diag';
+import { modoDemo, motivoBloqueio } from '../game/lib/producao';
 import { PainelNpc, PainelNota } from './PaineisNpc';
 import { linhasDe, livres } from '../game/sistemas/grade';
 
@@ -71,7 +73,7 @@ function Mapa() {
     g.putImageData(img, 0, 0); g.fillStyle = '#6a604c';
     const base = LOCAIS[0]; for (const l of LOCAIS.slice(1)) { const n = Math.ceil(Math.hypot(l.x - base.x, l.y - base.y)); for (let i = 0; i < n; i += 2) g.fillRect(Math.round(base.x + (l.x - base.x) * i / n), Math.round(base.y + (l.y - base.y) * i / n), 1, 1); }
   }, []);
-  const alvoObj = OBJETIVOS[Math.min(s.objIdx, OBJETIVOS.length - 1)].local, dest = localPorId(sel), custo = custoViagem(s.zonaId, sel, s.perks.includes('mecanico')), bloq = bloqueioLocal(dest, s.nivel, s.inv), travado = !!bloq, sem = s.combustivel < custo.combustivel, aqui = sel === s.zonaId;
+  const alvoObj = OBJETIVOS[Math.min(s.objIdx, OBJETIVOS.length - 1)].local, dest = localPorId(sel), custo = custoViagem(s.zonaId, sel, s.perks.includes('mecanico')), bloq = bloqueioLocal(dest, s.nivel, s.inv) ?? motivoBloqueio(modoDemo, dest.id), travado = !!bloq, sem = s.combustivel < custo.combustivel, aqui = sel === s.zonaId;
   return (
     <Cartao titulo="Mapa" larg={560} rodape={
       <div className="card aco degrau" style={{ display: 'grid', gap: 6 }}>
@@ -82,7 +84,7 @@ function Mapa() {
       </div>}>
       <div style={{ position: 'relative' }}>
         <canvas ref={ref} width={100} height={100} className="mapamundi" />
-        {LOCAIS.filter(l => l.id !== 'abrigo7' || s.sabeAbrigo || (s.inv.radio ?? 0) > 0).map(l => { const trava = !!bloqueioLocal(l, s.nivel, s.inv), aqui = l.id === s.zonaId; return (
+        {LOCAIS.filter(l => l.id !== 'abrigo7' || s.sabeAbrigo || (s.inv.radio ?? 0) > 0).map(l => { const trava = !!(bloqueioLocal(l, s.nivel, s.inv) ?? motivoBloqueio(modoDemo, l.id)), aqui = l.id === s.zonaId; return (
           <div key={l.id} className="no-mapa" style={{ left: `${l.x}%`, top: `${l.y}%` }}>
             <button className="btn" aria-label={l.nome} {...p(() => { setSel(l.id); sfx.ui('clique'); })} style={{ width: '100%', height: '100%', padding: 0, boxShadow: l.id === sel ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #f09a50' : aqui ? 'inset 0 0 0 2px #050506, inset 0 0 0 4px #8fe36a' : undefined }}><IconeLocal id={l.id} travado={trava} /></button>
             {l.id === alvoObj && <span className="estrela">★</span>}
@@ -118,6 +120,7 @@ function Config() {
   return (
     <Cartao titulo="Configurações">
       <ProgressoLocal />
+      <OQueMedimos />
       <div className="card aco">{sl('mestre', 'Geral')}{sl('sfx', 'Efeitos')}{sl('amb', 'Ambiente')}{sl('mus', 'Música')}</div>
       <div className="card aco"><h3>Equalizador</h3><div className="troca"><span>Perfil de som</span><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{PERFIS_ORDEM.map(k => <button key={k} className={`btn peq ${c.perfil === k ? 'aviso' : ''}`} {...p(() => { set('perfil', k); sfx.teste(); })}>{PERFIS[k].nome}</button>)}</div></div><div className="mini">{PERFIS[c.perfil]?.desc}</div>{eq('graves', 'Graves (dB)')}{eq('agudos', 'Agudos (dB)')}<div className="troca"><span>Ouvir o resultado</span><button className="btn peq" {...p(() => sfx.teste())}>Testar som</button></div></div>
       <div className="card aco"><div className="troca"><span>Controle</span><div style={{ display: 'flex', gap: 5 }}>{([['toque', 'Uma mão'], ['manche', 'Duas mãos']] as const).map(([v, n]) => <button key={v} className={`btn peq ${c.controle === v ? 'aviso' : ''}`} {...p(() => set('controle', v))}>{n}</button>)}</div></div>{tg('vibra', 'Vibração')}{tg('autoMira', 'Mira automática')}{tg('gore', 'Sangue e membros')}{tg('canhoto', 'Modo canhoto')}{tg('fps', 'Mostrar FPS')}

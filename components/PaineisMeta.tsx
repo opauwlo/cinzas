@@ -10,15 +10,16 @@ import { xpNivel, opcoesPerk, custoMelhoria, podeMelhorar, DIF_NOMES } from '../
 import { progresso, pronto, temParaEntregar } from '../game/sistemas/contratos';
 import Ico, { ic } from './Ico';
 import { Cartao, p, fechar } from './Cartao';
+import CadernoPainel from '../game/lib/escuta/CadernoPainel';
 
 const pct = (v: number) => `${Math.max(0, Math.min(100, v))}%`;
 const ico = ([a, n]: [string, string]) => ic(a, n);
 
 // ---------------------------------------------------------------- diário em abas
-type Aba = 'obj' | 'ctr' | 'hab' | 'con';
+type Aba = 'obj' | 'esc' | 'ctr' | 'hab' | 'con';
 export function Diario() {
   const s = useJogo(), [aba, setAba] = useState<Aba>('obj'), dia = Math.floor(s.minutos / 1440) + 1, noBase = s.zonaId === 'base';
-  const prontos = s.contratos.filter(pronto).length, abas: [Aba, string][] = [['obj', 'Objetivos'], ['ctr', prontos ? `Contratos ●${prontos}` : 'Contratos'], ['hab', s.pontos ? `Habilidades ★${s.pontos}` : 'Habilidades'], ['con', 'Conquistas']];
+  const prontos = s.contratos.filter(pronto).length, abas: [Aba, string][] = [['obj', 'Objetivos'], ['esc', 'Escuta'], ['ctr', prontos ? `Contratos ●${prontos}` : 'Contratos'], ['hab', s.pontos ? `Habilidades ★${s.pontos}` : 'Habilidades'], ['con', 'Conquistas']];
   return (
     <Cartao titulo="Diário">
       <div className="abas">{abas.map(([k, n]) => <button key={k} className={`btn aba ${aba === k ? 'on' : ''}`} {...p(() => { setAba(k); sfx.ui('clique'); })}>{n}</button>)}</div>
@@ -50,6 +51,7 @@ export function Diario() {
         {s.perks.map(id => { const k = perkPorId(id); return <div key={id} className="linha-item" style={{ ['--rc' as string]: '#8fe36a' }}><div className="im"><Ico src={ico(k.ic)} n={28} cor="#8fe36a" /></div><div><b>{k.nome}</b><small>{k.desc}</small></div><span /></div>; })}
         <div className="mini">Ganhe XP abatendo criaturas, vasculhando, fabricando, descobrindo locais e cumprindo contratos.</div>
       </>}
+      {aba === 'esc' && <CadernoPainel aoTriangular={() => { const st = useJogo.getState(); if (!((st.inv.bateria ?? 0) > 0)) return false; useJogo.setState({ inv: { ...st.inv, bateria: st.inv.bateria - 1 } }); ponte.cmd?.passarTempo(60); return true; }} />}
       {aba === 'con' && <>
         <div className="mini">{s.conquistas.length} de {CONQUISTAS.length} conquistas. Elas ficam com você mesmo depois da morte.</div>
         {CONQUISTAS.map(q => { const ok = s.conquistas.includes(q.id); return <div key={q.id} className="linha-item" style={{ ['--rc' as string]: ok ? '#e0b83a' : '#3a3d42', opacity: ok ? 1 : 0.55 }}><div className="im"><Ico src={ico(q.ic)} n={28} cor={ok ? '#e0b83a' : '#565c64'} /></div><div><b>{q.nome}</b><small>{q.desc}</small></div><span className="mini">{ok ? '★' : ''}</span></div>; })}

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useJogo, horaStr, OBJETIVOS, gravarCfg, type Configs } from '../game/store';
 import { sfx, setAvisoVisual } from '../game/audio';
 import { setaPan } from '../game/lib/radiacao/geiger';
+import RadioBalao from '../game/lib/escuta/RadioBalao';
 import { linhasDe, livres } from '../game/sistemas/grade';
 import { ponte } from '../game/ponte';
 import { ITENS, armaDe } from '../game/dados/itens';
@@ -118,6 +119,7 @@ export function Hud() {
         <button className="btn qbtn" aria-label="Mochila" {...press(() => useJogo.setState({ painel: 'inv' }))}><Ico src={ic('delapouite', 'backpack')} n={22} /><small style={{ color: lv <= 3 ? '#e0553f' : undefined }}>{lv}</small></button>
         <button className="btn qbtn" aria-label="Pausa" {...press(() => useJogo.setState({ painel: 'pausa' }))}><svg width="14" height="14" viewBox="0 0 8 8" shapeRendering="crispEdges"><rect x="1" y="0" width="2" height="8" fill="#cfc7ae" /><rect x="5" y="0" width="2" height="8" fill="#cfc7ae" /></svg></button>
       </div>
+      {s.painel === null && <RadioBalao />}
       {s.cfg.sonsVisuais && <SonsVisuais cpm={s.cpm} hp={s.hp} pan={s.geigerPan} />}
       {s.seta && s.painel === null && <Seta dx={s.seta.dx} dy={s.seta.dy} d={s.seta.d} />}
       {s.banner && <div key={s.banner.id} className="banner"><b>{s.banner.titulo.toUpperCase()}</b><strong>{s.banner.sub}</strong>{s.banner.extra && <small>{s.banner.extra}</small>}</div>}
