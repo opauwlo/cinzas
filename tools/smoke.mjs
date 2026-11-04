@@ -402,7 +402,7 @@ try {
 
   // 7f. invasão ao abrigo (forçada): aparece, é repelida e vira conquista
   await ev(() => { const k = window.__cinzas.cena(); k.s.hp = 100; k.devForcar = 'raid'; });
-  ok('a invasão chega ao abrigo', await ate(() => { const k = window.__cinzas.cena(); return !!k.raid && k.ents.some(e => e.vivo && e.grupo === k.raid.grupo); }, 20000));
+  ok('a invasão chega ao abrigo', await ate(() => { const k = window.__cinzas.cena(); return !!k.raid && k.ents.some(e => e.vivo && e.grupo === k.raid.grupo); }, 45000)); // a fábrica gera os sprites dos invasores com orçamento por quadro; em GL por software passa de 20 s
   await foto('4c-raid');
   await ev(() => { const k = window.__cinzas.cena(); for (const e of k.ents) if (k.raid && e.grupo === k.raid.grupo) { e.vivo = false; e.estado = 'morto'; } });
   ok('repelir a invasão conta como conquista', await ate(() => window.__cinzas.store.getState().conquistas.includes('defensor'), 8000));

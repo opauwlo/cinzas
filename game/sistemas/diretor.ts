@@ -13,6 +13,7 @@ import { criarEnt } from './ia';
 import { montarInterativos } from './acoes';
 import { DIF, dif, melNivel, ganharXp, registrar } from './progresso';
 import { tamanhoRaid, RAID_DIA_MIN } from '../dados/balanco';
+import { clarear } from './efeitos';
 export { airdropColetado } from './progresso';
 
 const ID_AIRDROP = 910000;
@@ -34,7 +35,10 @@ export function pontoLivre(c: Cena, rng: Rng, dmin: number, dmax: number, tent =
 }
 const spawnGrupo = (c: Cena, rng: Rng, arq: string, n: number, perto: [number, number], grupo: number, persegue = false, faccao?: number) => {
   for (let i = 0; i < n; i++) {
-    const x = perto[0] + 0.5 + rng.range(-2.5, 2.5), y = perto[1] + 0.5 + rng.range(-2.5, 2.5); if (c.solidoEm(Math.floor(x), Math.floor(y))) continue;
+    // re-sorteia até achar casa livre perto; se nada servir, nasce no próprio ponto-base (que quem chamou garantiu livre) —
+    // senão um grupo pequeno podia nascer vazio e a invasão se "resolvia" sozinha sem nenhum inimigo
+    let x = perto[0] + 0.5, y = perto[1] + 0.5;
+    for (let t = 0; t < 10; t++) { const px = perto[0] + 0.5 + rng.range(-2.5, 2.5), py = perto[1] + 0.5 + rng.range(-2.5, 2.5); if (!c.solidoEm(Math.floor(px), Math.floor(py))) { x = px; y = py; break; } }
     const e = criarEnt(c, arq, x, y, null, grupo, faccao); if (persegue) { e.estado = 'persegue'; e.alvo = { x: c.jog.x, y: c.jog.y }; e.semVer = 0; }
   }
 };
@@ -108,6 +112,6 @@ export function atualizarDiretor(c: Cena, _dt: number) {
     const base = pontoLivre(c, rng, 26, 34) ?? pontoLivre(c, rng, 20, 40); if (!base) return;
     for (let i = 0; i < n; i++) { const a = rng.peso(tipos); spawnGrupo(c, rng, a, 1, base, grupo, true, a === 'saqueador' ? 0 : a === 'filho' ? 1 : undefined); }
     if (d >= 8 && rng.chance(0.3)) spawnGrupo(c, rng, 'colosso', 1, base, grupo, true);
-    c.raid = { grupo, total: n, resolvido: false }; toast('ALARME! Invasores no portão!', '#e0553f'); sfx.alarme(); c.cameras.main.flash(180, 90, 12, 8);
+    c.raid = { grupo, total: n, resolvido: false }; toast('ALARME! Invasores no portão!', '#e0553f'); sfx.alarme(); clarear(c.cameras.main, 180, 90, 12, 8);
   });
 }

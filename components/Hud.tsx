@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useJogo, horaStr, OBJETIVOS, gravarCfg, type Configs } from '../game/store';
-import { sfx } from '../game/audio';
+import { sfx, setAvisoVisual } from '../game/audio';
 import { linhasDe, livres } from '../game/sistemas/grade';
 import { ponte } from '../game/ponte';
 import { ITENS, armaDe } from '../game/dados/itens';
@@ -49,6 +49,35 @@ function VRow({ k, ico, v, num, max = 100 }: { k: string; ico: string; v: number
   const crit = baixa(k, v), calma = !crit && !mudou && (k === 'rad' ? v < 10 : v >= 70);
   return <div role="meter" aria-label={({ vida: 'Vida', fome: 'Saciedade', sede: 'Hidratação', stam: 'Fôlego', rad: 'Radiação' } as Record<string, string>)[k]} aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.round(v)} className={`vrow ${k} ${crit ? 'baixa' : ''} ${calma ? 'calma' : ''}`}><Ico src={ico} n={14} cor={k === 'vida' ? '#e0553f' : k === 'rad' ? '#8fe36a' : k === 'fome' ? '#d99a2b' : k === 'sede' ? '#6fa6d6' : '#b9c76a'} /><div className="seg" style={{ ['--p' as string]: pct(v / max * 100) }}><i /></div><b>{num ?? ''}</b></div>;
 }
+// ---------------------------------------------------------------- legendas visuais de som (acessibilidade: o que soou e de que lado)
+const LEGENDA: Record<string, [string, string]> = {
+  zumbi: ['rosnado', '#e0553f'], corredor: ['rosnado rápido', '#e0553f'], cao: ['latido', '#e0553f'], javali: ['grunhido', '#d99a2b'], cervo: ['animal', '#8fe36a'], rato: ['guincho', '#d99a2b'], inseto: ['zumbido', '#d99a2b'], corvo: ['corvo', '#cfc7ae'], humano: ['voz humana', '#e0b83a'],
+  colosso: ['COLOSSO', '#ff8a70'], tiro_inimigo: ['tiro', '#ff8a70'], dano: ['você foi atingido', '#ff8a70'], porta: ['porta', '#cfc7ae'], trovao: ['trovão', '#6fa6d6'], alarme: ['ALARME', '#ff8a70'], sinal: ['rádio', '#8fe36a'], freio: ['freio', '#cfc7ae'],
+};
+type AvisoUI = { id: number; rot: string; cor: string; lado: number };
+function SonsVisuais({ cpm, hp }: { cpm: number; hp: number }) {
+  const [avisos, setAvisos] = useState<AvisoUI[]>([]), ult = useRef<Record<string, number>>({});
+  useEffect(() => {
+    let id = 1;
+    setAvisoVisual(a => {
+      const l = LEGENDA[a.nome]; if (!l) return;
+      const agora = Date.now(); if (agora - (ult.current[a.nome] ?? 0) < 900) return; ult.current[a.nome] = agora; // sem repetir a mesma legenda em menos de 0,9 s
+      const item: AvisoUI = { id: id++, rot: l[0], cor: l[1], lado: a.pan < -0.2 ? -1 : a.pan > 0.2 ? 1 : 0 };
+      setAvisos(v => [...v.slice(-3), item]);
+      setTimeout(() => setAvisos(v => v.filter(x => x.id !== item.id)), 2600);
+    });
+    return () => setAvisoVisual(null);
+  }, []);
+  const g = cpm > 400 ? 3 : cpm > 180 ? 2 : cpm > 60 ? 1 : 0;
+  return (
+    <div className="sons-visuais" role="status" aria-live="polite">
+      {g > 0 && <div className="sv" style={{ color: '#8fe36a', animationDuration: `${[1.2, 0.7, 0.35][g - 1]}s` }}><Ico src={ic('lorc', 'radioactive')} n={13} cor="#8fe36a" /> Geiger {['fraco', 'médio', 'FORTE'][g - 1]}</div>}
+      {hp < 30 && <div className="sv" style={{ color: '#e0553f', animationDuration: '0.9s' }}><Ico src={ic('delapouite', 'heart-beats')} n={13} cor="#e0553f" /> coração acelerado</div>}
+      {avisos.map(a => <div key={a.id} className="sv pontual" style={{ color: a.cor }}>{a.lado < 0 ? '◀ ' : ''}{a.rot}{a.lado > 0 ? ' ▶' : ''}</div>)}
+    </div>
+  );
+}
+
 const icoAcao = (rot: string | null) => (!rot ? ic('delapouite', 'crafting') : /vasculh|abrir|revist|suprimentos/i.test(rot) ? ic('delapouite', 'cardboard-box') : /cort|desmont|esfol|rasg/i.test(rot) ? ic('lorc', 'machete') : /[aá]gua/i.test(rot) ? ic('sbed', 'water-drop') : /dorm/i.test(rot) ? ic('lorc', 'bandage-roll') : /jipe|viaj/i.test(rot) ? ic('delapouite', 'car-door') : ic('delapouite', 'crafting'));
 
 export function Hud() {
@@ -88,6 +117,7 @@ export function Hud() {
         <button className="btn qbtn" aria-label="Mochila" {...press(() => useJogo.setState({ painel: 'inv' }))}><Ico src={ic('delapouite', 'backpack')} n={22} /><small style={{ color: lv <= 3 ? '#e0553f' : undefined }}>{lv}</small></button>
         <button className="btn qbtn" aria-label="Pausa" {...press(() => useJogo.setState({ painel: 'pausa' }))}><svg width="14" height="14" viewBox="0 0 8 8" shapeRendering="crispEdges"><rect x="1" y="0" width="2" height="8" fill="#cfc7ae" /><rect x="5" y="0" width="2" height="8" fill="#cfc7ae" /></svg></button>
       </div>
+      {s.cfg.sonsVisuais && <SonsVisuais cpm={s.cpm} hp={s.hp} />}
       {s.seta && s.painel === null && <Seta dx={s.seta.dx} dy={s.seta.dy} d={s.seta.d} />}
       {s.banner && <div key={s.banner.id} className="banner"><b>{s.banner.titulo.toUpperCase()}</b><strong>{s.banner.sub}</strong>{s.banner.extra && <small>{s.banner.extra}</small>}</div>}
       <div className="toasts" role="status" aria-live="polite">{s.toasts.map(t => <div key={t.id} className="toast" style={{ color: t.cor }}>{t.texto}</div>)}</div>
@@ -112,5 +142,5 @@ function Seta({ dx, dy, d }: { dx: number; dy: number; d: number }) {
 
 export function Sobreposicoes() {
   const s = useJogo();
-  return (<><div className="vinheta" /><div className={`perigo-borda ${s.hp < 30 ? 'on' : ''}`} /><div className="rad-tom" style={{ opacity: Math.min(1, Math.max(0, (s.cpm - 120) / 500)) }} />{s.danoTs ? <div key={s.danoTs} className="dano-flash" /> : null}</>);
+  return (<><div className="vinheta" /><div className={`perigo-borda ${s.hp < 30 ? 'on' : ''}`} /><div className="rad-tom" style={{ opacity: Math.min(1, Math.max(0, (s.cpm - 120) / 500)) }} />{s.danoTs ? <div key={s.danoTs} className={`dano-flash ${s.cfg.menosEfeitos ? 'suave' : ''}`} /> : null}</>);
 }

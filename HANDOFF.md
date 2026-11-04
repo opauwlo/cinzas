@@ -462,3 +462,34 @@ Mais animação de cenário (luzes que piscam na torre de rádio, bandeiras, got
 - `docs/REVISAO.md` e `docs/VALIDACAO.md`: critérios, limites, 223 verificações aprovadas e sete pranchas inspecionadas; capturas e logs guardados no repo. Não houve validação humana independente nem em aparelho físico.
 - `npm run qa:app` e `npm run qa:arte`; CI deixa de ignorar falha no smoke e inclui offline/backups. Sem dependências novas.
 - `.openai/hosting.json`: versão de revisão no Sites. A Vercel original continua no GitHub. Clone público funcionou, mas o push para `opauwlo/cinzas` não foi autorizado por falta de credencial de escrita neste ambiente.
+
+## 23. Rumo ao GOTY: pesquisa de critérios + onda 1 de acessibilidade (4/nov/2026)
+
+**Pedido do Uwlo:** melhorar o jogo até os critérios de Game of the Year; pesquisar e detalhar os critérios, comparar com vencedores anteriores e mapear as mudanças.
+
+### Pesquisa (relatório completo no artifact "CINZAS rumo ao GOTY")
+- TGA: júri de 100+ veículos (90%) + público (10%); sem inscrição; corte em 20/nov; acesso antecipado e web elegíveis. Critério oficial: "melhor trabalho criativo e técnico". Na prática: Metacritic ≥ 88 em todos os 12 vencedores, pacote completo de categorias, identidade memorável e impacto cultural.
+- Vencedores 2014–2025 comparados no relatório. Sinais pró-indie: Clair Obscur (≈30 pessoas) venceu 2025; Balatro (1 dev) indicado 2024; Vampire Survivors levou o BAFTA GOTY 2023. Nenhum web game jamais indicado — portas de entrada reais: Innovation in Accessibility, Games for Impact (Modo Estudo!), Best Mobile, Best Indie, e prêmios menores (IGF, BIG/gamescom latam, SXSW) antes.
+- Mapa em 5 ondas: 1 acessibilidade (feita) · 2 identidade/narrativa (nome, personagem-âncora, final) · 3 trilha adaptativa de verdade (maior lacuna) · 4 alcance (celular real, trailer, imprensa, ranking da seed) · 5 pacote completo (P2P, WASM, alto contraste, remapeamento).
+
+### Onda 1 — acessibilidade (implementada)
+- **Sons no visor** (`cfg.sonsVisuais`): `setAvisoVisual` em `audio.ts` publica sons relevantes (vozes de criatura, tiro inimigo, colosso, alarme, trovão, dano, porta) e a HUD (`SonsVisuais` em `Hud.tsx`) mostra legendas com direção (◀/▶ pelo pan), Geiger contínuo (fraco/médio/FORTE pelo cpm, pulsa na taxa) e coração acelerado (hp < 30). Filtro por nome+categoria e sem repetir a mesma legenda em < 0,9 s.
+- **Menos clarões e tremores** (`cfg.menosEfeitos`): todo `cameras.main.shake/flash` passou para `tremer`/`clarear` (`game/sistemas/efeitos.ts`), que não fazem nada com a opção ligada; o `dano-flash` vira borda breve (`.suave`). Quem tem `prefers-reduced-motion` no aparelho começa com a opção ligada (migração `cfg v:5`).
+- **Interface XG** (ui 1,4) nas Configurações; card "Acessibilidade" novo em `Paineis.tsx`.
+- **Bug real achado pelo smoke:** em `spawnGrupo` (diretor), cada integrante era descartado se o ponto sorteado (±2,5 do ponto-base) caísse em casa sólida — uma invasão pequena (Calmo, tamanho 1) podia nascer **vazia**, tocar "ALARME!" e se "resolver" sozinha. Determinístico pela seed do dia (por isso o CI passava em outros dias). Agora re-sorteia até 10 vezes e, se nada servir, nasce no ponto-base (garantido livre por `pontoLivre`). O teste da invasão também ganhou 45 s de espera (fábrica de sprites com orçamento por quadro em GL por software).
+- Testes: 51/51 de lógica; smoke 140/140.
+
+### Pendências da onda 1
+- Alto contraste, remapeamento de controles, leitor de tela nos painéis (fechariam o pacote "Innovation in Accessibility").
+- Validar as legendas visuais num celular real (posição em telas estreitas com o rastreador aberto).
+
+## 24. Plano mestre GOTY com agentes por área (4/nov/2026)
+
+**Pedido do Uwlo:** planejar minuciosamente como obter o GOTY, coordenando game design, direção de arte e roteiro com agentes por área.
+
+- **Plano mestre** (doc no celular, com tabela de decisões e status): https://claude.ai/artifact/78iip5uAYLwYKBHcbMV3vW. Planos completos das 5 áreas em `docs/plano-goty/` (ver o `README.md` de lá).
+- **Visão:** nome recomendado **FAROL** (CINZAS vira o nome do mundo); tagline "O Geiger não mente. O rádio, sim."; a interface nunca mente, os personagens sim; tela final **O QUE FOI DITO** no formato da Revelação do Modo Estudo.
+- **Datas:** fatia v0 até 10/jan/2027 → BIG Festival (15/jan, grátis); G1 até 28/fev → Tribeca (4/mar); Steam Next Fest de junho (registro até 25/abr); **GO/NO-GO 28/jun/2027**; **1.0 em 30/set/2027** (Steam, Google Play, web demo); TGA 2027 com corte ~19/nov.
+- **Regra de IA:** o Indie Game Awards retirou prêmios do Clair Obscur (dez/2025) por IA generativa; o Steam exige declaração. Texto, música e voz finais precisam ser humanos; arte procedural é código determinístico; declarar em público o uso de agentes na programação. Os textos-amostra de `docs/plano-goty/roteiro.md` são prova de tom, não texto final.
+- **Correções desta rodada:** áudio suspende com o app em segundo plano (`audio.ts`, e nada dispara com o contexto suspenso); ligaduras da Pixelify desligadas em todo elemento (`globals.css`, "ConAgurações").
+- **Antes de implementar as ondas:** esperar as decisões de 30/nov do Uwlo (Sinal e Ruído, escopo sem P2P, cor da radiação, dificuldade "Jornada"). A primeira coisa a fazer, decidido ou não: testar no celular real e com 5 estranhos.

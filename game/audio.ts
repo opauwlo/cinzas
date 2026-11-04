@@ -32,6 +32,9 @@ export async function iniciarAudio() {
     // reverb: ao ar livre = cauda longa e escura; dentro de casa = curta e clara (envios separados, trocados por ambiente())
     sendExt = c.createGain(); sendInt = c.createGain(); const rExt = c.createConvolver(), rInt = c.createConvolver(); rExt.buffer = respostaIR(1.7, 2.6, 0.55); rInt.buffer = respostaIR(0.5, 4.5, 0.9);
     bSfx.connect(sendExt).connect(rExt).connect(pre); bSfx.connect(sendInt).connect(rInt).connect(pre); sendExt.gain.value = 0.1; sendInt.gain.value = 0;
+    // app em segundo plano (tela apagada, outro app, menu, bolso): o som para de verdade e volta ao retornar
+    const visivel = () => { if (document.hidden) void c.suspend().catch(() => undefined); else void c.resume().catch(() => undefined); };
+    document.addEventListener('visibilitychange', visivel); window.addEventListener('pagehide', () => void c.suspend().catch(() => undefined));
     aplicarVolumes(); await c.resume(); ruidoBuf = criarRuido(); construirAmbiente(); geigerLoop(); batimentoLoop(); grilosLoop(); musicaLoop();
   } catch { ligado = false; }
 }
@@ -46,6 +49,14 @@ export function aplicarVolumes(v?: Partial<Ajustes & { vibra: boolean }>) {
   cadeia.comp.threshold.setTargetAtTime(p.comp[0], t, k); cadeia.comp.ratio.setTargetAtTime(p.comp[1], t, k); cadeia.comp.knee.setTargetAtTime(p.comp[2], t, k);
 }
 export const vibra = (p: number | number[]) => { if (!vibraOn) return; try { navigator.vibrate?.(p); } catch { /* sem háptico */ } };
+
+// ---------------------------------------------------------------- legendas visuais de som (acessibilidade: quem não ouve vê o que soou e de que lado)
+export type AvisoSom = { nome: string; cat: string; pan: number; vol: number };
+let avisoFn: ((a: AvisoSom) => void) | null = null;
+/** a HUD registra aqui para receber os sons que merecem legenda (vozes de criatura, tiro inimigo, alarme, trovão, dano…) */
+export const setAvisoVisual = (fn: ((a: AvisoSom) => void) | null) => { avisoFn = fn; };
+const CAT_VISIVEL = new Set(['voz', 'colosso', 'alerta']), NOME_VISIVEL = new Set(['tiro_inimigo', 'dano', 'porta', 'trovao']);
+const avisar = (nome: string, cat: string, pan: number, vol: number) => { if (avisoFn && (CAT_VISIVEL.has(cat) || NOME_VISIVEL.has(nome)) && vol >= 0.18) avisoFn({ nome, cat, pan, vol }); };
 
 function criarRuido() { const n = ctx!.sampleRate * 3, b = ctx!.createBuffer(1, n, ctx!.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; return b; }
 function fonteRuido(loop = true) { const s = ctx!.createBufferSource(); s.buffer = ruidoBuf; s.loop = loop; if (loop) s.loopStart = Math.random() * 2; return s; }
@@ -67,13 +78,14 @@ function duck(db: number, seg: number) {
 }
 /** toca um som já normalizado para o nível da sua categoria; `dist` (tiles) escurece o som de longe; `ui` usa o barramento da interface (sem reverb) */
 export function tocar(nome: Som, o: { vol?: number; pan?: number; rate?: number; dist?: number; ui?: boolean } = {}) {
-  if (!ctx || !z) return; const bs = buffers(nome); if (!bs.length) return;
+  if (!ctx || !z || ctx.state !== 'running') return; const bs = buffers(nome); if (!bs.length) return;
   const s = ctx.createBufferSource(); s.buffer = bs[(Math.random() * bs.length) | 0]; s.playbackRate.value = (o.rate ?? 1) * (0.94 + Math.random() * 0.12);
   const g = ctx.createGain(); g.gain.value = (o.vol ?? 1) * NIVEL_BASE; let no: AudioNode = s.connect(g);
   if (o.dist && o.dist > 3) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = Math.max(1400, 14000 * (1 - Math.min(1, o.dist / 26))); no = no.connect(f); }
   if (o.pan) no = no.connect(new StereoPannerNode(ctx, { pan: Math.max(-1, Math.min(1, o.pan)) }));
   no.connect(o.ui ? bUi : bSfx); s.start();
-  const dk = DUCK[catDe(nome)]; if (dk && (o.vol ?? 1) >= 0.5) duck(dk[0], dk[1]);
+  const cat = catDe(nome); if (!o.ui) avisar(nome, cat, o.pan ?? 0, o.vol ?? 1);
+  const dk = DUCK[cat]; if (dk && (o.vol ?? 1) >= 0.5) duck(dk[0], dk[1]);
 }
 /** volume por distância (em tiles) e pan pelo deslocamento horizontal em tela */
 export const aDist = (d: number) => Math.max(0, 1 - d / 22) ** 1.4;
@@ -97,12 +109,13 @@ export function ambiente(e: Partial<typeof estado>) {
   if (musica) { const noite = estado.hora < 6 || estado.hora >= 20; musica.g.gain.setTargetAtTime((0.07 + estado.perigo * 0.12 + (noite ? 0.04 : 0)), t, 1.2); musica.f.frequency.setTargetAtTime(180 + estado.perigo * 520, t, 1.5); }
 }
 export function trovao(atraso: number) {
-  if (!ctx) return; const c = ctx, t = c.currentTime + atraso, s = fonteRuido(false), f = c.createBiquadFilter(), g = c.createGain(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(90, t + 2.2);
+  if (!ctx || ctx.state !== 'running') return; const c = ctx, t = c.currentTime + atraso, s = fonteRuido(false), f = c.createBiquadFilter(), g = c.createGain(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(90, t + 2.2);
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.06); g.gain.exponentialRampToValueAtTime(0.01, t + 2.6); s.connect(f).connect(g).connect(bAmb); s.start(t, Math.random() * 1.5, 2.8); vibraEm(atraso, [60, 40, 90]);
+  setTimeout(() => avisar('trovao', 'alerta', 0, 1), atraso * 1000);
 }
 const vibraEm = (s: number, p: number[]) => setTimeout(() => vibra(p), s * 1000);
 function grilosLoop() { const passo = () => { if (!ligado) return; const noite = estado.hora < 6 || estado.hora >= 19.5, calmo = estado.chuva < 0.2 && estado.vento < 0.6 && !estado.interior; if (calmo && noite && ['ermo', 'floresta', 'pantano', 'base'].includes(estado.bioma)) { const n = 3 + ((Math.random() * 3) | 0); for (let i = 0; i < n; i++) setTimeout(() => tocar('grilo', { vol: 0.35, rate: 0.95 + Math.random() * 0.1 }), i * 70); } else if (calmo && !noite && estado.hora > 7 && Math.random() < 0.5 && estado.bioma !== 'industrial') tocar('passaro', { vol: 0.6, pan: Math.random() * 2 - 1, rate: 0.8 + Math.random() * 0.6 }); setTimeout(passo, 700 + Math.random() * 1800); }; passo(); }
-function musicaLoop() { const escala = [0, 3, 5, 7, 10, 12]; const passo = () => { if (!ligado) return; if (ctx && vol.mus > 0.02 && Math.random() < 0.7) { const n = 55 * Math.pow(2, escala[(Math.random() * escala.length) | 0] / 12) * (Math.random() < 0.5 ? 2 : 4), o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime; o.type = 'triangle'; o.frequency.value = n; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.08 + estado.perigo * 0.1, t + 0.04); g.gain.exponentialRampToValueAtTime(0.001, t + 2.4); o.connect(g).connect(bMus); o.start(t); o.stop(t + 2.6); } setTimeout(passo, 3500 + Math.random() * 7000 - estado.perigo * 2500); }; passo(); }
+function musicaLoop() { const escala = [0, 3, 5, 7, 10, 12]; const passo = () => { if (!ligado) return; if (ctx && ctx.state === 'running' && vol.mus > 0.02 && Math.random() < 0.7) { const n = 55 * Math.pow(2, escala[(Math.random() * escala.length) | 0] / 12) * (Math.random() < 0.5 ? 2 : 4), o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime; o.type = 'triangle'; o.frequency.value = n; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.08 + estado.perigo * 0.1, t + 0.04); g.gain.exponentialRampToValueAtTime(0.001, t + 2.4); o.connect(g).connect(bMus); o.start(t); o.stop(t + 2.6); } setTimeout(passo, 3500 + Math.random() * 7000 - estado.perigo * 2500); }; passo(); }
 export const setGeiger = (v: number) => { cpm = v; };
 function geigerLoop() { const passo = () => { if (!ligado) return; const taxa = Math.max(0.05, cpm / 60); if (cpm > 0) tocar('geiger', { vol: 0.4, rate: 0.9 + Math.random() * 0.3 }); setTimeout(passo, Math.min(4000, -Math.log(1 - Math.random()) / taxa * 1000)); }; passo(); }
 export const setBatimento = (b: boolean) => { batendo = b; };

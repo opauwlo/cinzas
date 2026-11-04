@@ -114,16 +114,22 @@ function Config() {
   const s = useJogo(), c = s.cfg, set = (k: keyof Configs, v: number | boolean | string) => { const n = { ...c, [k]: v } as Configs; useJogo.setState({ cfg: n }); gravarCfg(n); aplicarVolumes({ mestre: n.mestre, sfx: n.sfx, amb: n.amb, mus: n.mus, vibra: n.vibra, perfil: n.perfil, graves: n.graves, agudos: n.agudos }); };
   const eq = (k: 'graves' | 'agudos', nome: string) => <label className="slider">{nome}<input type="range" min={-6} max={6} step={1} value={c[k]} onChange={e => set(k, +e.target.value)} /><output>{c[k] > 0 ? '+' : ''}{c[k]}</output></label>;
   const sl = (k: 'mestre' | 'sfx' | 'amb' | 'mus', nome: string) => <label className="slider">{nome}<input type="range" min={0} max={1} step={0.05} value={c[k]} onChange={e => set(k, +e.target.value)} /><output>{Math.round(c[k] * 100)}</output></label>;
-  const tg = (k: 'vibra' | 'autoMira' | 'gore' | 'canhoto' | 'fps', nome: string) => <div className="troca"><span>{nome}</span><button className={`btn peq ${c[k] ? 'aviso' : ''}`} {...p(() => set(k, !c[k]))}>{c[k] ? 'Ligado' : 'Desligado'}</button></div>;
+  const tg = (k: 'vibra' | 'autoMira' | 'gore' | 'canhoto' | 'fps' | 'sonsVisuais' | 'menosEfeitos', nome: string) => <div className="troca"><span>{nome}</span><button className={`btn peq ${c[k] ? 'aviso' : ''}`} {...p(() => set(k, !c[k]))}>{c[k] ? 'Ligado' : 'Desligado'}</button></div>;
   return (
     <Cartao titulo="Configurações">
       <ProgressoLocal />
       <div className="card aco">{sl('mestre', 'Geral')}{sl('sfx', 'Efeitos')}{sl('amb', 'Ambiente')}{sl('mus', 'Música')}</div>
       <div className="card aco"><h3>Equalizador</h3><div className="troca"><span>Perfil de som</span><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{PERFIS_ORDEM.map(k => <button key={k} className={`btn peq ${c.perfil === k ? 'aviso' : ''}`} {...p(() => { set('perfil', k); sfx.teste(); })}>{PERFIS[k].nome}</button>)}</div></div><div className="mini">{PERFIS[c.perfil]?.desc}</div>{eq('graves', 'Graves (dB)')}{eq('agudos', 'Agudos (dB)')}<div className="troca"><span>Ouvir o resultado</span><button className="btn peq" {...p(() => sfx.teste())}>Testar som</button></div></div>
       <div className="card aco"><div className="troca"><span>Controle</span><div style={{ display: 'flex', gap: 5 }}>{([['toque', 'Uma mão'], ['manche', 'Duas mãos']] as const).map(([v, n]) => <button key={v} className={`btn peq ${c.controle === v ? 'aviso' : ''}`} {...p(() => set('controle', v))}>{n}</button>)}</div></div>{tg('vibra', 'Vibração')}{tg('autoMira', 'Mira automática')}{tg('gore', 'Sangue e membros')}{tg('canhoto', 'Modo canhoto')}{tg('fps', 'Mostrar FPS')}
-        <div className="troca"><span>Tamanho da interface</span><div style={{ display: 'flex', gap: 5 }}>{[0.85, 1, 1.2].map(v => <button key={v} className={`btn peq ${c.ui === v ? 'aviso' : ''}`} {...p(() => set('ui', v))}>{v === 0.85 ? 'P' : v === 1 ? 'M' : 'G'}</button>)}</div></div>
+        <div className="troca"><span>Tamanho da interface</span><div style={{ display: 'flex', gap: 5 }}>{[0.85, 1, 1.2, 1.4].map(v => <button key={v} className={`btn peq ${c.ui === v ? 'aviso' : ''}`} {...p(() => set('ui', v))}>{v === 0.85 ? 'P' : v === 1 ? 'M' : v === 1.2 ? 'G' : 'XG'}</button>)}</div></div>
         <div className="troca"><span>Densidade de pixels (aplica ao reabrir)</span><div style={{ display: 'flex', gap: 5 }}>{([[1, 'Ultra'], [1.5, 'Alta'], [2, 'Média'], [3, 'Leve']] as const).map(([v, n]) => <button key={v} className={`btn peq ${c.escala === v ? 'aviso' : ''}`} {...p(() => set('escala', v))}>{n}</button>)}</div></div>
         <div className="troca"><span>Tela cheia</span><button className="btn peq" {...p(() => { try { void document.documentElement.requestFullscreen?.(); } catch { /* */ } })}>Ativar</button></div>
+      </div>
+      <div className="card aco"><h3>Acessibilidade</h3>
+        {tg('sonsVisuais', 'Sons no visor')}
+        <div className="mini">Mostra em texto o que soou e de que lado: Geiger, coração, rosnados, tiros, alarme. Para quem não ouve ou joga sem som.</div>
+        {tg('menosEfeitos', 'Menos clarões e tremores')}
+        <div className="mini">Remove o tremor de câmera e os flashes de tela (fotossensibilidade e enjoo de movimento). O aviso de dano vira uma borda breve.</div>
       </div>
     </Cartao>
   );
