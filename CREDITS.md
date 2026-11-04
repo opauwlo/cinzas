@@ -35,3 +35,4 @@ Phaser (MIT), Box2D v3 (MIT), walloc (MIT), Trystero (MIT), @noble/secp256k1 (MI
 - web-vitals 6.2.3 (Apache-2.0, Google Chrome team): medição de INP (latência de toque) no diagnóstico `?diag=1`. Carregado só quando o Diag abre.
 - Telemetria (`game/lib/producao/`): fila local própria, desligada por padrão; se um dia houver servidor, será Umami (MIT) auto-hospedado, sem o script de rastreio dele.
 - Escuta (`game/lib/escuta/`): sem terceiros novos (usa alea, MIT, e as fontes VT323 e Pixelify Sans, OFL).
+- Texto (rascunho): lib de Narrativa (`game/lib/narrativa/`), sprint 1 — rascunho de IA, aguardando revisão e assinatura humana (ver `game/lib/narrativa/PEDIDO.md`). i18n próprio sobre `Intl.PluralRules` (nativo).

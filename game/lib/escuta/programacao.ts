@@ -34,7 +34,8 @@ export class ProgramacaoEscuta implements Programacao {
   fitaFarol(seed: string, dia: number, ato: number): Transmissao | null {
     const fitas = this.cat.filter(t => t.emissor === 'farol' && t.atos.includes(ato));
     if (!fitas.length) return null;
-    const ordem = new Rng(`${seed}|farol|${ato}`).embaralhar([...fitas]);
+    // ordem fixa do catálogo (farol-d1…d7): a semana gravada é a mesma para todos, e a Narrativa (caderno da Lia, tosse do dia 4) conta com ela
+    const ordem = fitas; void seed;
     return ordem[(((dia - 1) % LOOP_FAROL) + LOOP_FAROL) % LOOP_FAROL % ordem.length];
   }
 

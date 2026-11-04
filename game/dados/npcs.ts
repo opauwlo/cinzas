@@ -36,13 +36,13 @@ const DICA_OBJ: Record<string, string[]> = {
   fabricar: ['Madeira, sucata e tecido na bancada fazem milagre.', 'Fabrique alguma coisa: curativo é o melhor começo.'],
   noite: ['À noite eles ficam mais ativos. Durma no abrigo, ou fique perto de luz.', 'Aguente até o amanhecer e a gente conversa de novo.'],
   nivel3: ['Cada coisa que você faz te deixa mais esperto. Escolha bem as habilidades.'],
-  contrato: ['Abra o Diário: o rádio passa tarefa com pagamento.', 'Contrato cumprido é combustível e munição no bolso.'],
+  contrato: ['A Cida do PX passa serviço no rádio. Paga direito, e paga no abrigo.', 'Serviço feito é gasolina e bala no bolso.'],
   melhoria: ['Muralha forte afasta visita. Melhore o abrigo na bancada.'],
   explorar3: ['Já foi à Floresta? Tem caça e madeira de sobra.', 'Descubra mais lugares no mapa: cada um tem seu tipo de saque.'], explorar6: ['O Hospital guarda remédio e o Posto guarda combustível. Vá preparado.'],
-  comer: ['Não deixe a fome e a sede chegarem ao fim. Os atalhos de baixo usam água e comida.'], abater3: ['Deixe eles chegarem perto: seu personagem ataca sozinho.'], bichos: ['Cão, lobo, cervo, coelho: tudo vira carne. Leve uma faca para esfolar.'], cozinhar: ['Carne crua cozida na fogueira sacia o dobro.'], horta: ['Semente na horta rende legume em meio dia.'], machado: ['Madeira e sucata fazem um machado. Árvore vira lenha.'],
+  comer: ['Come antes de ter fome. Bebe antes de ter sede. Quem espera, cai.'], abater3: ['Deixa chegar perto. De longe eles parecem gente.'], bichos: ['Cão, lobo, cervo, coelho: tudo vira carne. Leve uma faca para esfolar.'], cozinhar: ['Carne crua cozida na fogueira sacia o dobro.'], horta: ['Semente na horta rende legume em meio dia.'], machado: ['Madeira e sucata fazem um machado. Árvore vira lenha.'],
   nivel5: ['No nível 5 abrem o Hospital e o Pântano. Suba de nível com contratos e abates.'], nivel7: ['No nível 7 a Refinaria abre. Cuidado com o Colosso.'], nivel8: ['Nível 8 e o rádio: aí o Abrigo 7 abre.'], gangue: ['Os acampamentos têm baú, mas os saqueadores atiram. Vá com vida cheia.'], contratos2: ['Contrato cumprido é combustível e munição no bolso.'],
   radio: ['Tem uma Torre de Rádio ao norte do mapa... dizem que ainda guarda um rádio de campanha.', 'Procure a Torre de Rádio. O sinal do Abrigo 7 sai de um aparelho daquele.'],
-  combustivel: ['Sem combustível, nem o Abrigo 7 você alcança. Junte oito.', 'Reservatório de água, posto, carro velho: combustível aparece onde menos se espera.'],
+  combustivel: ['Sem gasolina, nem o Abrigo 7 você alcança. Junta dez galões.', 'Caixa d\'água, posto, carro velho: gasolina aparece onde menos se espera.'],
   abrigo7: ['O sinal vem do norte. Boa viagem... e boa sorte.'],
 };
 const CLIMA: Record<string, string> = { chuva: 'Essa chuva não para.', tempestade: 'Tempestade feia. Fique longe de árvore alta.', neblina: 'Com essa neblina dá pra tropeçar em qualquer coisa.', poeira: 'Poeira pra todo lado... cubra o rosto.', acida: 'Chuva ácida! Procure abrigo.', vento: 'Esse vento anda zangado hoje.' };

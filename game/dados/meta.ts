@@ -98,8 +98,13 @@ export const DICAS_CARGA = [
   'Dormir no abrigo cura e passa a noite. Melhore a cama para curar mais.',
   'Colosso é lento, mas bate forte. Use o terreno e mantenha distância.',
 ];
-export const PASSOS_INTRO = [
+/** abertura antiga (substituída pela da lib de Narrativa, rascunho-ia) */
+export const PASSOS_INTRO_ANTIGA = [
   'O mundo acabou em luz. Cidades viraram cinza, e o que sobrou aprendeu a caçar.',
   'Você guarda um abrigo no meio do nada, um jipe com o tanque quase seco e um rádio que só chia.',
   'Saia, saqueie, volte vivo. Em algum lugar há um sinal apontando para o Abrigo 7 — a saída.',
 ];
+
+// abertura nova ("Deixa eu contar do começo."): lib de Narrativa, texto em rascunho até revisão humana
+import { telasAbertura, tradutor } from '../lib/narrativa';
+export const PASSOS_INTRO: string[] = telasAbertura(tradutor('pt', 'o'));
