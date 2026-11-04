@@ -9,3 +9,4 @@ vendor/src/
 .DS_Store
 tsconfig.tsbuildinfo
 dist-artifact/
+.claude/worktrees/
