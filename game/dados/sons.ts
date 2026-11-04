@@ -82,3 +82,11 @@ export const PERFIS: Record<Perfil, PerfilEq> = {
   noturno: { nome: 'Noturno', desc: 'Volume parelho: tiro não estoura e som baixo aparece.', hp: 60, grave: [140, -1], medio: [2200, -1.5, 0.8], agudo: [6500, -4], comp: [-28, 6, 12], trim: 0.8 },
 };
 export const PERFIS_ORDEM: Perfil[] = ['equilibrado', 'celular', 'fone', 'noturno'];
+
+// ---------------------------------------------------------------- trilha e batimento (lib/musica; plano de áudio §3.3 e P0 0.6)
+/** ganho do barramento de música por unidade do volume "Música": com o padrão 0,3, a exploração fica ~8–12 dB abaixo do tiro (gate G3, a medir) */
+export const ALVO_MUSICA = 0.55;
+/** intervalo do batimento (ms) pela vida (0..1): 900 ms com 30% ou mais, acelerando até 520 ms com 5% */
+export function intervaloBatimento(hp01: number): number {
+  const k = Math.max(0, Math.min(1, (0.3 - hp01) / 0.25)); return Math.round(900 - k * 380);
+}
