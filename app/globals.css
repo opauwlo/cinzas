@@ -356,3 +356,12 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 .catalogo-arte nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
 .catalogo-arte a { color: #d2c39c; min-height: 44px; padding: 10px; display: inline-flex; align-items: center; background: #252d1e; text-decoration: none; }
 .prancha-arte { width: 100%; max-width: 1000px; margin-inline: auto; overflow: auto; touch-action: pan-x pan-y; }
+
+/* ---- acessibilidade: legendas visuais de som e dano sem flash ---- */
+.sons-visuais { position: absolute; left: calc(8px + var(--sl)); top: 38%; display: grid; justify-items: start; gap: 4px; pointer-events: none !important; z-index: 6; max-width: 46vw; }
+.sv { display: inline-flex; align-items: center; gap: 5px; font: 600 calc(13px * var(--u))/1.2 var(--f-txt); padding: 4px 9px; background: rgba(8, 9, 8, .78); border: 1px solid #2c2f2a; animation: svpulsa 1s steps(2) infinite; }
+.sv.pontual { animation: svchega .22s steps(3) backwards; }
+@keyframes svpulsa { 0% { border-color: currentColor; } 50% { border-color: #2c2f2a; } }
+@keyframes svchega { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+.dano-flash.suave { background: none; animation: none; box-shadow: inset 0 0 0 4px rgba(176, 58, 44, .8); opacity: 0; animation: svsuave .4s steps(3) forwards; }
+@keyframes svsuave { from { opacity: 1; } to { opacity: 0; } }

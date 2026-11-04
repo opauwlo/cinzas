@@ -13,6 +13,7 @@ import { apagarRun } from './salvar';
 import type { Ent } from './ia';
 import { Rng } from '../lib/rng';
 import { cabeNaMochila, sincGrade, adicionar, remover, linhasDe, emGrade } from './grade';
+import { tremer, clarear } from './efeitos';
 import { EVENTOS_VIAGEM, type Ajuda, type EventoViagem } from '../dados/eventos';
 import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado, dif } from './progresso';
 import { tocarToque } from './toque';
@@ -41,8 +42,8 @@ export function iniciarAcao(c: Cena, rot: string, dur: number, fim: () => void, 
 export function ticarAcao(c: Cena, dt: number) {
   const a = c.acao; if (!a?.tipo) return; a.tk = (a.tk ?? 0) + dt; if (a.tk < (a.tipo === 'cortar' ? 0.45 : a.tipo === 'metal' ? 0.4 : 0.55)) return; a.tk = 0;
   const [sx, sy] = proj(a.x ?? c.jog.x, a.y ?? c.jog.y, 14);
-  if (a.tipo === 'cortar') { sfx.golpe(); c.part.emitir(5, sx, sy, 10, { vz: 26, esp: 36, g: 190, vida: 0.5, cor: [0x8a6a3a, 0xa88a5a, 0x6a4e28] }); c.cameras.main.shake(60, 0.0025); }
-  else if (a.tipo === 'metal') { sfx.acerto(false); c.part.faisca(sx, sy, 10, 5); c.cameras.main.shake(50, 0.002); }
+  if (a.tipo === 'cortar') { sfx.golpe(); c.part.emitir(5, sx, sy, 10, { vz: 26, esp: 36, g: 190, vida: 0.5, cor: [0x8a6a3a, 0xa88a5a, 0x6a4e28] }); tremer(c.cameras.main, 60, 0.0025); }
+  else if (a.tipo === 'metal') { sfx.acerto(false); c.part.faisca(sx, sy, 10, 5); tremer(c.cameras.main, 50, 0.002); }
   else if (a.tipo === 'agua') { sfx.beber(); c.part.emitir(3, sx, sy, 6, { vz: 16, esp: 14, g: 120, vida: 0.4, cor: [0x6fa6d6, 0x9ac0c8] }); }
   else { sfx.saque(); c.part.poeira(sx, sy, 3); }
 }
@@ -100,7 +101,7 @@ function concluirSaque(c: Cena, p: Prop, it: { feito?: boolean }) {
   const resto: string[] = []; let raro = false;
   for (const id of p.loot ?? []) { const x = ITENS[id]; if (!x) continue; if (x.tipo !== 'municao' && !cabe(id)) { resto.push(id); continue; } dar(c, id, 1); if (x.raridade === 'raro') raro = true; }
   if (resto.length) toast('Mochila cheia', '#c9561f'); p.loot = resto; if (!resto.length) { p.aberto = true; it.feito = true; c.ze.saqueados.push(p.id); acharPs(c, p)?.spr.setAlpha(0.8); }
-  c.s.vasculhados++; if (raro) { sfx.raro(); c.cameras.main.flash(220, 255, 225, 120); } else sfx.achado();
+  c.s.vasculhados++; if (raro) { sfx.raro(); clarear(c.cameras.main, 220, 255, 225, 120); } else sfx.achado();
   registrar(c, 'saque', 1, { zona: c.zona.id }); ganharXp(c, raro ? 9 : 3, false); if (pk(c.s, 'catador') && Math.random() < 0.25) dar(c, ['sucata', 'tecido', 'madeira', 'enlatado', 'bandagem'][Math.floor(Math.random() * 5)], 1); if (p.id >= 910000) airdropColetado(c);
 }
 /** cadáver revistável / esfolável */

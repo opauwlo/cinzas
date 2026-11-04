@@ -33,6 +33,7 @@ import { dif, pk, melNivel, ganharXp, registrar, tickProgresso } from './sistema
 import { MIN_POR_SEG, FOME_POR_MIN, SEDE_POR_MIN, DIF, REGEN_VIDA, VIDA_POR_NIVEL } from './dados/balanco';
 import { alvoHostis, escolherArq, tamanhoGrupo, intervaloSpawn, podeSpawnar, pontoSpawn, tensaoDecai, type CtxSpawn } from './sistemas/spawn';
 import { toqueNovo, passoToque, cancelarToque, desenharToque, toqueAtivo } from './sistemas/toque';
+import { clarear } from './sistemas/efeitos';
 
 export { MIN_POR_SEG };
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
@@ -89,7 +90,7 @@ export class Cena extends Phaser.Scene {
     this.zona.spawns = this.zona.spawns.filter(sp => !this.ze.abatidos.includes(sp.id));
     const manter = [0.6, 1, 1][dif(this.s)]; if (manter < 1) this.zona.spawns = this.zona.spawns.filter(sp => new Rng(`${this.s.seed}|grp|${loc.id}|${sp.grupo}`).f() < manter); /* Calmo: 40% dos grupos nem existem */
     this.clima = new Clima(this.s.seed + '|' + loc.id + '|' + Math.floor(this.s.minutos / 1440), this.bioma, this.s.minutos);
-    this.clima.aoRaio = atraso => { this.flashRaio = 1; this.cameras.main.flash(140, 235, 240, 255); trovao(atraso); };
+    this.clima.aoRaio = atraso => { this.flashRaio = 1; clarear(this.cameras.main, 140, 235, 240, 255); trovao(atraso); };
     this.part = new Particulas(); this.recToco = gerarFlora(new Rng('toco'), 'toco', ''); this.recColhida = gerarFlora(new Rng('colhida'), 'capim', '');
     // jogador (receita base fixa por seed)
     this.jogBase = gerarHumano(new Rng(this.s.seed + '|jogador'), 'sobrevivente');

@@ -13,12 +13,17 @@ export type Toast = { id: number; texto: string; cor: string };
 /** viagem de jipe em curso: a tela de estrada (components/Viagem.tsx) conduz; `fase` muda com o evento de estrada e a chegada */
 export type ViagemUI = { de: string; para: string; horas: number; comb: number; evento: boolean; fase: 'indo' | 'evento' | 'retomando' | 'chegando'; t0: number; hora: number; clima: string; seed: string };
 export type Resumo = { causa: string; dias: number; hora: string; abates: number; vasculhados: number; radMax: number; vitoria: boolean; distAbrigo: number; nivel?: number; contratos?: number; conquistas?: string[] };
-export type Configs = { mestre: number; sfx: number; amb: number; mus: number; vibra: boolean; ui: number; escala: number; v?: number; autoMira: boolean; gore: boolean; canhoto: boolean; fps: boolean; /** toque = uma mão (point & click) · manche = duas mãos (manche fixo + botão de ataque) */ controle: 'toque' | 'manche'; /** equalizador: perfil de som e ajuste de graves/agudos em dB */ perfil: Perfil; graves: number; agudos: number };
+export type Configs = { mestre: number; sfx: number; amb: number; mus: number; vibra: boolean; ui: number; escala: number; v?: number; autoMira: boolean; gore: boolean; canhoto: boolean; fps: boolean; /** toque = uma mão (point & click) · manche = duas mãos (manche fixo + botão de ataque) */ controle: 'toque' | 'manche'; /** equalizador: perfil de som e ajuste de graves/agudos em dB */ perfil: Perfil; graves: number; agudos: number; /** acessibilidade: legendas visuais de som (Geiger, vozes, tiros com direção) para quem não ouve */ sonsVisuais: boolean; /** acessibilidade: sem tremor de câmera nem clarão de tela (fotossensibilidade e enjoo de movimento) */ menosEfeitos: boolean };
 export type ClimaHud = { tipo: ClimaId; chuva: number; vento: number; neblina: number; poeira: number; nuvem: number };
 
-export const CFG0: Configs = { mestre: 0.6, sfx: 0.7, amb: 0.5, mus: 0.3, vibra: true, ui: 1, escala: 1, v: 4, autoMira: true, gore: true, canhoto: false, fps: false, controle: 'toque', perfil: 'equilibrado', graves: 0, agudos: 0 };
+export const CFG0: Configs = { mestre: 0.6, sfx: 0.7, amb: 0.5, mus: 0.3, vibra: true, ui: 1, escala: 1, v: 5, autoMira: true, gore: true, canhoto: false, fps: false, controle: 'toque', perfil: 'equilibrado', graves: 0, agudos: 0, sonsVisuais: false, menosEfeitos: false };
 export function lerCfg(): Configs {
-  try { const salvo = JSON.parse(localStorage.getItem('cinzas.cfg') ?? '{}'), c: Configs = { ...CFG0, ...salvo }; if ((salvo.v ?? 1) < 3) c.escala = CFG0.escala; if ((salvo.v ?? 1) < 4) { c.mestre = CFG0.mestre; c.sfx = CFG0.sfx; c.amb = CFG0.amb; c.mus = CFG0.mus; } c.v = 4; return c; } catch { return { ...CFG0 }; }
+  try {
+    const salvo = JSON.parse(localStorage.getItem('cinzas.cfg') ?? '{}'), c: Configs = { ...CFG0, ...salvo }; if ((salvo.v ?? 1) < 3) c.escala = CFG0.escala; if ((salvo.v ?? 1) < 4) { c.mestre = CFG0.mestre; c.sfx = CFG0.sfx; c.amb = CFG0.amb; c.mus = CFG0.mus; }
+    // v5: quem pediu menos movimento ao sistema (prefers-reduced-motion) começa sem tremor nem clarão
+    if ((salvo.v ?? 1) < 5 && salvo.menosEfeitos === undefined) { try { c.menosEfeitos = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { /* sem matchMedia */ } }
+    c.v = 5; return c;
+  } catch { return { ...CFG0 }; }
 }
 export function gravarCfg(c: Configs) { try { localStorage.setItem('cinzas.cfg', JSON.stringify(c)); } catch { /* sem storage */ } }
 

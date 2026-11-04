@@ -10,6 +10,7 @@ import { Rng } from '../lib/rng';
 import { avancarContratos, garantirContratos, progresso, pronto, temParaEntregar, type CtxEvento } from './contratos';
 import type { Run } from './salvar';
 import { sincGrade } from './grade';
+import { tremer, clarear } from './efeitos';
 
 export const pk = (s: { perks?: string[] }, id: string) => !!s.perks?.includes(id);
 export { xpNivel, DIF } from '../dados/balanco';
@@ -25,7 +26,7 @@ export function ganharXp(c: Cena, n: number, mostrar = true) {
   const s = c.s; n = Math.round(n * DIF.xp[dif(s)]); if (n <= 0) return; s.xp = (s.xp ?? 0) + n; s.nivel ??= 1;
   if (mostrar && n >= 5) c.texto(c.jog.x, c.jog.y - 1.1, `+${n} XP`, '#8fe36a');
   while (s.xp >= xpNivel(s.nivel)) {
-    s.xp -= xpNivel(s.nivel); s.nivel++; s.pontos = (s.pontos ?? 0) + 1; sfx.nivel(); c.cameras.main.flash(260, 143, 227, 106);
+    s.xp -= xpNivel(s.nivel); s.nivel++; s.pontos = (s.pontos ?? 0) + 1; sfx.nivel(); clarear(c.cameras.main, 260, 143, 227, 106);
     toast(`NÍVEL ${s.nivel}! Escolha uma habilidade`, '#8fe36a'); c.s.st!.niveis = s.nivel;
     const abre = [...LOCAIS.filter(l => l.nivel === s.nivel && l.id !== 'base').map(l => l.nome), ...RECEITAS.filter(r => (r.nivelJog ?? 1) === s.nivel).map(r => r.nome)]; if (abre.length) setTimeout(() => toast(`Liberado: ${abre.slice(0, 4).join(', ')}${abre.length > 4 ? '…' : ''}`, '#e0b83a'), 900);
   }
@@ -106,7 +107,7 @@ export function melhorar(c: Cena, id: string) {
   if (!podeMelhorar(id, nv)) { toast('Faltam materiais.', '#d9a02b'); sfx.ui('erro'); return; }
   const st = useJogo.getState(), inv = { ...st.inv }, bau = { ...st.bau };
   for (const [i, q] of cs) { let falta = q; const d = Math.min(falta, inv[i] ?? 0); inv[i] = (inv[i] ?? 0) - d; falta -= d; if (falta > 0) bau[i] = (bau[i] ?? 0) - falta; if (!inv[i]) delete inv[i]; if (!bau[i]) delete bau[i]; }
-  s.mel = { ...(s.mel ?? {}), [id]: nv + 1 }; s.inv = inv; s.bau = bau; useJogo.setState({ inv, bau, mel: { ...s.mel } }); sincGrade(); sfx.raro(); c.cameras.main.shake(180, 0.004);
+  s.mel = { ...(s.mel ?? {}), [id]: nv + 1 }; s.inv = inv; s.bau = bau; useJogo.setState({ inv, bau, mel: { ...s.mel } }); sincGrade(); sfx.raro(); tremer(c.cameras.main, 180, 0.004);
   toast(`${MELHORIAS.find(m => m.id === id)!.nome}: nível ${nv + 1}`, '#8fe36a'); ganharXp(c, 35); registrar(c, 'melhorias');
 }
 export { progresso, pronto, temParaEntregar };

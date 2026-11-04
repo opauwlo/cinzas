@@ -14,6 +14,7 @@ import { T, idx, dentro, W, H } from '../zona';
 import { mostrarCadaver } from './acoes';
 import { registrar, ganharXp, pk, DIF, dif } from './progresso';
 import { tensaoDano, tensaoAbate } from './spawn';
+import { tremer } from './efeitos';
 
 import type { Oferta, TipoNpc } from '../dados/npcs';
 export type NpcInfo = { tipo: TipoNpc; nome: string; casa: { x: number; y: number }; id: string; falou: boolean; ferido: boolean; estoque?: Oferta[]; rumores?: number };
@@ -42,7 +43,7 @@ const ehRanged = (e: Ent) => e.arq.ia === 'ranged' && ['pistola', 'escopeta', 'r
 export function machucarJogador(c: Cena, dano: number, sangra: number, de?: { x: number; y: number }) {
   if (c.morto) return; const st = useJogo.getState(), colete = st.inv.colete ? 0.75 : 1; dano *= colete * (pk(c.s, 'pele') ? 0.85 : 1) * DIF.dano[dif(c.s)]; c.s.hp -= dano; c.tensao = tensaoDano(c.tensao, dano); c.jog.dano = 0.22;
   if (Math.random() < sangra && !c.s.sangra) { c.s.sangra = true; st.toast('Você está sangrando', '#c9561f'); }
-  c.texto(c.jog.x, c.jog.y - 0.3, '-' + Math.round(dano), '#d9472b'); c.cameras.main.shake(140, 0.006); sfx.dano(); useJogo.setState({ danoTs: Date.now() });
+  c.texto(c.jog.x, c.jog.y - 0.3, '-' + Math.round(dano), '#d9472b'); tremer(c.cameras.main, 140, 0.006); sfx.dano(); useJogo.setState({ danoTs: Date.now() });
   if (st.cfg.gore) { const [px, py] = proj(c.jog.x, c.jog.y, 18), dx = de ? c.jog.x - de.x : 0, dy = de ? c.jog.y - de.y : 0, m = Math.hypot(dx, dy) || 1; c.part.sangue(px, py, 18, dx / m, dy / m, 5); }
   if (c.acao) { c.acao = null; st.toast('Interrompido', '#d9a02b'); }
   if (c.s.hp <= 0) c.morrer('Morto por criaturas do ermo');
@@ -82,12 +83,12 @@ export function atacarJogador(c: Cena) {
       if (alvo) { ferir(c, alvo, arma.dano * (pk(c.s, 'mira') ? 1.25 : 1), a); sfx.acerto(); c.hitstop = 0.04; }
     }
     c.flash = 0.14; const [fx, fy] = proj(J.x + Math.cos(J.ang) * 0.9, J.y + Math.sin(J.ang) * 0.9, 18); c.clarao.setPosition(Math.round(fx), Math.round(fy)).setVisible(true); const [px, py] = proj(J.x, J.y, 18); c.part.faisca(fx, fy, 14, 5); void px; void py;
-    sfx.tiro(arma.id); c.ruido(J.x, J.y, arma.ruido); c.cameras.main.shake(90, arma.id === 'escopeta' ? 0.007 : 0.004);
+    sfx.tiro(arma.id); c.ruido(J.x, J.y, arma.ruido); tremer(c.cameras.main, 90, arma.id === 'escopeta' ? 0.007 : 0.004);
   } else {
     if (c.s.stamina < arma.custo + 1) { c.cdAtaque = 0.6; return; } c.s.stamina -= arma.custo; c.cdAtaque = arma.cd; J.atk = J.atkDur = Math.min(0.34, arma.cd * 0.85); sfx.swing(); c.ruido(J.x, J.y, arma.ruido);
     const a0 = J.ang; c.time.delayedCall(J.atkDur * 0.45 * 1000, () => {
       let bateu = false; for (const e of c.ents) { if (!e.vivo || e.arq.ia === 'voo' || (auto && e.npc)) continue; const dx = e.x - J.x, dy = e.y - J.y, d = Math.hypot(dx, dy); if (d < arma.alcance + e.arq.raio && Math.abs(ang(Math.atan2(dy, dx) - a0)) < 1.0 && c.temLOS(J.x, J.y, e.x, e.y)) { ferir(c, e, arma.dano * (0.85 + Math.random() * 0.3) * (pk(c.s, 'forte') ? 1.25 : 1), a0, !!arma.corta); bateu = true; } }
-      if (bateu) { sfx.acerto(); c.hitstop = 0.055; c.cameras.main.shake(100, 0.005); }
+      if (bateu) { sfx.acerto(); c.hitstop = 0.055; tremer(c.cameras.main, 100, 0.005); }
     });
   }
 }
@@ -161,7 +162,7 @@ export function atualizarEnt(c: Cena, e: Ent, dt: number, noite: number) {
   if (!c.morto && e.estado === 'persegue' && dist < alc && e.cd <= 0 && e.atk <= 0) { iniciarAtaque(e, arq.ia === 'colosso' ? 0.9 : 0.45); e.cd = arq.cd; e.ang = Math.atan2(dy, dx); if (arq.ia === 'colosso') sfx.voz('colosso', dist, 0, 1); }
   if (e.atk > 0 && !e.atkOk && e.atk < e.atkDur * 0.5) {
     e.atkOk = true;
-    if (arq.ia === 'colosso') { c.cameras.main.shake(260, 0.012); const [px, py] = proj(e.x + Math.cos(e.ang) * 1.5, e.y + Math.sin(e.ang) * 1.5); c.part.poeira(px, py, 14); if (dist < 2.6) { machucarJogador(c, arq.dano * (0.8 + Math.random() * 0.4), 0.3, e); J.x += Math.cos(e.ang) * 0.4; J.y += Math.sin(e.ang) * 0.4; } }
+    if (arq.ia === 'colosso') { tremer(c.cameras.main, 260, 0.012); const [px, py] = proj(e.x + Math.cos(e.ang) * 1.5, e.y + Math.sin(e.ang) * 1.5); c.part.poeira(px, py, 14); if (dist < 2.6) { machucarJogador(c, arq.dano * (0.8 + Math.random() * 0.4), 0.3, e); J.x += Math.cos(e.ang) * 0.4; J.y += Math.sin(e.ang) * 0.4; } }
     else if (dist < alc * 1.5) machucarJogador(c, arq.dano * (0.8 + Math.random() * 0.4), arq.modelo === 'quad' ? 0.35 : arq.id === 'escorpiao' ? 0.5 : 0.08, e);
   }
 }

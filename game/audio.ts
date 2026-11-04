@@ -47,6 +47,14 @@ export function aplicarVolumes(v?: Partial<Ajustes & { vibra: boolean }>) {
 }
 export const vibra = (p: number | number[]) => { if (!vibraOn) return; try { navigator.vibrate?.(p); } catch { /* sem háptico */ } };
 
+// ---------------------------------------------------------------- legendas visuais de som (acessibilidade: quem não ouve vê o que soou e de que lado)
+export type AvisoSom = { nome: string; cat: string; pan: number; vol: number };
+let avisoFn: ((a: AvisoSom) => void) | null = null;
+/** a HUD registra aqui para receber os sons que merecem legenda (vozes de criatura, tiro inimigo, alarme, trovão, dano…) */
+export const setAvisoVisual = (fn: ((a: AvisoSom) => void) | null) => { avisoFn = fn; };
+const CAT_VISIVEL = new Set(['voz', 'colosso', 'alerta']), NOME_VISIVEL = new Set(['tiro_inimigo', 'dano', 'porta', 'trovao']);
+const avisar = (nome: string, cat: string, pan: number, vol: number) => { if (avisoFn && (CAT_VISIVEL.has(cat) || NOME_VISIVEL.has(nome)) && vol >= 0.18) avisoFn({ nome, cat, pan, vol }); };
+
 function criarRuido() { const n = ctx!.sampleRate * 3, b = ctx!.createBuffer(1, n, ctx!.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; return b; }
 function fonteRuido(loop = true) { const s = ctx!.createBufferSource(); s.buffer = ruidoBuf; s.loop = loop; if (loop) s.loopStart = Math.random() * 2; return s; }
 /** resposta ao impulso sintética: ruído estéreo que decai (decai = expoente), `brilho` = 1 é claro e perto de 0 é escuro */
@@ -73,7 +81,8 @@ export function tocar(nome: Som, o: { vol?: number; pan?: number; rate?: number;
   if (o.dist && o.dist > 3) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = Math.max(1400, 14000 * (1 - Math.min(1, o.dist / 26))); no = no.connect(f); }
   if (o.pan) no = no.connect(new StereoPannerNode(ctx, { pan: Math.max(-1, Math.min(1, o.pan)) }));
   no.connect(o.ui ? bUi : bSfx); s.start();
-  const dk = DUCK[catDe(nome)]; if (dk && (o.vol ?? 1) >= 0.5) duck(dk[0], dk[1]);
+  const cat = catDe(nome); if (!o.ui) avisar(nome, cat, o.pan ?? 0, o.vol ?? 1);
+  const dk = DUCK[cat]; if (dk && (o.vol ?? 1) >= 0.5) duck(dk[0], dk[1]);
 }
 /** volume por distância (em tiles) e pan pelo deslocamento horizontal em tela */
 export const aDist = (d: number) => Math.max(0, 1 - d / 22) ** 1.4;
@@ -99,6 +108,7 @@ export function ambiente(e: Partial<typeof estado>) {
 export function trovao(atraso: number) {
   if (!ctx) return; const c = ctx, t = c.currentTime + atraso, s = fonteRuido(false), f = c.createBiquadFilter(), g = c.createGain(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(90, t + 2.2);
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.06); g.gain.exponentialRampToValueAtTime(0.01, t + 2.6); s.connect(f).connect(g).connect(bAmb); s.start(t, Math.random() * 1.5, 2.8); vibraEm(atraso, [60, 40, 90]);
+  setTimeout(() => avisar('trovao', 'alerta', 0, 1), atraso * 1000);
 }
 const vibraEm = (s: number, p: number[]) => setTimeout(() => vibra(p), s * 1000);
 function grilosLoop() { const passo = () => { if (!ligado) return; const noite = estado.hora < 6 || estado.hora >= 19.5, calmo = estado.chuva < 0.2 && estado.vento < 0.6 && !estado.interior; if (calmo && noite && ['ermo', 'floresta', 'pantano', 'base'].includes(estado.bioma)) { const n = 3 + ((Math.random() * 3) | 0); for (let i = 0; i < n; i++) setTimeout(() => tocar('grilo', { vol: 0.35, rate: 0.95 + Math.random() * 0.1 }), i * 70); } else if (calmo && !noite && estado.hora > 7 && Math.random() < 0.5 && estado.bioma !== 'industrial') tocar('passaro', { vol: 0.6, pan: Math.random() * 2 - 1, rate: 0.8 + Math.random() * 0.6 }); setTimeout(passo, 700 + Math.random() * 1800); }; passo(); }
