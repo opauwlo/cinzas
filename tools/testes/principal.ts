@@ -25,9 +25,7 @@ import { TW, TH, CH } from '../../game/chao';
 import { VALOR, precoCompra, precoVenda } from '../../game/dados/balanco';
 import { GANGUE, TENSAO_LIMITE, alvoHostis, escolherArq, intervaloSpawn, noiteFator, pesosArq, podeSpawnar, pontoSpawn, tamanhoGrupo, tensaoAbate, tensaoDano, tensaoDecai, type CtxSpawn } from '../../game/sistemas/spawn';
 
-const casos: { nome: string; fn: () => void }[] = [];
-const teste = (nome: string, fn: () => void) => casos.push({ nome, fn });
-const entre = (v: number, a: number, b: number, rot: string) => assert.ok(v >= a && v <= b, `${rot}: ${v.toFixed(2)} fora de [${a}, ${b}]`);
+import { teste, entre } from './harness';
 const ctx = (o: Partial<CtxSpawn> = {}): CtxSpawn => ({ hora: 12, nivel: 1, dia: 2, dif: 1, interior: false, neblina: 0, chuva: 0, noBase: false, ...o });
 const HOSTIS_BASICOS = ['irradiado', 'corredor', 'rastejador', 'cao', 'lobo', 'javali', 'rato', 'barata', 'escorpiao', 'aranha'];
 
@@ -412,8 +410,4 @@ teste('vida no ar: taxas finitas, sem passar do teto, vagalumes só à noite e s
   assert.equal(seco('ermo', 0).poeira, 0, 'sem poeira em suspensão à noite'); assert.ok(seco('ermo', 1).poeira >= 3); assert.ok(seco('pantano', 1).esporo >= 1.5 && seco('floresta', 1).esporo >= 0.8, 'esporos de dia no Pântano e na Floresta');
 });
 
-// ================================================================ execução
-let falhas = 0; const t0 = Date.now();
-for (const c of casos) { try { c.fn(); console.log('  ok   ' + c.nome); } catch (e) { falhas++; console.log('  FALHA ' + c.nome + '\n        ' + String((e as Error).message).split('\n')[0]); } }
-console.log(`\n${casos.length - falhas}/${casos.length} testes passaram em ${((Date.now() - t0) / 1000).toFixed(1)} s.`);
-process.exitCode = falhas ? 1 : 0;
+// a execução fica em harness.ts: tools/testes.mjs junta este arquivo com os *.teste.ts das libs e chama rodar()

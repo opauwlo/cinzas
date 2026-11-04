@@ -34,6 +34,8 @@ import { MIN_POR_SEG, FOME_POR_MIN, SEDE_POR_MIN, DIF, REGEN_VIDA, VIDA_POR_NIVE
 import { alvoHostis, escolherArq, tamanhoGrupo, intervaloSpawn, podeSpawnar, pontoSpawn, tensaoDecai, type CtxSpawn } from './sistemas/spawn';
 import { toqueNovo, passoToque, cancelarToque, desenharToque, toqueAtivo } from './sistemas/toque';
 import { clarear } from './sistemas/efeitos';
+import { Nucleo, novoMundo, ventoDir, barramento } from './nucleo';
+import { OBJETIVOS as OBJS_ATO } from './dados/objetivos';
 
 export { MIN_POR_SEG };
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
@@ -57,6 +59,8 @@ export class Cena extends Phaser.Scene {
   gfx!: Phaser.GameObjects.Graphics; marca!: Phaser.GameObjects.Graphics; gChao!: Phaser.GameObjects.Graphics; gAr!: Phaser.GameObjects.Graphics;
   teclas!: Record<string, Phaser.Input.Keyboard.Key>; acao: { rotulo: string; dur: number; t: number; fim: () => void; ruido?: number; tipo?: string; tk?: number; x?: number; y?: number } | null = null;
   tracers: { x0: number; y0: number; x1: number; y1: number; t: number; cor: number }[] = []; aneis: { x: number; y: number; r: number; t: number }[] = [];
+  /** libs de área (radiação, escuta, música…) plugadas pelo núcleo; `mundo` é a fachada que elas leem */
+  nucleo = new Nucleo(); mundo = novoMundo(); minutoUlt = -1; private nucleoDe: Run | null = null;
   pronto = false; morto = false; vitoria = false; ambient = 1; hitstop = 0; cdAtaque = 0; tSync = 0; tAlvo = 0; tRuido = 0; tSpawn = 0; tPortas = 0; tCut = 0; tAmb = 0; tSave = 0; tSeg = 0; tFlora = 0; tDicas = 0; flashRaio = 0;
   camX = 0; camY = 0; pathBudget = 3; desktop = false; mouse = { x: 0, y: 0, ativo: false, baixo: false }; radSuave = 0; interior = false; alvoInter: Interativo | null = null; tapVisto = 0; esc = 2; fogW = 0; fogH = 0;
   evPend: import('./sistemas/acoes').EvPend | null = null;
@@ -157,6 +161,18 @@ export class Cena extends Phaser.Scene {
     this.events.once('shutdown', () => { ponte.cmd = null; this.scale.off('resize', this.aoRedimensionar); });
     this.pronto = true; useJogo.setState({ carga: 1 }); this.sincronizar(); this.salvar(); this.intro = 1; this.cameras.main.fadeIn(500, 5, 4, 6);
     if (loc.id !== 'base') useJogo.getState().toast('Chegada: ' + loc.nome, '#8fe36a'); this.verPois(); iniciarZona(this); popularNpcs(this);
+    if (this.nucleoDe !== this.s) { this.nucleo = new Nucleo(); this.nucleo.carregar(this.s.nucleo); this.nucleoDe = this.s; } /* mesma run trocando de zona: o estado em memória é o mais novo */
+    this.preencherMundo(); barramento.emit({ t: 'zona', zonaId: z.id, bioma: z.bioma, seed: this.s.seed }); this.nucleo.iniciar(this.mundo);
+  }
+  /** atualiza a fachada só-leitura que as libs de área recebem (game/nucleo/contratos.ts) */
+  preencherMundo() {
+    const m = this.mundo, s = this.s, z = this.zona, cl = this.clima, J = this.jog;
+    m.seed = s.seed; m.minutos = s.minutos; m.dia = Math.floor(s.minutos / 1440) + 1; m.hora = this.hora();
+    m.zona.id = z.id; m.zona.bioma = z.bioma; m.zona.w = W; m.zona.h = H; m.zona.tipos = z.tipos; m.zona.solido = z.solido; m.zona.opaco = z.opaco; m.zona.rad = z.rad;
+    if (J) { m.jogador.x = J.x; m.jogador.y = J.y; m.jogador.ang = J.ang; } m.jogador.hp = s.hp; m.jogador.maxHp = s.maxHp; m.jogador.furtivo = ponte.entrada.furtivo; m.jogador.mascara = s.mascara;
+    m.clima.tipo = cl.tipo; m.clima.chuva = cl.chuva; m.clima.vento = cl.vento; m.clima.ventoDir = ventoDir(s.seed, s.minutos); m.clima.neblina = cl.neblina; m.clima.poeira = cl.poeira; m.clima.acida = cl.acida;
+    m.interior = this.interior; m.perigo = Math.min(1, this.ents.filter(e => e.vivo && e.arq.hostil && e.estado === 'persegue').length / 4);
+    m.ato = OBJS_ATO[Math.min(s.objIdx, OBJS_ATO.length - 1)]?.ato ?? 1; m.dif = s.dif ?? 1;
   }
   fov!: InstanceType<typeof ROT.FOV.PreciseShadowcasting>; clarao!: Phaser.GameObjects.Image;
   /** coleta de itens soltos: é só passar por cima (se couber na mochila) */
@@ -264,14 +280,14 @@ export class Cena extends Phaser.Scene {
     this.tweens.add({ targets: o, y: o.y - 22, alpha: 0, duration: 800, ease: 'Cubic.easeOut', onComplete: () => o.destroy() });
   }
   ruido(x: number, y: number, raio: number) {
-    raio *= this.clima.ruidoMult; if (raio >= 5) this.aneis.push({ x, y, r: raio, t: 0 });
+    raio *= this.clima.ruidoMult; if (raio >= 5) this.aneis.push({ x, y, r: raio, t: 0 }); barramento.emit({ t: 'ruido', x, y, raio });
     for (const e of this.ents) { if (!e.vivo || e.estado === 'persegue' || !e.arq.hostil) continue; if (Math.hypot(e.x - x, e.y - y) < raio) { e.estado = 'investiga'; e.alvo = { x, y }; e.caminho = []; e.tCam = 0; } }
   }
   tom(a: number, noite: number) { const f = 1 - Math.min(1, a) * 0.94, r = Math.round(255 * f * (1 - 0.12 * noite)), g = Math.round(255 * f * (1 - 0.05 * noite)), b = Math.round(255 * f); return (r << 16) | (g << 8) | b; }
   tingir(r: Rastreado, noite: number) { const a = this.lmA[r.i], l = Math.round(a * 12); if (l === r.lvl) return; r.lvl = l; r.spr.setTint(this.tom(l / 12, noite)); }
   hora() { return (this.s.minutos % 1440) / 60; }
   superficie(t: number) { return t === T.MADEIRA || t === T.PORTA ? 'madeira' : t === T.AZULEJO ? 'azulejo' : t === T.METAL ? 'metal' : [T.ESTRADA, T.LINHA_H, T.LINHA_V, T.CALCADA, T.CONCRETO].includes(t as 1) ? 'concreto' : t === T.AREIA ? 'areia' : t === T.AGUA_RASA || t === T.LAMA ? 'agua' : 'terra'; }
-  salvar() { if (!this.pronto || this.morto || this.vitoria) return; const st = useJogo.getState(); this.s.inv = { ...st.inv }; this.s.bau = { ...st.bau }; this.s.grade = st.grade.map(g => ({ ...g })); const copia: Run = { ...this.s, px: this.jog?.x, py: this.jog?.y }; const ok = salvarRun(copia); useJogo.setState({ temSave: ok }); if (!ok) useJogo.getState().toast('Não foi possível salvar. Libere espaço ou exporte uma cópia em Configurações.', '#e38d6b'); }
+  salvar() { if (!this.pronto || this.morto || this.vitoria) return; const st = useJogo.getState(); this.s.inv = { ...st.inv }; this.s.bau = { ...st.bau }; this.s.grade = st.grade.map(g => ({ ...g })); this.s.nucleo = this.nucleo.salvar(); const copia: Run = { ...this.s, px: this.jog?.x, py: this.jog?.y }; const ok = salvarRun(copia); useJogo.setState({ temSave: ok }); if (!ok) useJogo.getState().toast('Não foi possível salvar. Libere espaço ou exporte uma cópia em Configurações.', '#e38d6b'); }
   dentroPredio(x: number, y: number) { return this.zona.predios.some(p => x > p.x && x < p.x + p.w - 1 && y > p.y && y < p.y + p.h - 1); }
 
   // ------------------------------------------------------------------ luz: cone de visão (rot.js) + pontilhado no chão + tingimento dos objetos
@@ -327,6 +343,7 @@ export class Cena extends Phaser.Scene {
     this.tPortas += dt; if (this.tPortas > 0.5) { this.tPortas = 0; for (const [i, d] of this.portas) if (d.aberta) { d.t += 0.5; const x = i % W, y = Math.floor(i / W); if (d.t > 4 && Math.hypot(x + 0.5 - J.x, y + 0.5 - J.y) > 6 && !this.ents.some(e => e.vivo && Math.hypot(e.x - x - 0.5, e.y - y - 0.5) < 1.2)) this.fecharPorta(i); } }
     this.tSync += dt; if (this.tSync > 0.1) { this.tSync = 0; this.sincronizar(); }
     this.tSave += dt; if (this.tSave > 30 && !this.morto) { this.tSave = 0; this.salvar(); }
+    if (!this.morto) { this.preencherMundo(); this.nucleo.tick(dt, this.mundo); const mi = Math.floor(s.minutos); if (mi !== this.minutoUlt) { this.minutoUlt = mi; barramento.emit({ t: 'minuto', minutos: mi }); } }
     this.tSeg += dt; if (this.tSeg > 1) { this.tSeg = 0; this.verPois(); this.dicas(); if (this.zona.id === 'base') tickHortas(this); tickProgresso(this); avancarObjetivos(this); tickNpcs(this); atualizarDiretor(this, 1); sincGrade(); }
   }
   separar() {

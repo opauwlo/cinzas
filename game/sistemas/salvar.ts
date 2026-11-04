@@ -17,6 +17,8 @@ export type Run = {
   // camada de progressão (opcionais para aceitar saves antigos; normalizarRun preenche)
   grade?: Peca[]; xp?: number; nivel?: number; pontos?: number; perks?: string[]; st?: Record<string, number>; contratos?: Contrato[]; nContratos?: number; mel?: Record<string, number>; dif?: number;
   traiu?: boolean; objVer?: number; saiuEm?: number; raidDia?: number; emboscada?: [string, number] | null; ultEv?: string;
+  /** estado dos módulos das libs de área (game/nucleo), chave = id do módulo */
+  nucleo?: Record<string, unknown>;
 };
 export function normalizarRun(r: Run): Run { r.grade ??= []; r.xp ??= 0; r.nivel ??= 1; r.pontos ??= 0; r.perks ??= []; r.st ??= {}; r.contratos ??= []; r.nContratos ??= 0; r.mel ??= {}; r.dif ??= 1; r.emboscada ??= null; return r; }
 export const novoZEstado = (): ZEstado => ({ saqueados: [], abatidos: [], cortadas: [], desmontados: [], rasgados: [], hortas: {}, coletados: [], colhidas: [], lidas: [], fontes: {}, ultima: 0, fogueiras: [], pois: [], esfolados: [] });
@@ -46,6 +48,7 @@ export function validarRun(valor: unknown): Run | null {
   for (const mapa of [r.st, r.mel]) if (mapa !== undefined && (!mapa || typeof mapa !== 'object' || Array.isArray(mapa) || !Object.values(mapa).every(n => Number.isFinite(n) && n >= 0))) return null;
   if (r.nivel !== undefined && (!Number.isSafeInteger(r.nivel) || r.nivel < 1 || r.nivel > 10000)) return null;
   if (r.dif !== undefined && ![0, 1, 2].includes(r.dif)) return null;
+  if (r.nucleo !== undefined && (!r.nucleo || typeof r.nucleo !== 'object' || Array.isArray(r.nucleo))) return null;
   return normalizarRun(r);
 }
 export function salvarRun(r: Run): boolean { try { localStorage.setItem(CHAVE, JSON.stringify(r)); return true; } catch { return false; } }

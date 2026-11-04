@@ -14,6 +14,7 @@ import type { Ent } from './ia';
 import { Rng } from '../lib/rng';
 import { cabeNaMochila, sincGrade, adicionar, remover, linhasDe, emGrade } from './grade';
 import { tremer, clarear } from './efeitos';
+import { barramento } from '../nucleo/barramento';
 import { EVENTOS_VIAGEM, type Ajuda, type EventoViagem } from '../dados/eventos';
 import { registrar, ganharXp, pk, melNivel, escolherPerk, receberContrato, melhorar, airdropColetado, dif } from './progresso';
 import { tocarToque } from './toque';
@@ -101,6 +102,7 @@ function concluirSaque(c: Cena, p: Prop, it: { feito?: boolean }) {
   const resto: string[] = []; let raro = false;
   for (const id of p.loot ?? []) { const x = ITENS[id]; if (!x) continue; if (x.tipo !== 'municao' && !cabe(id)) { resto.push(id); continue; } dar(c, id, 1); if (x.raridade === 'raro') raro = true; }
   if (resto.length) toast('Mochila cheia', '#c9561f'); p.loot = resto; if (!resto.length) { p.aberto = true; it.feito = true; c.ze.saqueados.push(p.id); acharPs(c, p)?.spr.setAlpha(0.8); }
+  barramento.emit({ t: 'saque', item: p.rec.n, q: 1, raro });
   c.s.vasculhados++; if (raro) { sfx.raro(); clarear(c.cameras.main, 220, 255, 225, 120); } else sfx.achado();
   registrar(c, 'saque', 1, { zona: c.zona.id }); ganharXp(c, raro ? 9 : 3, false); if (pk(c.s, 'catador') && Math.random() < 0.25) dar(c, ['sucata', 'tecido', 'madeira', 'enlatado', 'bandagem'][Math.floor(Math.random() * 5)], 1); if (p.id >= 910000) airdropColetado(c);
 }
@@ -224,7 +226,7 @@ function concluirViagem(c: Cena, dest: string, custo: Custo) {
   registrar(c, 'viagens'); registrar(c, 'visita', 1, { zona: dest });
   c.ze.ultima = c.s.minutos; c.s.inv = { ...st().inv }; c.s.bau = { ...st().bau };
   if (dest === 'abrigo7') { c.cameras.main.fadeOut(600, 5, 4, 6); c.time.delayedCall(700, () => executarVitoria(c)); return; }
-  c.salvar(); sfx.ui('ok'); c.cameras.main.fadeOut(450, 5, 4, 6);
+  barramento.emit({ t: 'viagem', de: cur, para: dest, fase: 'inicio' }); c.salvar(); sfx.ui('ok'); c.cameras.main.fadeOut(450, 5, 4, 6);
   c.time.delayedCall(500, () => { c.s.px = undefined; c.s.py = undefined; c.scene.restart({ run: c.s, zonaId: dest, esc: c.esc }); });
 }
 function dormir(c: Cena, horas: number) {
@@ -240,17 +242,17 @@ function desmaiar(c: Cena, causa: string) {
     for (const id of Object.keys(inv)) { if (id === 'radio' || id === s.arma || (ITENS[id]?.tipo === 'equip')) continue; const perde = Math.min(inv[id], Math.floor(inv[id] * 0.4) + (rng.chance(0.4) ? 1 : 0)); if (perde > 0) { inv[id] -= perde; if (inv[id] <= 0) delete inv[id]; } }
     useJogo.setState({ inv }); sincGrade(); s.inv = { ...st().inv }; s.bau = { ...st().bau };
     s.hp = Math.max(s.hp, s.maxHp * 0.6); s.fome = Math.max(s.fome, 40); s.sede = Math.max(s.sede, 40); s.sangra = false; s.rad = Math.max(0, s.rad - 30); s.minutos += 360; s.st = s.st ?? {}; s.st.desmaios = (s.st.desmaios ?? 0) + 1;
-    s.px = undefined; s.py = undefined; c.salvar(); toast(`Você desmaiou (${causa.toLowerCase()}) e acordou no abrigo. Perdeu parte da mochila.`, '#d9a02b');
+    s.px = undefined; s.py = undefined; s.nucleo = c.nucleo.salvar(); c.salvar(); toast(`Você desmaiou (${causa.toLowerCase()}) e acordou no abrigo. Perdeu parte da mochila.`, '#d9a02b');
     c.scene.restart({ run: c.s, zonaId: 'base', esc: c.esc });
   });
 }
 export function executarMorte(c: Cena, causa: string) {
-  if (c.morto) return; if (dif(c.s) === 0) { desmaiar(c, causa); return; } c.morto = true; sfx.morte(); c.iniciarMorte(); c.cameras.main.fadeOut(1100, 20, 0, 0); apagarRun(); useJogo.setState({ temSave: false });
+  if (c.morto) return; barramento.emit({ t: 'morte', causa }); if (dif(c.s) === 0) { desmaiar(c, causa); return; } c.morto = true; sfx.morte(); c.iniciarMorte(); c.cameras.main.fadeOut(1100, 20, 0, 0); apagarRun(); useJogo.setState({ temSave: false });
   const J = c.jog, dist = 0;
   c.time.delayedCall(1300, () => { c.sincronizar(); const dias = Math.floor(c.s.minutos / 1440) + 1; useJogo.setState({ resumo: { causa, dias, hora: horaStr(c.s.minutos), abates: c.s.abates, vasculhados: c.s.vasculhados, radMax: Math.round(c.s.radMax), vitoria: false, distAbrigo: dist + Math.round(Math.hypot(J.x - 48, J.y - 85) * 0) + 143, nivel: c.s.nivel, contratos: c.s.st?.contratos ?? 0, conquistas: [...c.novasConquistas] }, tela: 'morte', acao: null, painel: null }); });
 }
 export function executarVitoria(c: Cena) {
-  if (c.vitoria) return; c.vitoria = true; c.morto = true; registrar(c, 'vitoria'); sfx.vitoria(); apagarRun(); useJogo.setState({ temSave: false });
+  if (c.vitoria) return; barramento.emit({ t: 'vitoria' }); c.vitoria = true; c.morto = true; registrar(c, 'vitoria'); sfx.vitoria(); apagarRun(); useJogo.setState({ temSave: false });
   c.sincronizar(); const dias = Math.floor(c.s.minutos / 1440) + 1; useJogo.setState({ resumo: { causa: 'Chegou ao Abrigo 7', dias, hora: horaStr(c.s.minutos), abates: c.s.abates, vasculhados: c.s.vasculhados, radMax: Math.round(c.s.radMax), vitoria: true, distAbrigo: 0, nivel: c.s.nivel, contratos: c.s.st?.contratos ?? 0, conquistas: [...c.novasConquistas] }, tela: 'vitoria', acao: null, painel: null });
 }
 

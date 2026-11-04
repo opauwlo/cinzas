@@ -15,6 +15,7 @@ import { mostrarCadaver } from './acoes';
 import { registrar, ganharXp, pk, DIF, dif } from './progresso';
 import { tensaoDano, tensaoAbate } from './spawn';
 import { tremer } from './efeitos';
+import { barramento } from '../nucleo/barramento';
 
 import type { Oferta, TipoNpc } from '../dados/npcs';
 export type NpcInfo = { tipo: TipoNpc; nome: string; casa: { x: number; y: number }; id: string; falou: boolean; ferido: boolean; estoque?: Oferta[]; rumores?: number };
@@ -43,7 +44,7 @@ const ehRanged = (e: Ent) => e.arq.ia === 'ranged' && ['pistola', 'escopeta', 'r
 export function machucarJogador(c: Cena, dano: number, sangra: number, de?: { x: number; y: number }) {
   if (c.morto) return; const st = useJogo.getState(), colete = st.inv.colete ? 0.75 : 1; dano *= colete * (pk(c.s, 'pele') ? 0.85 : 1) * DIF.dano[dif(c.s)]; c.s.hp -= dano; c.tensao = tensaoDano(c.tensao, dano); c.jog.dano = 0.22;
   if (Math.random() < sangra && !c.s.sangra) { c.s.sangra = true; st.toast('Você está sangrando', '#c9561f'); }
-  c.texto(c.jog.x, c.jog.y - 0.3, '-' + Math.round(dano), '#d9472b'); tremer(c.cameras.main, 140, 0.006); sfx.dano(); useJogo.setState({ danoTs: Date.now() });
+  barramento.emit({ t: 'dano', quem: 'jogador', valor: dano }); c.texto(c.jog.x, c.jog.y - 0.3, '-' + Math.round(dano), '#d9472b'); tremer(c.cameras.main, 140, 0.006); sfx.dano(); useJogo.setState({ danoTs: Date.now() });
   if (st.cfg.gore) { const [px, py] = proj(c.jog.x, c.jog.y, 18), dx = de ? c.jog.x - de.x : 0, dy = de ? c.jog.y - de.y : 0, m = Math.hypot(dx, dy) || 1; c.part.sangue(px, py, 18, dx / m, dy / m, 5); }
   if (c.acao) { c.acao = null; st.toast('Interrompido', '#d9a02b'); }
   if (c.s.hp <= 0) c.morrer('Morto por criaturas do ermo');
@@ -61,7 +62,7 @@ export function ferir(c: Cena, e: Ent, dano: number, de: number, corta = false) 
   if (e.hp <= 0) matar(c, e);
 }
 function matar(c: Cena, e: Ent) {
-  e.vivo = false; e.estado = 'morto'; e.morrT = 0; e.atk = 0; c.s.abates++; c.tensao = tensaoAbate(c.tensao); if (e.sid !== null) c.ze.abatidos.push(e.sid);
+  e.vivo = false; e.estado = 'morto'; e.morrT = 0; e.atk = 0; c.s.abates++; barramento.emit({ t: 'abate', arq: e.arq.id, x: e.x, y: e.y }); c.tensao = tensaoAbate(c.tensao); if (e.sid !== null) c.ze.abatidos.push(e.sid);
   e.bolha?.destroy(); e.bolha = undefined; if (e.npc) { c.ze.npcMortos = [...(c.ze.npcMortos ?? []), e.npc.id]; c.s.traiu = true; c.s.abates--; }
   else registrar(c, 'abate', 1, { arq: e.arq.id }); if (e.arq.id === 'colosso') registrar(c, 'colossos'); if (e.arq.modelo === 'quad' && !e.npc) registrar(c, 'bichos'); if (['saqueador', 'filho', 'miliciano'].includes(e.arq.id)) registrar(c, 'gangue'); ganharXp(c, e.arq.xp, false);
   e.som.setAlpha(0); sfx.voz(e.arq.voz, 0, 0, 0.5); c.cadaveres.push(e); if (c.cadaveres.length > 40) { const o = c.cadaveres.shift()!; o.remover = true; o.spr.destroy(); o.som.destroy(); }
